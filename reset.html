@@ -128,66 +128,41 @@
       statusEl.textContent = msg;
     }
 
-    // Helper: parse "code" from either ?query or #hash
-    function getCodeFromUrl() {
-      const href = window.location.href;
-      const url = new URL(href);
-
-      // 1) Try ?code=... first
-      const searchCode = url.searchParams.get("code");
-      if (searchCode) return searchCode;
-
-      // 2) If not there, look in the hash: #access_token=...&type=...&code=...
-      if (url.hash && url.hash.length > 1) {
-        const hash = url.hash.substring(1); // remove leading '#'
-        const params = new URLSearchParams(hash);
-        const hashCode = params.get("code");
-        if (hashCode) return hashCode;
-      }
-
-      return null;
-    }
-
     async function main() {
       if (typeof supabase === "undefined") {
         setStatus("Error: Supabase library failed to load.");
         return;
       }
 
+      // Create client – in a browser, this will automatically
+      // detect the hash (#access_token=...) and set the session.
       supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-      const code = getCodeFromUrl();
-
-      if (!code) {
-        setStatus("Invalid or missing reset code. Please request a new reset email.");
-        return;
-      }
 
       setStatus("Verifying reset link…");
 
-      let exchangeResult;
+      let sessionResult;
       try {
-        exchangeResult = await supabaseClient.auth.exchangeCodeForSession(code);
+        sessionResult = await supabaseClient.auth.getSession();
       } catch (err) {
-        console.error("exchangeCodeForSession threw:", err);
+        console.error("getSession threw:", err);
         setStatus("This reset link is invalid or expired. Please request a new reset email.");
         return;
       }
 
-      const { data, error } = exchangeResult || {};
-
+      const { data, error } = sessionResult || {};
       if (error) {
-        console.error("exchangeCodeForSession error:", error);
+        console.error("getSession error:", error);
         setStatus("This reset link is invalid or expired. Please request a new reset email.");
         return;
       }
 
-      if (!data || !data.session) {
-        setStatus("Could not establish a session from this reset link. Please request a new reset email.");
+      const session = data && data.session;
+      if (!session) {
+        setStatus("This reset link is invalid or expired. Please request a new reset email.");
         return;
       }
 
-      // We now have a valid session, user is effectively logged in
+      // We now have a valid session from the hash
       setStatus("Link verified. Enter a new password below.");
       formContainer.style.display = "block";
 
@@ -201,9 +176,8 @@
         resetBtn.disabled = true;
         setStatus("Updating password…");
 
-        const { data: updateData, error: updateError } = await supabaseClient.auth.updateUser({
-          password: newPw,
-        });
+        const { data: updateData, error: updateError } =
+          await supabaseClient.auth.updateUser({ password: newPw });
 
         if (updateError) {
           console.error("updateUser error:", updateError);
