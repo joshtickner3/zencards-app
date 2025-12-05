@@ -1,0 +1,2661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <meta charset="UTF-8" />
+  <title>ZenCards — Hands-Free & Silent Flashcards</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(circle at top, #1f2937 0, #020617 55%);
+      color: #e5e7eb;
+      margin: 0;
+      padding: 1rem;
+      line-height: 1.5;
+    }
+    h1, h2, h3 {
+      margin: 0.5rem 0;
+    }
+
+    /* App header + logo */
+    .appHeader {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      margin-bottom: 0.15rem;
+    }
+    .logoMark {
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.9);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      background: radial-gradient(circle at 30% 0%, #22c55e 0, #22c55e22 45%, #020617 70%);
+      box-shadow: 0 8px 18px rgba(15,23,42,0.9);
+      color: #e5e7eb;
+      flex-shrink: 0;
+    }
+    .appTitle {
+      text-align: center;
+      font-size: 1.9rem;
+      letter-spacing: 0.04em;
+    }
+    .appSubtitle {
+      text-align: center;
+      font-size: 0.95rem;
+      color: #9ca3af;
+      margin-top: 0.15rem;
+      margin-bottom: 0.75rem;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .card {
+      background: #020617cc;
+      border-radius: 0.9rem;
+      padding: 1rem;
+      margin-top: 1rem;
+      border: 1px solid #1f2937;
+      box-shadow:
+        0 18px 35px rgba(0,0,0,0.55),
+        0 0 0 1px rgba(15,23,42,0.7);
+    }
+    label {
+      display: inline-block;
+      margin: 0.25rem 0;
+      font-size: 0.9rem;
+    }
+    input[type="text"], textarea, select, input[type="number"] {
+      width: 100%;
+      padding: 0.55rem 0.65rem;
+      border-radius: 0.6rem;
+      border: 1px solid #374151;
+      background: #020617;
+      color: #e5e7eb;
+      box-sizing: border-box;
+      font-size: 0.9rem;
+    }
+    input[type="text"]:focus,
+    textarea:focus,
+    select:focus,
+    input[type="number"]:focus {
+      outline: none;
+      border-color: #22c55e;
+      box-shadow: 0 0 0 1px rgba(34,197,94,0.35);
+    }
+    textarea {
+      min-height: 60px;
+    }
+    button {
+      margin: 0.25rem 0.25rem 0.25rem 0;
+      padding: 0.5rem 1.2rem;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      background: #10b981;
+      color: #020617;
+      font-weight: 600;
+      font-size: 0.95rem;
+      transition:
+        background 0.15s ease,
+        transform 0.08s ease,
+        box-shadow 0.12s ease;
+      box-shadow: 0 8px 18px rgba(16,185,129,0.28);
+    }
+    button:hover:not(:disabled) {
+      background: #22c55e;
+      transform: translateY(-1px);
+      box-shadow: 0 10px 22px rgba(34,197,94,0.35);
+    }
+    button:active:not(:disabled) {
+      transform: translateY(0);
+      box-shadow: 0 4px 10px rgba(15,23,42,0.6);
+    }
+    button.secondary {
+      background: #374151;
+      color: #e5e7eb;
+      box-shadow: none;
+    }
+    button.secondary:hover:not(:disabled) {
+      background: #4b5563;
+      box-shadow: 0 6px 14px rgba(15,23,42,0.65);
+    }
+    button.small {
+      padding: 0.25rem 0.7rem;
+      font-size: 0.8rem;
+    }
+    button:disabled {
+      background: #374151;
+      cursor: default;
+      box-shadow: none;
+      opacity: 0.7;
+    }
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+    }
+    .row > * {
+      flex: 1;
+      min-width: 0;
+    }
+    .inline {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      margin-right: 0.75rem;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      background: #1f2937;
+      font-size: 0.75rem;
+      margin-left: 0.25rem;
+    }
+    #status {
+      margin-top: 0.75rem;
+      font-size: 0.9rem;
+      color: #9ca3af;
+      min-height: 1.2em;
+    }
+    #cardsList {
+      max-height: 180px;
+      overflow-y: auto;
+      margin-top: 0.5rem;
+      border-top: 1px solid #111827;
+      padding-top: 0.5rem;
+    }
+    .cardRow {
+      padding: 0.35rem 0;
+      border-bottom: 1px solid #020617;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+    }
+    .cardRow span {
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #e5e7eb;
+    }
+    .cardRow:hover span {
+      color: #a5b4fc;
+    }
+    .hidden {
+      display: none;
+    }
+    #studySection {
+      margin-top: 1rem;
+    }
+    /* Shared visual style for both silent + voice question/answer blocks */
+    #silentQuestion, #silentAnswer, #voiceQuestion, #voiceAnswer {
+      margin-top: 0.75rem;
+      padding: 0.75rem;
+      background: #020617;
+      border-radius: 0.6rem;
+      min-height: 3rem;
+      border: 1px solid #1f2937;
+    }
+    #modeBadge {
+      font-size: 0.8rem;
+      margin-left: 0.5rem;
+    }
+    .dueHint {
+      display: block;
+      font-size: 0.75rem;
+      color: #9ca3af;
+      margin-bottom: 0.35rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="appHeader">
+      <div class="logoMark">Z</div>
+      <h1 class="appTitle">ZenCards</h1>
+    </div>
+    <p class="appSubtitle">Hands-free & silent spaced&nbsp;repetition flashcards</p>
+
+    <!-- ========== MAIN SETTINGS / MENU ========== -->
+    <div id="mainMenu" class="card">
+      <h2>Main Menu</h2>
+
+      <!-- Deck controls -->
+      <div class="card">
+        <h3>Decks</h3>
+        <div class="row">
+          <div>
+            <label for="deckSelect">Select deck:</label>
+            <select id="deckSelect"></select>
+          </div>
+          <div>
+            <label for="newDeckName">New deck name:</label>
+            <input id="newDeckName" type="text" placeholder="e.g. MCAT Bio, Anatomy, etc." />
+          </div>
+          <div style="flex:0 0 auto;">
+            <button id="addDeckBtn">Add Deck</button>
+            <!-- Delete deck button -->
+            <button id="deleteDeckBtn" class="secondary">Delete Deck</button>
+          </div>
+        </div>
+        <!-- Legend for counts -->
+        <p style="font-size:0.8rem;color:#9ca3af;margin-top:0.35rem;">
+          Legend: <em>Deck name (new / review ≤ level 5 / mature &gt; level 5)</em>
+        </p>
+      </div>
+
+      <!-- Card editor / viewer -->
+      <div class="card">
+        <h3>Cards (Viewer & Editor)</h3>
+        <div class="row">
+          <div>
+            <label for="cardQuestion">Question:</label>
+            <textarea id="cardQuestion" placeholder="Enter question"></textarea>
+          </div>
+          <div>
+            <label for="cardAnswer">Answer:</label>
+            <textarea id="cardAnswer" placeholder="Enter answer"></textarea>
+          </div>
+        </div>
+        <div class="row">
+          <div style="flex:0 0 auto;">
+            <button id="addCardBtn">Add Card</button>
+            <button id="updateCardBtn" class="secondary" disabled>Update Selected Card</button>
+          </div>
+          <div>
+            <span id="selectedCardInfo" style="font-size:0.85rem;color:#9ca3af;"></span>
+          </div>
+        </div>
+        <div id="cardsList"></div>
+        <!-- NEW: Import from Anki block -->
+        <div style="margin-top:0.75rem;border-top:1px solid #111827;padding-top:0.5rem;">
+          <label for="ankiImport" style="display:block;margin-bottom:0.25rem;">
+            Import from Anki (TSV export):
+          </label>
+          <input id="ankiImport" type="file" accept=".txt,.tsv,.csv" />
+          <button id="ankiImportHelpBtn" class="secondary small" type="button">How?</button>
+          <span id="ankiImportStatus" style="font-size:0.8rem;color:#9ca3af;margin-left:0.5rem;"></span>
+        </div>
+      </div>
+
+      <!-- Study options -->
+      <div class="card">
+        <h3>Study Options</h3>
+        <div>
+          <label class="inline">
+            <input type="checkbox" id="skipInstructionsAfterFirst" checked />
+            Skip detailed difficulty instructions after first card
+          </label>
+        </div>
+        <!-- Automatic mode -->
+        <div>
+          <label class="inline">
+            <input type="checkbox" id="autoGoodToggle" />
+            Can't give voice commands? Enable automatic mode so each card is assigned
+            <select id="autoRatingSelect" style="width:auto;min-width:120px;">
+              <option value="again">Again</option>
+              <option value="hard">Hard</option>
+              <option value="good" selected>Good</option>
+              <option value="easy">Easy</option>
+              <option value="tomorrow">Show again tomorrow</option>
+            </select>
+            rating automatically
+            <span class="badge">New</span>
+          </label>
+        </div>
+        <div style="margin-top:0.5rem;">
+          <strong>Hands-free answer behavior:</strong>
+          <div class="row" style="margin-top:0.25rem;">
+            <div class="inline">
+              <input type="radio" name="answerMode" id="answerModeDelay" value="delay" checked />
+              <label for="answerModeDelay">Wait</label>
+              <input type="number" id="answerDelaySeconds" min="1" max="60" value="4" style="width:60px;" />
+              <span>seconds before answer</span>
+            </div>
+            <div class="inline">
+              <input type="radio" name="answerMode" id="answerModeVoice" value="voice" />
+              <label for="answerModeVoice">Play answer after I speak</label>
+            </div>
+          </div>
+        </div>
+        <!-- NEW: study-ahead answer gap control -->
+        <div style="margin-top:0.5rem;">
+          <label class="inline" for="studyAheadGapSeconds">
+            Study-ahead: delay after answer before next question
+          </label>
+          <input type="number" id="studyAheadGapSeconds" min="1" max="60" value="4" style="width:60px;" />
+          <span>seconds</span>
+        </div>
+      </div>
+
+      <!-- NEW: Audio & Voice Settings (collapsible section) -->
+      <div class="card">
+        <div class="row" style="justify-content:space-between;align-items:center;">
+          <h3>Audio &amp; Voice Settings</h3>
+          <div style="flex:0 0 auto;text-align:right;">
+            <button id="toggleAudioSettingsBtn" class="secondary small" type="button">Show</button>
+          </div>
+        </div>
+        <div id="audioSettingsPanel" class="hidden" style="margin-top:0.5rem;">
+          <div>
+            <label for="ttsRateInput">
+              TTS speed (0.5 = slower, 1.0 = normal, 2.0 = faster)
+            </label>
+            <input
+              type="number"
+              id="ttsRateInput"
+              min="0.5"
+              max="2"
+              step="0.1"
+              value="1.0"
+            />
+          </div>
+          <div style="margin-top:0.5rem;">
+            <label for="ttsVolumeInput">
+              TTS volume (0 = mute, 1 = max)
+            </label>
+            <input
+              type="number"
+              id="ttsVolumeInput"
+              min="0"
+              max="1"
+              step="0.05"
+              value="1.0"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Study mode buttons -->
+      <div class="card">
+        <h3>Start Studying</h3>
+        <div class="row">
+          <button id="startVoiceBtn">Start Hands-Free Study</button>
+          <button id="startSilentBtn" class="secondary">Start Silent Study</button>
+        </div>
+        <p style="font-size:0.85rem;color:#9ca3af;margin-top:0.5rem;">
+          Voice commands (hands-free): "again", "hard", "good", "easy", "next",
+          "repeat question", "repeat answer", "pause study session",
+          "resume study session", "go to the main menu".
+        </p>
+      </div>
+    </div>
+
+    <!-- ========== STUDY SECTION ========== -->
+    <div id="studySection" class="card hidden">
+      <div class="row" style="justify-content:space-between;">
+        <h2>
+          Study Session
+          <span id="modeBadge" class="badge"></span>
+        </h2>
+        <div>
+          <button id="backToMenuBtn" class="secondary small">Main Menu</button>
+          <button id="pauseBtn" class="secondary small">Pause</button>
+          <button id="resumeBtn" class="secondary small" disabled>Resume</button>
+        </div>
+      </div>
+      <div id="status"></div>
+
+      <!-- Voice mode UI (visual front/back during hands-free) -->
+      <div id="voiceUI" class="hidden">
+        <div id="voiceQuestion">
+          <strong>Question:</strong> <span id="voiceQuestionText"></span>
+        </div>
+        <div id="voiceAnswer" class="hidden">
+          <strong>Answer:</strong> <span id="voiceAnswerText"></span>
+        </div>
+
+        <!-- Inline edit for voice mode -->
+        <div style="margin-top:0.5rem;">
+          <button id="voiceEditToggleBtn" class="secondary small">Edit Card</button>
+        </div>
+        <div id="voiceEditPanel" class="hidden" style="margin-top:0.75rem;">
+          <label for="voiceEditQuestion">Edit question:</label>
+          <textarea id="voiceEditQuestion"></textarea>
+          <label for="voiceEditAnswer">Edit answer:</label>
+          <textarea id="voiceEditAnswer"></textarea>
+          <div style="margin-top:0.5rem;">
+            <button id="voiceSaveEditBtn">Save</button>
+            <button id="voiceCancelEditBtn" class="secondary">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Silent mode UI -->
+      <div id="silentUI" class="hidden">
+        <div id="silentQuestion">
+          <strong>Question:</strong> <span id="silentQuestionText"></span>
+        </div>
+        <div id="silentAnswer" class="hidden">
+          <strong>Answer:</strong> <span id="silentAnswerText"></span>
+        </div>
+
+        <!-- Inline edit for silent mode -->
+        <div style="margin-top:0.5rem;">
+          <button id="silentEditToggleBtn" class="secondary small">Edit Card</button>
+        </div>
+        <div id="silentEditPanel" class="hidden" style="margin-top:0.75rem;">
+          <label for="silentEditQuestion">Edit question:</label>
+          <textarea id="silentEditQuestion"></textarea>
+          <label for="silentEditAnswer">Edit answer:</label>
+          <textarea id="silentEditAnswer"></textarea>
+          <div style="margin-top:0.5rem;">
+            <button id="silentSaveEditBtn">Save</button>
+            <button id="silentCancelEditBtn" class="secondary">Cancel</button>
+          </div>
+        </div>
+
+        <div style="margin-top:0.75rem;">
+          <button id="showAnswerBtn">Show Answer</button>
+          <!-- next card button for silent study-ahead -->
+          <button id="silentNextCardBtn" class="secondary hidden">Next Card</button>
+        </div>
+        <div id="silentRatingButtons" class="hidden" style="margin-top:0.5rem;">
+          <span>How was that?</span><br />
+          <div>
+            <button data-rating="again">Again</button>
+            <span id="hint-again" class="dueHint"></span>
+          </div>
+          <div>
+            <button data-rating="hard">Hard</button>
+            <span id="hint-hard" class="dueHint"></span>
+          </div>
+          <div>
+            <button data-rating="good">Good</button>
+            <span id="hint-good" class="dueHint"></span>
+          </div>
+          <div>
+            <button data-rating="easy">Easy</button>
+            <span id="hint-easy" class="dueHint"></span>
+          </div>
+        </div>
+        <!-- Completion controls for silent mode -->
+        <div id="silentCompletionControls" class="hidden" style="margin-top:0.75rem;">
+          <button id="silentMainMenuBtn">Main Menu</button>
+          <button id="silentStudyAheadBtn" class="secondary">Study Ahead in this Deck</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ===================== SUPABASE CONFIG =====================
+const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";  
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
+
+// Create the Supabase client
+let supabaseClient = null;
+
+if (typeof supabase !== "undefined") {
+  supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  console.log("Supabase client initialized");
+} else {
+  console.error("Supabase library not loaded — check CDN script in <head>.");
+}
+
+    // ===================== DATA & STORAGE =====================
+    let decks = [];
+    // schedule[deckId_cardId] = {
+    //   phase: "ladder" | "mature1" | "mature2",
+    //   level: 1..5 (only for ladder),
+    //   intervalMinutes: number,
+    //   timesGraduated: number,
+    //   dueTime: ms since epoch
+    // }
+    let schedule = {};
+
+    const MINUTES_PER_DAY = 1440;
+    const LADDER_LEVEL_MINUTES = {
+      1: 5,                 // level 1: ~5 minutes
+      2: 10,                // level 2: 10 minutes
+      3: 1 * MINUTES_PER_DAY,   // 1 day
+      4: 3 * MINUTES_PER_DAY,   // 3 days
+      5: 7 * MINUTES_PER_DAY    // 7 days
+    };
+
+    // threshold for "show again in this session" behavior
+    const SHORT_REVIEW_THRESHOLD_MINUTES = 10;
+
+    function loadFromStorage() {
+      try {
+        const d = localStorage.getItem("srsDecks");
+        decks = d ? JSON.parse(d) : [];
+      } catch (_) {
+        decks = [];
+      }
+      if (!Array.isArray(decks)) decks = [];
+      if (decks.length === 0) {
+        // default deck
+        decks = [{
+          id: "deck1",
+          name: "Sample Deck",
+          cards: [
+            { id: "c1", question: "What does DOMS stand for?", answer: "Delayed onset muscle soreness." },
+            { id: "c2", question: "In a dumbbell incline press, what area of the chest is emphasized?", answer: "The upper chest, especially the clavicular head of the pectoralis major." }
+          ]
+        }];
+      }
+
+      try {
+        const s = localStorage.getItem("srsSchedule");
+        schedule = s ? JSON.parse(s) : {};
+      } catch (_) {
+        schedule = {};
+      }
+      if (typeof schedule !== "object" || schedule === null) schedule = {};
+    }
+
+    function saveDecks() {
+  localStorage.setItem("srsDecks", JSON.stringify(decks));
+  // Also sync to Supabase (fire and forget)
+  saveStateToSupabase();
+}
+
+function saveSchedule() {
+  localStorage.setItem("srsSchedule", JSON.stringify(schedule));
+  // Also sync to Supabase (fire and forget)
+  saveStateToSupabase();
+}
+
+// ===================== SUPABASE SYNC HELPERS =====================
+async function saveStateToSupabase() {
+  if (!supabaseClient) return;
+
+  const payload = {
+    decks,
+    schedule,
+  };
+
+  try {
+    const { error } = await supabaseClient
+      .from("zencards_state")
+      .upsert({
+        id: "default",          // single row for this user/browser
+        state_json: payload,
+      });
+
+    if (error) {
+      console.error("Supabase save error:", error);
+    } else {
+      console.log("Supabase state saved.");
+    }
+  } catch (err) {
+    console.error("Supabase save exception:", err);
+  }
+}
+
+async function loadStateFromSupabase() {
+  if (!supabaseClient) return;
+
+  try {
+    const { data, error } = await supabaseClient
+      .from("zencards_state")
+      .select("state_json")
+      .eq("id", "default")
+      .limit(1);
+
+    if (error) {
+      console.error("Supabase load error:", error);
+      return;
+    }
+
+    if (data && data.length > 0 && data[0].state_json) {
+      const remote = data[0].state_json;
+
+      if (remote.decks && Array.isArray(remote.decks)) {
+        decks = remote.decks;
+      }
+      if (remote.schedule && typeof remote.schedule === "object") {
+        schedule = remote.schedule;
+      }
+
+      console.log("Loaded state from Supabase.");
+    } else {
+      // No row yet — push our current local state up once
+      console.log("No Supabase state yet; saving initial local state.");
+      await saveStateToSupabase();
+    }
+  } catch (err) {
+    console.error("Supabase load exception:", err);
+  }
+}
+
+    function scheduleKey(deckId, cardId) {
+      return `${deckId}_${cardId}`;
+    }
+
+    // NEW: simple Fisher-Yates shuffle helper (returns a new array)
+    function shuffleArray(arr) {
+      const a = arr.slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = a[i];
+        a[i] = a[j];
+        a[j] = tmp;
+      }
+      return a;
+    }
+
+    // Normalize old/new schedule entries into our new shape
+    function normalizeScheduleEntry(raw) {
+      const now = Date.now();
+      if (!raw || typeof raw !== "object") {
+        return {
+          phase: "ladder",
+          level: 1,
+          intervalMinutes: LADDER_LEVEL_MINUTES[1],
+          timesGraduated: 0,
+          dueTime: now
+        };
+      }
+      let phase = raw.phase || "ladder";
+      let level = typeof raw.level === "number" ? raw.level : 1;
+      let timesGraduated =
+        typeof raw.timesGraduated === "number" ? raw.timesGraduated : 0;
+      let intervalMinutes =
+        typeof raw.intervalMinutes === "number" && raw.intervalMinutes > 0
+          ? raw.intervalMinutes
+          : (LADDER_LEVEL_MINUTES[level] || LADDER_LEVEL_MINUTES[1]);
+
+      let dueTime;
+      if (typeof raw.dueTime === "number") {
+        dueTime = raw.dueTime;
+      } else if (raw.dueDate) {
+        const t = Date.parse(raw.dueDate);
+        dueTime = isNaN(t) ? now : t;
+      } else {
+        dueTime = now;
+      }
+
+      return { phase, level, intervalMinutes, timesGraduated, dueTime };
+    }
+
+    // Core scheduling logic implementing your rules
+    function computeNextState(entry, ratingKey) {
+      const s = normalizeScheduleEntry(entry);
+      const result = { ...s };
+
+      // "again" always: reset to level 1, ladder, 5 minutes
+      if (ratingKey === "again") {
+        result.phase = "ladder";
+        result.level = 1;
+        result.intervalMinutes = LADDER_LEVEL_MINUTES[1];
+        // keep timesGraduated so we know if it was ever mature before
+        return result;
+      }
+
+      // Ladder phase: 5 levels
+      if (s.phase === "ladder") {
+        let lvl = s.level || 1;
+
+        if (ratingKey === "hard") {
+          // Stay on same level, same interval as that level
+          result.level = lvl;
+          result.intervalMinutes = LADDER_LEVEL_MINUTES[lvl];
+          return result;
+        }
+
+        if (ratingKey === "good" || ratingKey === "easy") {
+          const jump = ratingKey === "good" ? 1 : 2;
+          let target = lvl + jump;
+
+          // Still within ladder (1–5)
+          if (target <= 5) {
+            result.level = target;
+            result.intervalMinutes = LADDER_LEVEL_MINUTES[target];
+            return result;
+          }
+
+          // We are "past level 5" -> enter mature phase
+          const prevInterval = LADDER_LEVEL_MINUTES[lvl];
+          const alreadyGraduated = (s.timesGraduated || 0) > 0;
+
+          result.level = 0;
+          result.phase = alreadyGraduated ? "mature2" : "mature1";
+          result.timesGraduated = (s.timesGraduated || 0) + 1;
+
+          if (result.phase === "mature1") {
+            // First time past level 5:
+            // hard: 1x, good: 1.75x, easy: 2.5x
+            if (ratingKey === "good") {
+              result.intervalMinutes = prevInterval * 1.75;
+            } else {
+              // easy from level 5 into mature1
+              result.intervalMinutes = prevInterval * 2.5;
+            }
+          } else {
+            // mature2 = after you've already been mature before,
+            // passed through the ladder again and gone past level 5:
+            // hard: 1.2x, good: 2x, easy: 2.5x
+            const base = prevInterval;
+            if (ratingKey === "hard") {
+              result.intervalMinutes = base * 1.2;
+            } else if (ratingKey === "good") {
+              result.intervalMinutes = base * 2.0;
+            } else {
+              result.intervalMinutes = base * 2.5;
+            }
+          }
+
+          return result;
+        }
+      }
+
+      // Mature phases
+      const base = s.intervalMinutes || MINUTES_PER_DAY;
+
+      if (s.phase === "mature1") {
+        // First mature phase: hard=1x, good=1.75x, easy=2.5x
+        if (ratingKey === "hard") {
+          result.intervalMinutes = base * 1.0;
+        } else if (ratingKey === "good") {
+          result.intervalMinutes = base * 1.75;
+        } else if (ratingKey === "easy") {
+          result.intervalMinutes = base * 2.5;
+        }
+        return result;
+      }
+
+      if (s.phase === "mature2") {
+        // Second+ mature phase: hard=1.2x, good=2x, easy=2.5x
+        if (ratingKey === "hard") {
+          result.intervalMinutes = base * 1.2;
+        } else if (ratingKey === "good") {
+          result.intervalMinutes = base * 2.0;
+        } else if (ratingKey === "easy") {
+          result.intervalMinutes = base * 2.5;
+        }
+        return result;
+      }
+
+      // Fallback: keep same interval
+      return result;
+    }
+
+    // Apply scheduling (mutates global schedule) — now returns the new entry
+    function applyAnkiScheduling(deckId, cardId, ratingKey) {
+      const key = scheduleKey(deckId, cardId);
+      const existing = schedule[key] || {};
+      const nextState = computeNextState(existing, ratingKey);
+      const now = Date.now();
+      nextState.dueTime = now + nextState.intervalMinutes * 60000;
+      schedule[key] = nextState;
+      saveSchedule();
+      // Update deck dropdown counts when schedule changes
+      refreshDeckSelect();
+      return nextState;
+    }
+
+    // NEW: apply "show again tomorrow" behavior for automatic mode
+    function applyTomorrowScheduling(deckId, cardId) {
+      const key = scheduleKey(deckId, cardId);
+      const existing = normalizeScheduleEntry(schedule[key] || {});
+      const now = Date.now();
+      const nextState = { ...existing };
+      // Keep phase/level/interval the same, just snooze dueTime by 1 day
+      nextState.dueTime = now + MINUTES_PER_DAY * 60000;
+      schedule[key] = nextState;
+      saveSchedule();
+      refreshDeckSelect();
+      return nextState;
+    }
+
+    // Preview next interval (in minutes) without changing schedule
+    function previewIntervalMinutes(deckId, cardId, ratingKey) {
+      const key = scheduleKey(deckId, cardId);
+      const existing = schedule[key] || {};
+      const nextState = computeNextState(existing, ratingKey);
+
+      const minutes =
+        typeof nextState.intervalMinutes === "number" && nextState.intervalMinutes > 0
+          ? nextState.intervalMinutes
+          : LADDER_LEVEL_MINUTES[1]; // default to 5 minutes
+
+      return minutes;
+    }
+
+    // ===================== DECK & CARD UI =====================
+    const deckSelect = document.getElementById("deckSelect");
+    const newDeckNameInput = document.getElementById("newDeckName");
+    const addDeckBtn = document.getElementById("addDeckBtn");
+    const deleteDeckBtn = document.getElementById("deleteDeckBtn");
+
+    const cardQuestionInput = document.getElementById("cardQuestion");
+    const cardAnswerInput = document.getElementById("cardAnswer");
+    const addCardBtn = document.getElementById("addCardBtn");
+    const updateCardBtn = document.getElementById("updateCardBtn");
+    const cardsListDiv = document.getElementById("cardsList");
+    const selectedCardInfo = document.getElementById("selectedCardInfo");
+
+    // NEW: Anki import elements
+    const ankiImportInput   = document.getElementById("ankiImport");
+    const ankiImportStatus  = document.getElementById("ankiImportStatus");
+    const ankiImportHelpBtn = document.getElementById("ankiImportHelpBtn");
+
+    let selectedDeckId = null;
+    let selectedCardId = null;
+
+    function getDeckById(id) {
+      return decks.find(d => d.id === id) || null;
+    }
+
+    // New: compute due-today counts per deck (new/ladder/mature)
+    function getDeckDueCounts(deck) {
+      const now = Date.now();
+      let newCount = 0;
+      let ladderCount = 0;
+      let matureCount = 0;
+
+      deck.cards.forEach(card => {
+        const key = scheduleKey(deck.id, card.id);
+        const s = schedule[key];
+
+        // New card: never scheduled
+        if (!s) {
+          newCount++;
+          return;
+        }
+
+        const normalized = normalizeScheduleEntry(s);
+        const due = normalized.dueTime || now;
+
+        // Only count cards due now or overdue
+        if (due > now) return;
+
+        if (normalized.phase === "ladder") {
+          ladderCount++;
+        } else {
+          // mature1 or mature2
+          matureCount++;
+        }
+      });
+
+      return { newCount, ladderCount, matureCount };
+    }
+
+    function refreshDeckSelect() {
+      const currentValue = selectedDeckId;
+      deckSelect.innerHTML = "";
+      decks.forEach(deck => {
+        const opt = document.createElement("option");
+        opt.value = deck.id;
+
+        const counts = getDeckDueCounts(deck);
+        // Format: Deck Name (new/ladder/mature)
+        opt.textContent = `${deck.name} (${counts.newCount}/${counts.ladderCount}/${counts.matureCount})`;
+
+        deckSelect.appendChild(opt);
+      });
+      if (!selectedDeckId && decks.length > 0) {
+        selectedDeckId = decks[0].id;
+      }
+      if (currentValue && decks.some(d => d.id === currentValue)) {
+        selectedDeckId = currentValue;
+      }
+      if (selectedDeckId && decks.some(d => d.id === selectedDeckId)) {
+        deckSelect.value = selectedDeckId;
+      } else if (decks.length > 0) {
+        selectedDeckId = decks[0].id;
+        deckSelect.value = selectedDeckId;
+      } else {
+        selectedDeckId = null;
+      }
+    }
+
+    function refreshCardsList() {
+      const deck = getDeckById(selectedDeckId);
+      cardsListDiv.innerHTML = "";
+      selectedCardId = null;
+      selectedCardInfo.textContent = "";
+      updateCardBtn.disabled = true;
+      if (!deck) return;
+
+      deck.cards.forEach(card => {
+        const row = document.createElement("div");
+        row.className = "cardRow";
+
+        const span = document.createElement("span");
+        span.textContent = card.question;
+        row.appendChild(span);
+
+        const editBtn = document.createElement("button");
+        editBtn.textContent = "Edit";
+        editBtn.className = "secondary small";
+        editBtn.addEventListener("click", () => {
+          selectedCardId = card.id;
+          cardQuestionInput.value = card.question;
+          cardAnswerInput.value = card.answer;
+          selectedCardInfo.textContent = `Editing card: ${card.id}`;
+          updateCardBtn.disabled = false;
+        });
+        row.appendChild(editBtn);
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.textContent = "Delete";
+        deleteBtn.className = "secondary small";
+        deleteBtn.addEventListener("click", () => {
+          if (!confirm("Delete this card?")) return;
+          const d = getDeckById(selectedDeckId);
+          if (!d) return;
+          const idx = d.cards.findIndex(c => c.id === card.id);
+          if (idx !== -1) {
+            d.cards.splice(idx, 1);
+          }
+          const key = scheduleKey(selectedDeckId, card.id);
+          delete schedule[key];
+          saveDecks();
+          saveSchedule();
+          if (selectedCardId === card.id) {
+            selectedCardId = null;
+            cardQuestionInput.value = "";
+            cardAnswerInput.value = "";
+            selectedCardInfo.textContent = "";
+            updateCardBtn.disabled = true;
+          }
+          refreshCardsList();
+          refreshDeckSelect();
+        });
+        row.appendChild(deleteBtn);
+
+        cardsListDiv.appendChild(row);
+      });
+    }
+
+    addDeckBtn.addEventListener("click", () => {
+      const name = newDeckNameInput.value.trim();
+      if (!name) return;
+      const id = "deck_" + Date.now();
+      decks.push({ id, name, cards: [] });
+      saveDecks();
+      newDeckNameInput.value = "";
+      selectedDeckId = id;
+      refreshDeckSelect();
+      refreshCardsList();
+    });
+
+    deleteDeckBtn.addEventListener("click", () => {
+      if (!selectedDeckId) return;
+      const deck = getDeckById(selectedDeckId);
+      if (!deck) return;
+      if (!confirm(`Delete deck "${deck.name}" and all its cards?`)) return;
+
+      decks = decks.filter(d => d.id !== selectedDeckId);
+      saveDecks();
+
+      const prefix = selectedDeckId + "_";
+      Object.keys(schedule).forEach(key => {
+        if (key.startsWith(prefix)) {
+          delete schedule[key];
+        }
+      });
+      saveSchedule();
+
+      if (decks.length > 0) {
+        selectedDeckId = decks[0].id;
+      } else {
+        selectedDeckId = null;
+      }
+      refreshDeckSelect();
+      refreshCardsList();
+    });
+
+    deckSelect.addEventListener("change", () => {
+      selectedDeckId = deckSelect.value;
+      refreshCardsList();
+    });
+
+    addCardBtn.addEventListener("click", () => {
+      const q = cardQuestionInput.value.trim();
+      const a = cardAnswerInput.value.trim();
+      if (!q || !a) return;
+      const deck = getDeckById(selectedDeckId);
+      if (!deck) return;
+      const id = "c_" + Date.now();
+      deck.cards.push({ id, question: q, answer: a });
+      saveDecks();
+      cardQuestionInput.value = "";
+      cardAnswerInput.value = "";
+      selectedCardId = null;
+      selectedCardInfo.textContent = "";
+      updateCardBtn.disabled = true;
+      refreshCardsList();
+      refreshDeckSelect();
+    });
+
+    updateCardBtn.addEventListener("click", () => {
+      if (!selectedCardId) return;
+      const q = cardQuestionInput.value.trim();
+      const a = cardAnswerInput.value.trim();
+      if (!q || !a) return;
+      const deck = getDeckById(selectedDeckId);
+      if (!deck) return;
+      const card = deck.cards.find(c => c.id === selectedCardId);
+      if (!card) return;
+      card.question = q;
+      card.answer = a;
+      saveDecks();
+      refreshCardsList();
+      selectedCardInfo.textContent = `Updated card: ${selectedCardId}`;
+    });
+
+    // NEW: Anki import help button
+    ankiImportHelpBtn.addEventListener("click", () => {
+      alert(
+        "How to export from Anki:\n\n" +
+        "1. Open Anki on desktop and click 'Browse'.\n" +
+        "2. Select the deck or the notes you want.\n" +
+        "3. Go to File → Export.\n" +
+        "4. In 'Export format', choose 'Notes in plain text (*.txt)'.\n" +
+        "5. Make sure fields are separated by TAB, then export.\n\n" +
+        "Save that file, then choose it here to import."
+      );
+    });
+
+    // NEW: Anki import handler
+    ankiImportInput.addEventListener("change", (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      if (!selectedDeckId) {
+        alert("Please select a deck first, so I know where to import the cards.");
+        ankiImportInput.value = "";
+        return;
+      }
+
+      const deck = getDeckById(selectedDeckId);
+      if (!deck) {
+        alert("Selected deck not found.");
+        ankiImportInput.value = "";
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const text = ev.target.result || "";
+        const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+
+        let imported = 0;
+        const timestamp = Date.now();
+
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+
+          // Try TAB first (typical Anki export), fall back to comma
+          let parts = line.split("\t");
+          if (parts.length < 2) {
+            parts = line.split(",");
+          }
+          if (parts.length < 2) continue;
+
+          const q = parts[0].trim();
+          const a = parts[1].trim();
+          if (!q || !a) continue;
+
+          const id = "c_" + timestamp + "_" + imported;
+          deck.cards.push({ id, question: q, answer: a });
+          imported++;
+        }
+
+        if (imported > 0) {
+          saveDecks();
+          refreshCardsList();
+          refreshDeckSelect();
+          ankiImportStatus.textContent = `Imported ${imported} cards.`;
+        } else {
+          ankiImportStatus.textContent = "No valid cards found in file.";
+        }
+
+        // Reset file input so you can import the same file again if needed
+        ankiImportInput.value = "";
+      };
+
+      reader.onerror = () => {
+        alert("Error reading file.");
+        ankiImportInput.value = "";
+      };
+
+      reader.readAsText(file);
+    });
+
+    // ===================== TTS & STT =====================
+    const statusDiv = document.getElementById("status");
+
+    function setStatus(text) {
+      statusDiv.textContent = text;
+    }
+
+    let isSpeaking = false;
+
+    // ===== Native iOS VoiceCommands plugin (Capacitor) =====
+    let nativeVoicePlugin = null;
+    let nativeVoiceActiveCallback = null;
+    let usingNativeVoice = false;
+
+    if (
+      window.Capacitor &&
+      window.Capacitor.Plugins &&
+      window.Capacitor.Plugins.VoiceCommands
+    ) {
+      nativeVoicePlugin = window.Capacitor.Plugins.VoiceCommands;
+      usingNativeVoice = true;
+      console.log("Using native iOS VoiceCommands plugin");
+
+      nativeVoicePlugin.addListener("speechResult", (data) => {
+        const text = (data && data.text) || "";
+        const isFinal = !!(data && data.isFinal);
+        if (!text) return;
+
+        if (isFinal && nativeVoiceActiveCallback) {
+          const cb = nativeVoiceActiveCallback;
+          nativeVoiceActiveCallback = null;
+          cb(text);
+        }
+      });
+    }
+
+    // ===== Browser Web SpeechRecognition fallback =====
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition = null;
+    let speechSupported = !!SpeechRecognition;
+
+    // NEW: track whether we *expect* recognition to keep listening
+    let keepListening = false;
+
+    if (speechSupported) {
+      recognition = new SpeechRecognition();
+      recognition.lang = "en-US";
+      recognition.interimResults = false;
+      recognition.continuous = false;
+      recognition.maxAlternatives = 3; // tiny robustness boost, still using top result
+    }
+
+    // >>> NEW: explicit microphone permission helper (kept as-is, though not called now) <<<
+    function requestMicrophoneAccess() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.warn("getUserMedia not supported in this browser.");
+        return;
+      }
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(stream => {
+          // Immediately stop the stream; we just needed the permission prompt.
+          stream.getTracks().forEach(track => track.stop());
+          console.log("Microphone permission granted.");
+        })
+        .catch(err => {
+          console.error("Microphone permission denied:", err);
+          setStatus("Please allow microphone access in your browser to use hands-free mode.");
+        });
+    }
+    // <<< END MIC HELPER <<<
+
+    // NEW: TTS settings (rate & volume)
+    let ttsRate = 1.0;
+    let ttsVolume = 1.0;
+    const TTS_SETTINGS_KEY = "srsTtsSettings";
+
+    const toggleAudioSettingsBtn = document.getElementById("toggleAudioSettingsBtn");
+    const audioSettingsPanel = document.getElementById("audioSettingsPanel");
+    const ttsRateInput = document.getElementById("ttsRateInput");
+    const ttsVolumeInput = document.getElementById("ttsVolumeInput");
+
+    // Load TTS settings from storage
+    (function loadTtsSettings() {
+      try {
+        const raw = localStorage.getItem(TTS_SETTINGS_KEY);
+        if (raw) {
+          const s = JSON.parse(raw);
+          if (typeof s.rate === "number") {
+            ttsRate = Math.max(0.5, Math.min(2, s.rate));
+          }
+          if (typeof s.volume === "number") {
+            ttsVolume = Math.max(0, Math.min(1, s.volume));
+          }
+        }
+      } catch (_) {
+        // ignore, fall back to defaults
+      }
+      if (ttsRateInput) {
+        ttsRateInput.value = String(ttsRate);
+      }
+      if (ttsVolumeInput) {
+        ttsVolumeInput.value = String(ttsVolume);
+      }
+    })();
+
+    function saveTtsSettings() {
+      try {
+        localStorage.setItem(
+          TTS_SETTINGS_KEY,
+          JSON.stringify({ rate: ttsRate, volume: ttsVolume })
+        );
+      } catch (_) {
+        // ignore storage errors
+      }
+    }
+
+    if (toggleAudioSettingsBtn && audioSettingsPanel) {
+      toggleAudioSettingsBtn.addEventListener("click", () => {
+        const isHidden = audioSettingsPanel.classList.contains("hidden");
+        if (isHidden) {
+          audioSettingsPanel.classList.remove("hidden");
+          toggleAudioSettingsBtn.textContent = "Hide";
+        } else {
+          audioSettingsPanel.classList.add("hidden");
+          toggleAudioSettingsBtn.textContent = "Show";
+        }
+      });
+    }
+
+    if (ttsRateInput) {
+      ttsRateInput.addEventListener("change", () => {
+        let v = parseFloat(ttsRateInput.value);
+        if (isNaN(v)) v = 1.0;
+        v = Math.max(0.5, Math.min(2, v));
+        ttsRate = v;
+        ttsRateInput.value = String(v);
+        saveTtsSettings();
+      });
+    }
+
+    if (ttsVolumeInput) {
+      ttsVolumeInput.addEventListener("change", () => {
+        let v = parseFloat(ttsVolumeInput.value);
+        if (isNaN(v)) v = 1.0;
+        v = Math.max(0, Math.min(1, v));
+        ttsVolume = v;
+        ttsVolumeInput.value = String(v);
+        saveTtsSettings();
+      });
+    }
+
+    // Helper: stop all audio + listening
+    function stopAllAudio() {
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      isSpeaking = false;
+
+      // Stop native plugin listener if we're using it
+      if (nativeVoicePlugin) {
+        try {
+          nativeVoicePlugin.stop();
+        } catch (e) {
+          console.error("Error stopping native voice plugin:", e);
+        }
+        nativeVoiceActiveCallback = null;
+      }
+
+      // Stop browser Web SpeechRecognition if used
+      if (recognition) {
+        try {
+          // make sure auto-restart doesn't fire while we're intentionally stopping
+          keepListening = false;
+          recognition.onresult = null;
+          recognition.onerror = null;
+          recognition.onend = null;
+          recognition.stop();
+        } catch (e) {
+          console.error("Error stopping recognition:", e);
+        }
+      }
+    }
+
+    function speak(text, onEnd) {
+      if (!window.speechSynthesis) {
+        setStatus("Text-to-speech not supported in this browser.");
+        if (onEnd) onEnd();
+        return;
+      }
+      const utt = new SpeechSynthesisUtterance(text);
+      utt.rate = ttsRate || 1.0;
+      utt.volume = (ttsVolume === 0 || ttsVolume) ? ttsVolume : 1.0;
+      utt.onstart = () => {
+        isSpeaking = true;
+        setStatus("Speaking...");
+      };
+      utt.onend = () => {
+        isSpeaking = false;
+        if (onEnd) onEnd();
+      };
+      window.speechSynthesis.speak(utt);
+    }
+
+    function listenForCommand(callback) {
+      // 1) Prefer native iOS plugin when running inside the Capacitor app
+      if (nativeVoicePlugin) {
+        setStatus("Listening...");
+        // Save the callback for the next FINAL phrase from Swift
+        nativeVoiceActiveCallback = callback;
+
+        nativeVoicePlugin
+          .start()
+          .catch((err) => {
+            console.error("Native voice start failed:", err);
+            setStatus(
+              "Error starting native speech. You can still use silent mode."
+            );
+          });
+        return;
+      }
+
+      // 2) Fallback: Browser Web SpeechRecognition
+      if (!speechSupported || !recognition) {
+        setStatus("Speech recognition not supported in this browser.");
+        return;
+      }
+      setStatus("Listening...");
+      keepListening = true;
+
+      recognition.onresult = (event) => {
+        keepListening = false; // we got something, don't auto-restart this cycle
+        const transcript = event.results[0][0].transcript;
+        callback(transcript);
+      };
+      recognition.onerror = (event) => {
+        console.error("STT error:", event.error);
+        keepListening = false;
+        if (event.error !== "not-allowed") {
+          setTimeout(() => listenForCommand(callback), 800);
+        } else {
+          setStatus("Microphone access blocked.");
+        }
+      };
+      recognition.onend = () => {
+        // If the recognizer stopped *without* hearing anything, gently restart.
+        // We now allow this even while paused, so "resume study session" always works.
+        if (keepListening && currentMode === "voice") {
+          try {
+            recognition.start();
+          } catch (e) {
+            console.error("Error restarting recognition:", e);
+          }
+        }
+      };
+      try {
+        recognition.start();
+      } catch (e) {
+        console.error("Error starting recognition:", e);
+      }
+    }
+
+    // ===================== STUDY LOGIC (DUE / AHEAD) =====================
+    function getDueCardsForDeck(deckId, allowAhead, includeOverdue) {
+      const deck = getDeckById(deckId);
+      if (!deck) return [];
+      const now = Date.now();
+
+      const filtered = deck.cards.filter(card => {
+        const key = scheduleKey(deckId, card.id);
+        const s = schedule[key];
+
+        // New cards: treat as due now
+        if (!s) {
+          if (!allowAhead) return true;
+          if (includeOverdue) return true;
+          return true;
+        }
+
+        const normalized = normalizeScheduleEntry(s);
+        const due = normalized.dueTime || now;
+        const isDueOrOverdue = due <= now;
+        const isFuture = due > now;
+
+        if (!allowAhead) {
+          return isDueOrOverdue;
+        }
+
+        if (isFuture) return true;
+        if (includeOverdue && isDueOrOverdue) return true;
+        return false;
+      });
+
+      // Still sort by dueTime so earlier due cards are "earlier" in the day,
+      // but we will add randomness at selection time.
+      return filtered.sort((a, b) => {
+        const ka = scheduleKey(deckId, a.id);
+        const kb = scheduleKey(deckId, b.id);
+        const sa = schedule[ka];
+        const sb = schedule[kb];
+        const na = sa ? normalizeScheduleEntry(sa).dueTime : 0;
+        const nb = sb ? normalizeScheduleEntry(sb).dueTime : 0;
+        return na - nb;
+      });
+    }
+
+    function getNextCardForDeck(deckId, allowAhead, includeOverdue) {
+      const dueCards = getDueCardsForDeck(deckId, allowAhead, includeOverdue);
+      if (dueCards.length === 0) return null;
+      return dueCards[0];
+    }
+
+    // ===================== STUDY SESSION STATE =====================
+    const mainMenuDiv = document.getElementById("mainMenu");
+    const studySectionDiv = document.getElementById("studySection");
+    const modeBadge = document.getElementById("modeBadge");
+    const backToMenuBtn = document.getElementById("backToMenuBtn");
+    const pauseBtn = document.getElementById("pauseBtn");
+    const resumeBtn = document.getElementById("resumeBtn");
+
+    const skipInstructionsAfterFirstCheckbox = document.getElementById("skipInstructionsAfterFirst");
+    const autoGoodToggle = document.getElementById("autoGoodToggle");
+    const autoRatingSelect = document.getElementById("autoRatingSelect");
+    const answerModeDelayRadio = document.getElementById("answerModeDelay");
+    const answerModeVoiceRadio = document.getElementById("answerModeVoice");
+    const answerDelaySecondsInput = document.getElementById("answerDelaySeconds");
+    const studyAheadGapSecondsInput = document.getElementById("studyAheadGapSeconds");
+
+    const startVoiceBtn = document.getElementById("startVoiceBtn");
+    const startSilentBtn = document.getElementById("startSilentBtn");
+
+    const silentUI = document.getElementById("silentUI");
+    const silentQuestion = document.getElementById("silentQuestion");
+    const silentQuestionText = document.getElementById("silentQuestionText");
+    const silentAnswer = document.getElementById("silentAnswer");
+    const silentAnswerText = document.getElementById("silentAnswerText");
+    const showAnswerBtn = document.getElementById("showAnswerBtn");
+    const silentRatingButtons = document.getElementById("silentRatingButtons");
+
+    const hintAgain = document.getElementById("hint-again");
+    const hintHard = document.getElementById("hint-hard");
+    const hintGood = document.getElementById("hint-good");
+    const hintEasy = document.getElementById("hint-easy");
+
+    const voiceUI = document.getElementById("voiceUI");
+    const voiceQuestion = document.getElementById("voiceQuestion");
+    const voiceQuestionText = document.getElementById("voiceQuestionText");
+    const voiceAnswer = document.getElementById("voiceAnswer");
+    const voiceAnswerText = document.getElementById("voiceAnswerText");
+
+    const silentNextCardBtn = document.getElementById("silentNextCardBtn");
+
+    const silentEditToggleBtn = document.getElementById("silentEditToggleBtn");
+    const silentEditPanel = document.getElementById("silentEditPanel");
+    const silentEditQuestion = document.getElementById("silentEditQuestion");
+    const silentEditAnswer = document.getElementById("silentEditAnswer");
+    const silentSaveEditBtn = document.getElementById("silentSaveEditBtn");
+    const silentCancelEditBtn = document.getElementById("silentCancelEditBtn");
+
+    const voiceEditToggleBtn = document.getElementById("voiceEditToggleBtn");
+    const voiceEditPanel = document.getElementById("voiceEditPanel");
+    const voiceEditQuestion = document.getElementById("voiceEditQuestion");
+    const voiceEditAnswer = document.getElementById("voiceEditAnswer");
+    const voiceSaveEditBtn = document.getElementById("voiceSaveEditBtn");
+    const voiceCancelEditBtn = document.getElementById("voiceCancelEditBtn");
+
+    const silentCompletionControls = document.getElementById("silentCompletionControls");
+    const silentMainMenuBtn = document.getElementById("silentMainMenuBtn");
+    const silentStudyAheadBtn = document.getElementById("silentStudyAheadBtn");
+
+    let currentMode = null;
+    let currentDeckId = null;
+    let currentCard = null;
+
+    // ***** STATE MACHINE FOR CARD FLOW *****
+    const StudyState = {
+      IDLE: "idle",
+      SHOWING_QUESTION: "showing_question",
+      WAITING_FOR_ANSWER: "waiting_for_answer",
+      SHOWING_ANSWER: "showing_answer",
+      WAITING_FOR_RATING: "waiting_for_rating"
+    };
+
+    let studyState = StudyState.IDLE;
+
+    function setStudyState(newState) {
+      studyState = newState;
+      // You can comment this out later if you don't want console noise:
+      console.log("Study state:", newState);
+    }
+    // ***** END STATE MACHINE DEFINITIONS *****
+
+    let studyAheadSession = false;
+    let noScheduleChanges = false;
+    let studyAheadPromptedOnceVoice = false;
+    let skipInstructionsAfterFirst = true;
+    let hasSpokenInstructionsOnce = false;
+    let answerMode = "delay";
+    let answerDelayMs = 4000;
+    let autoGoodMode = false;
+    let autoModeBehavior = "good"; // again | hard | good | easy | tomorrow
+
+    let studyAheadGapMs = 4000;
+    let inStudyAheadAnswerGap = false;
+    let studyAheadGapTimerId = null;
+
+    let isPaused = false;
+    let awaitingDifficulty = false;
+    let awaitingAnswerSignal = false;
+    let awaitingPostCompletionChoice = false;
+
+    let reviewQueue = [];
+    let aheadQueue = [];
+    let aheadQueueIndex = 0;
+
+    // NEW: track if question/answer have been spoken for current card
+    let hasSpokenCurrentQuestion = false;
+    let hasSpokenCurrentAnswer = false;
+
+    // NEW: track delay window between question and answer in delay mode
+    let questionDelayTimerId = null;
+
+    function clearStudyAheadGapTimer() {
+      if (studyAheadGapTimerId !== null) {
+        clearTimeout(studyAheadGapTimerId);
+        studyAheadGapTimerId = null;
+      }
+      inStudyAheadAnswerGap = false;
+    }
+
+    function clearQuestionDelayTimer() {
+      if (questionDelayTimerId !== null) {
+        clearTimeout(questionDelayTimerId);
+        questionDelayTimerId = null;
+      }
+    }
+
+    function queueCardForAgain(deckId, cardObj) {
+      if (!cardObj) return;
+      const key = scheduleKey(deckId, cardObj.id);
+      const exists = reviewQueue.some((c) => scheduleKey(deckId, c.id) === key);
+      if (!exists) {
+        reviewQueue.push(cardObj);
+      }
+    }
+
+    function showMainMenu() {
+      stopAllAudio();
+      clearStudyAheadGapTimer();
+      clearQuestionDelayTimer();
+
+      currentMode = null;
+      mainMenuDiv.classList.remove("hidden");
+      studySectionDiv.classList.add("hidden");
+      setStatus("");
+      isPaused = false;
+      awaitingDifficulty = false;
+      awaitingAnswerSignal = false;
+      awaitingPostCompletionChoice = false;
+      resumeBtn.disabled = true;
+      pauseBtn.disabled = false;
+      pauseBtn.classList.remove("hidden");
+      resumeBtn.classList.remove("hidden");
+      silentNextCardBtn.classList.add("hidden");
+      studyAheadSession = false;
+      noScheduleChanges = false;
+      studyAheadPromptedOnceVoice = false;
+      reviewQueue = [];
+      aheadQueue = [];
+      aheadQueueIndex = 0;
+      hasSpokenCurrentQuestion = false;
+      hasSpokenCurrentAnswer = false;
+      silentCompletionControls.classList.add("hidden");
+      if (voiceQuestionText) voiceQuestionText.textContent = "";
+      if (voiceAnswerText) voiceAnswerText.textContent = "";
+      if (voiceAnswer) voiceAnswer.classList.add("hidden");
+      silentEditPanel.classList.add("hidden");
+      voiceEditPanel.classList.add("hidden");
+      setStudyState(StudyState.IDLE);
+    }
+
+    function showStudySection(mode) {
+      currentMode = mode;
+      mainMenuDiv.classList.add("hidden");
+      studySectionDiv.classList.remove("hidden");
+      modeBadge.textContent = mode === "voice" ? "Hands-Free Mode" : "Silent Mode";
+      isPaused = false;
+      resumeBtn.disabled = true;
+      pauseBtn.disabled = false;
+      pauseBtn.classList.remove("hidden");
+      resumeBtn.classList.remove("hidden");
+    }
+
+    backToMenuBtn.addEventListener("click", () => {
+      showMainMenu();
+    });
+
+    pauseBtn.addEventListener("click", () => {
+      isPaused = true;
+      clearStudyAheadGapTimer();
+      clearQuestionDelayTimer();
+      pauseBtn.disabled = true;
+      resumeBtn.disabled = false;
+      setStatus("Paused. Say 'resume study session' or tap Resume.");
+      // keep listening while paused when paused via button
+      if (currentMode === "voice" && speechSupported && recognition) {
+        listenForCommand(handleVoiceTranscript);
+      }
+    });
+
+    resumeBtn.addEventListener("click", () => {
+      if (!currentMode) return;
+      isPaused = false;
+      pauseBtn.disabled = false;
+      resumeBtn.disabled = true;
+      if (currentMode === "voice") {
+        runVoiceLoop();
+      } else {
+        runSilentLoop();
+      }
+    });
+
+    function endStudySession() {
+      clearStudyAheadGapTimer();
+      clearQuestionDelayTimer();
+      showMainMenu();
+      setStatus("Study session ended.");
+    }
+
+    // ===================== INLINE EDIT HELPERS =====================
+    function updateCardTextInDeck(deckId, cardId, newQ, newA) {
+      const deck = getDeckById(deckId);
+      if (!deck) return null;
+      const card = deck.cards.find(c => c.id === cardId);
+      if (!card) return null;
+      card.question = newQ;
+      card.answer = newA;
+      saveDecks();
+      refreshDeckSelect();
+      return card;
+    }
+
+    // Silent mode inline edit
+    silentEditToggleBtn.addEventListener("click", () => {
+      if (!currentCard) return;
+      silentEditQuestion.value = currentCard.question;
+      silentEditAnswer.value = currentCard.answer;
+      silentEditPanel.classList.remove("hidden");
+    });
+
+    silentCancelEditBtn.addEventListener("click", () => {
+      silentEditPanel.classList.add("hidden");
+    });
+
+    silentSaveEditBtn.addEventListener("click", () => {
+      if (!currentCard) return;
+      const q = silentEditQuestion.value.trim();
+      const a = silentEditAnswer.value.trim();
+      if (!q || !a) return;
+      const updated = updateCardTextInDeck(currentDeckId, currentCard.id, q, a);
+      if (!updated) return;
+      currentCard = updated;
+      silentQuestionText.textContent = currentCard.question;
+      silentAnswerText.textContent = currentCard.answer;
+      voiceQuestionText.textContent = currentCard.question;
+      voiceAnswerText.textContent = currentCard.answer;
+
+      // refresh main card list so changes are visible there too
+      refreshCardsList();
+
+      silentEditPanel.classList.add("hidden");
+      setStatus("Card updated.");
+    });
+
+    // Voice mode inline edit
+    voiceEditToggleBtn.addEventListener("click", () => {
+      if (!currentCard) return;
+      voiceEditQuestion.value = currentCard.question;
+      voiceEditAnswer.value = currentCard.answer;
+      voiceEditPanel.classList.remove("hidden");
+    });
+
+    voiceCancelEditBtn.addEventListener("click", () => {
+      voiceEditPanel.classList.add("hidden");
+    });
+
+    voiceSaveEditBtn.addEventListener("click", () => {
+      if (!currentCard) return;
+      const q = voiceEditQuestion.value.trim();
+      const a = voiceEditAnswer.value.trim();
+      if (!q || !a) return;
+      const updated = updateCardTextInDeck(currentDeckId, currentCard.id, q, a);
+      if (!updated) return;
+      currentCard = updated;
+      voiceQuestionText.textContent = currentCard.question;
+      voiceAnswerText.textContent = currentCard.answer;
+      silentQuestionText.textContent = currentCard.question;
+      silentAnswerText.textContent = currentCard.answer;
+
+      // refresh main card list so changes are visible there too
+      refreshCardsList();
+
+      voiceEditPanel.classList.add("hidden");
+      setStatus("Card updated.");
+    });
+
+    // ===================== VOICE MODE =====================
+
+    // Helper: detect "main menu" style commands
+    function isMainMenuCommand(text) {
+      const t = text.toLowerCase();
+      return (
+        t.includes("main menu") ||
+        (t.includes("menu") && t.includes("main")) ||
+        t.includes("go back") ||
+        t.includes("back to menu") ||
+        t.includes("back to the menu") ||
+        t.includes("go to the menu") ||
+        t.includes("go to main menu")
+      );
+    }
+
+    // NEW helper: fully restart current card flow in hands-free mode
+    function restartCurrentCardVoiceFlow() {
+      if (!currentCard) return;
+
+      // Reset timers and state for this card
+      clearStudyAheadGapTimer();
+      clearQuestionDelayTimer();
+      awaitingDifficulty = false;
+      awaitingAnswerSignal = false;
+      awaitingPostCompletionChoice = false;
+      inStudyAheadAnswerGap = false;
+
+      // Hide answer again and reset flags
+      if (voiceAnswer) {
+        voiceAnswer.classList.add("hidden");
+      }
+      hasSpokenCurrentAnswer = false;
+      hasSpokenCurrentQuestion = false;
+
+      setStatus("Repeating card...");
+      setStudyState(StudyState.SHOWING_QUESTION);
+
+      hasSpokenCurrentQuestion = true;
+      speak(currentCard.question, () => {
+        if (isPaused) return;
+
+        if (answerMode === "delay") {
+          const delay = Math.max(
+            1,
+            Math.min(60, Math.floor(answerDelayMs / 1000))
+          );
+
+          // Allow commands like "repeat question" during the thinking window
+          if (!autoGoodMode) {
+            listenForCommand(handleVoiceTranscript);
+          }
+
+          setStudyState(StudyState.WAITING_FOR_ANSWER);
+
+          questionDelayTimerId = setTimeout(() => {
+            if (!isPaused) {
+              // This will speak the answer and then either:
+              // - ask for difficulty, or
+              // - do auto-good / study-ahead behavior
+              speakAnswerThenAskDifficulty();
+            }
+          }, delay * 1000);
+        } else {
+          // Voice-answer mode: wait for you to speak your answer again
+          awaitingAnswerSignal = true;
+          setStudyState(StudyState.WAITING_FOR_ANSWER);
+          setStatus("Listening for your answer...");
+          listenForCommand(handleVoiceTranscript);
+        }
+      });
+    }
+
+    function parseRatingFromText(text) {
+      const t = text.toLowerCase();
+      if (t.includes("again")) return "again";
+      if (t.includes("hard")) return "hard";
+      if (t.includes("easy")) return "easy";
+      if (t.includes("good") || t.includes("fine") || t.includes("okay")) return "good";
+      if (t.includes("next")) return "good";
+      return null;
+    }
+
+    function handleGlobalVoiceCommands(text) {
+      const t = text.toLowerCase();
+
+      // NEW: repeat question using state machine
+      if (t.includes("repeat question") && currentMode === "voice" && currentCard) {
+        if (
+          studyState === StudyState.SHOWING_QUESTION ||
+          studyState === StudyState.WAITING_FOR_ANSWER ||
+          studyState === StudyState.WAITING_FOR_RATING
+        ) {
+          restartCurrentCardVoiceFlow();
+          return true;
+        }
+      }
+
+      // NEW: repeat answer using state machine
+      if (t.includes("repeat answer") && currentMode === "voice" && currentCard) {
+        if (
+          studyState === StudyState.SHOWING_ANSWER ||
+          studyState === StudyState.WAITING_FOR_RATING ||
+          inStudyAheadAnswerGap
+        ) {
+          speak("Answer: " + currentCard.answer, () => {
+            if (isPaused) return;
+            if (awaitingDifficulty) {
+              const detailed =
+                !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
+              hasSpokenInstructionsOnce = true;
+              const promptText = detailed
+                ? "How was that? Say again, hard, good, or easy. You can also say next, repeat question, or repeat answer."
+                : "How was that?";
+              awaitingDifficulty = true;
+              setStudyState(StudyState.WAITING_FOR_RATING);
+              speak(promptText, () => {
+                listenForCommand(handleVoiceTranscript);
+              });
+            } else if (inStudyAheadAnswerGap) {
+              // Re-start the study-ahead gap so you get another window to speak
+              startStudyAheadAnswerWindow(true);
+            } else if (awaitingPostCompletionChoice) {
+              speak("Say main menu to go back.", () => {
+                listenForCommand(handleVoiceTranscript);
+              });
+            }
+          });
+          return true;
+        }
+      }
+
+      if (t.includes("end study session")) {
+        endStudySession();
+        return true;
+      }
+
+      // UPDATED: pause only allowed in specific states,
+      // and keep listening while paused.
+      if (t.includes("pause study session") || (t.includes("pause") && t.includes("study"))) {
+        const canPauseNormal =
+          currentMode === "voice" &&
+          awaitingDifficulty &&
+          !noScheduleChanges;
+        const canPauseStudyAheadGap =
+          currentMode === "voice" &&
+          inStudyAheadAnswerGap &&
+          noScheduleChanges &&
+          studyAheadSession;
+
+        if (canPauseNormal || canPauseStudyAheadGap) {
+          isPaused = true;
+          clearStudyAheadGapTimer();
+          clearQuestionDelayTimer();
+          pauseBtn.disabled = true;
+          resumeBtn.disabled = false;
+          setStatus("Paused. Say 'resume study session' or tap Resume.");
+          // NEW: keep listening while paused (voice pause)
+          if (currentMode === "voice" && speechSupported && recognition) {
+            listenForCommand(handleVoiceTranscript);
+          }
+        }
+        return true;
+      }
+
+      // UPDATED: more robust resume detection
+      if (
+        t.includes("resume study session") ||
+        (t.includes("resume") && (t.includes("study") || t.includes("session")))
+      ) {
+        if (isPaused) {
+          isPaused = false;
+          pauseBtn.disabled = false;
+          resumeBtn.disabled = true;
+          if (currentMode === "voice") {
+            runVoiceLoop();
+          } else if (currentMode === "silent") {
+            runSilentLoop();
+          }
+        }
+        return true;
+      }
+      return false;
+    }
+
+    function handleVoiceTranscript(text) {
+      // NEW: allow "main menu" ONLY during study-ahead answer gap window
+      if (inStudyAheadAnswerGap && noScheduleChanges && studyAheadSession && isMainMenuCommand(text)) {
+        inStudyAheadAnswerGap = false;
+        clearStudyAheadGapTimer();
+        endStudySession();
+        return;
+      }
+
+      if (handleGlobalVoiceCommands(text)) return;
+
+      if (awaitingPostCompletionChoice) {
+        const wantsMainMenu = isMainMenuCommand(text);
+
+        awaitingPostCompletionChoice = false;
+
+        if (wantsMainMenu) {
+          endStudySession();
+          return;
+        }
+
+        // Enter study-ahead mode (no schedule changes)
+        studyAheadSession = true;
+        noScheduleChanges = true;
+        studyAheadPromptedOnceVoice = false;
+
+        aheadQueue = shuffleArray(getDueCardsForDeck(currentDeckId, true, false));
+        aheadQueueIndex = 0;
+
+        speak(
+          "Okay, entering study ahead mode. These reviews will not change your future schedule.",
+          () => {
+            runVoiceLoop();
+          }
+        );
+        return;
+      }
+
+      if (awaitingAnswerSignal) {
+        awaitingAnswerSignal = false;
+        speakAnswerThenAskDifficulty();
+        return;
+      }
+
+      if (awaitingDifficulty) {
+        const t = text.toLowerCase();
+
+        // NEW: allow "main menu" ONLY while difficulty is being asked (normal mode)
+        if (!noScheduleChanges && isMainMenuCommand(t)) {
+          awaitingDifficulty = false;
+          endStudySession();
+          return;
+        }
+
+        if (noScheduleChanges) {
+          if (isMainMenuCommand(t)) {
+            awaitingDifficulty = false;
+            endStudySession();
+            return;
+          }
+          speak("I didn't catch that. Say main menu to go to the main menu.", () => {
+            listenForCommand(handleVoiceTranscript);
+          });
+          return;
+        }
+
+        const ratingKey = parseRatingFromText(text);
+        if (!ratingKey) {
+          speak(
+            "I didn't catch that. Please say again, hard, good, or easy.",
+            () => {
+              listenForCommand(handleVoiceTranscript);
+            }
+          );
+          return;
+        }
+        if (!noScheduleChanges) {
+          const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
+          if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
+            queueCardForAgain(currentDeckId, currentCard);
+          }
+        }
+        awaitingDifficulty = false;
+        setStudyState(StudyState.IDLE); // will be set to question again when next card loads
+        runVoiceLoop();
+        return;
+      }
+
+      // Fallback: keep listening
+      listenForCommand(handleVoiceTranscript);
+    }
+
+    function describeAutoModeBehavior() {
+      switch (autoModeBehavior) {
+        case "again":
+          return "mark each card as again";
+        case "hard":
+          return "mark each card as hard";
+        case "good":
+          return "mark each card as good";
+        case "easy":
+          return "mark each card as easy";
+        case "tomorrow":
+          return "push each card to show again tomorrow";
+        default:
+          return "mark each card as good";
+      }
+    }
+
+    function speakAnswerThenAskDifficulty() {
+      if (!currentCard) return;
+
+      if (voiceAnswer) {
+        voiceAnswer.classList.remove("hidden");
+      }
+      hasSpokenCurrentAnswer = true;
+      setStudyState(StudyState.SHOWING_ANSWER);
+
+      speak("Answer: " + currentCard.answer, () => {
+        // STUDY-AHEAD HANDS-FREE: always respect the study-ahead gap and never schedule
+        if (noScheduleChanges && studyAheadSession) {
+          startStudyAheadAnswerWindow(false);
+          return;
+        }
+
+        // Automatic mode for pure hands-free, no commands
+        if (autoGoodMode) {
+          // Only schedule in normal mode; never schedule in noScheduleChanges/study-ahead
+          if (!noScheduleChanges) {
+            if (autoModeBehavior === "tomorrow") {
+              applyTomorrowScheduling(currentDeckId, currentCard.id);
+            } else {
+              const behaviorRating = autoModeBehavior || "good";
+              const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, behaviorRating);
+              if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
+                queueCardForAgain(currentDeckId, currentCard);
+              }
+            }
+          }
+          // Just advance to the next card
+          setStudyState(StudyState.IDLE);
+          runVoiceLoop();
+          return;
+        }
+
+        if (noScheduleChanges && !studyAheadSession) {
+          // This case shouldn't normally happen, but keep safety behavior
+          if (!studyAheadPromptedOnceVoice) {
+            studyAheadPromptedOnceVoice = true;
+            speak("Say main menu to go to the main menu.", () => {
+              runVoiceLoop();
+            });
+          } else {
+            runVoiceLoop();
+          }
+          return;
+        }
+
+        const detailed =
+          !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
+        hasSpokenInstructionsOnce = true;
+        const promptText = detailed
+          ? "How was that? Say again, hard, good, or easy. You can also say next, repeat question, or repeat answer."
+          : "How was that?";
+        awaitingDifficulty = true;
+        setStudyState(StudyState.WAITING_FOR_RATING);
+        speak(promptText, () => {
+          listenForCommand(handleVoiceTranscript);
+        });
+      });
+    }
+
+    // NEW: Study-ahead answer window – gives you time to say "repeat answer" or "main menu"
+    function startStudyAheadAnswerWindow(restartOnly) {
+      if (isPaused) return;
+      clearStudyAheadGapTimer();
+      inStudyAheadAnswerGap = true;
+
+      const startListeningAndTimer = () => {
+        if (!isPaused && currentMode === "voice") {
+          listenForCommand(handleVoiceTranscript);
+        }
+        studyAheadGapTimerId = setTimeout(() => {
+          inStudyAheadAnswerGap = false;
+          studyAheadGapTimerId = null;
+          if (!isPaused && currentMode === "voice" && !awaitingPostCompletionChoice) {
+            runVoiceLoop();
+          }
+        }, studyAheadGapMs);
+      };
+
+      if (!restartOnly && !studyAheadPromptedOnceVoice) {
+        studyAheadPromptedOnceVoice = true;
+        speak("You are in study ahead mode. You can say repeat answer or main menu before the next card.", () => {
+          if (isPaused) return;
+          startListeningAndTimer();
+        });
+      } else {
+        startListeningAndTimer();
+      }
+    }
+
+    // NEW helper: randomized next-card picker for normal (schedule-changing) mode
+    function pickRandomNextCardNormal(dueCards, lastId, isSilentMode) {
+      // Remove duplicates between reviewQueue and dueCards
+      const uniqueDue = dueCards.filter(card =>
+        !reviewQueue.some(r => r.id === card.id)
+      );
+
+      const reviewCandidates = reviewQueue.slice();
+      const dueCandidates = uniqueDue;
+
+      function pickFromPool(pool) {
+        if (pool.length === 0) return null;
+        let candidates = pool;
+        if (pool.length > 1 && lastId) {
+          const filtered = pool.filter(c => c.id !== lastId);
+          if (filtered.length > 0) {
+            candidates = filtered;
+          }
+        }
+        const idx = Math.floor(Math.random() * (candidates.length));
+        return candidates[idx];
+      }
+
+      function chooseRandom() {
+        if (reviewCandidates.length === 0 && dueCandidates.length === 0) return null;
+
+        let poolType;
+        if (reviewCandidates.length && dueCandidates.length) {
+          // 50/50 mix when both exist
+          poolType = Math.random() < 0.5 ? "review" : "due";
+        } else if (reviewCandidates.length) {
+          poolType = "review";
+        } else {
+          poolType = "due";
+        }
+
+        let candidate = pickFromPool(poolType === "review" ? reviewCandidates : dueCandidates);
+
+        // If we couldn't get a candidate from that pool (e.g., only lastId and we're avoiding it),
+        // fall back to the other pool if possible.
+        if (!candidate && poolType === "review") {
+          candidate = pickFromPool(dueCandidates);
+        } else if (!candidate && poolType === "due") {
+          candidate = pickFromPool(reviewCandidates);
+        }
+
+        // In silent mode we prefer never to repeat the same card back-to-back
+        // when there are other options. The picker above already tries to avoid
+        // lastId when pool size > 1, so at this point if candidate === lastId,
+        // it means it's the only card available globally.
+        return candidate;
+      }
+
+      const chosen = chooseRandom();
+
+      if (chosen && reviewQueue.length > 0) {
+        // If we picked from reviewQueue, remove it so it can be re-queued later
+        const idx = reviewQueue.findIndex(c => c.id === chosen.id);
+        if (idx !== -1) {
+          reviewQueue.splice(idx, 1);
+        }
+      }
+
+      return chosen;
+    }
+
+    function runVoiceLoop() {
+      if (isPaused) {
+        setStatus("Paused.");
+        return;
+      }
+      clearStudyAheadGapTimer();
+      clearQuestionDelayTimer();
+      const deck = getDeckById(currentDeckId);
+      if (!deck || deck.cards.length === 0) {
+        if (voiceQuestionText) voiceQuestionText.textContent = "";
+        if (voiceAnswerText) voiceAnswerText.textContent = "";
+        if (voiceAnswer) voiceAnswer.classList.add("hidden");
+
+        setStudyState(StudyState.IDLE);
+        speak("This deck has no cards.", () => {
+          awaitingPostCompletionChoice = true;
+          speak("Say main menu to go back.", () =>
+            listenForCommand(handleVoiceTranscript)
+          );
+        });
+        return;
+      }
+
+      const allowAhead = studyAheadSession;
+      const includeOverdue = !noScheduleChanges;
+      const lastId = currentCard ? currentCard.id : null;
+
+      let nextCard = null;
+
+      // Study-ahead voice mode (no schedule changes, uses aheadQueue)
+      if (noScheduleChanges && allowAhead) {
+        if (!aheadQueue || aheadQueue.length === 0) {
+          aheadQueue = shuffleArray(getDueCardsForDeck(currentDeckId, true, false));
+          aheadQueueIndex = 0;
+        }
+        if (aheadQueueIndex < aheadQueue.length) {
+          nextCard = aheadQueue[aheadQueueIndex++];
+        } else {
+          nextCard = null;
+        }
+      } else {
+        // Normal schedule-changing mode with randomized mixing
+        const dueCards = getDueCardsForDeck(currentDeckId, false, includeOverdue);
+        nextCard = pickRandomNextCardNormal(dueCards, lastId, false);
+      }
+
+      if (!nextCard && !allowAhead) {
+        setStudyState(StudyState.IDLE);
+        awaitingPostCompletionChoice = true;
+        speak(
+          "Congratulations, you are all caught up, no more cards are due today.",
+          () => {
+            speak(
+              "If you'd like to go back to the main menu, say 'main menu'. Otherwise, would you like me to start study ahead mode, which lets you preview future cards without changing their schedule?",
+              () => {
+                listenForCommand(handleVoiceTranscript);
+              }
+            );
+          }
+        );
+        return;
+      } else if (!nextCard && allowAhead) {
+        setStudyState(StudyState.IDLE);
+        awaitingPostCompletionChoice = true;
+        speak(
+          "There are no more cards available to study in this deck right now.",
+          () => {
+            speak("Say main menu to go back.", () =>
+              listenForCommand(handleVoiceTranscript)
+            );
+          }
+        );
+        return;
+      }
+
+      currentCard = nextCard;
+      setStatus("Studying card...");
+      hasSpokenCurrentQuestion = false;
+      hasSpokenCurrentAnswer = false;
+
+      if (voiceQuestionText) {
+        voiceQuestionText.textContent = currentCard.question;
+      }
+      if (voiceAnswerText) {
+        voiceAnswerText.textContent = currentCard.answer;
+      }
+      if (voiceAnswer) {
+        voiceAnswer.classList.add("hidden");
+      }
+      voiceEditPanel.classList.add("hidden");
+
+      hasSpokenCurrentQuestion = true;
+      setStudyState(StudyState.SHOWING_QUESTION);
+
+      speak(currentCard.question, () => {
+        if (isPaused) return;
+        if (answerMode === "delay") {
+          const delay = Math.max(
+            1,
+            Math.min(60, Math.floor(answerDelayMs / 1000))
+          );
+          // In auto mode we do NOT start listening here,
+          // so the mic isn't open while you're silently thinking.
+          if (!autoGoodMode) {
+            // start listening so "repeat question" etc. work before the answer
+            listenForCommand(handleVoiceTranscript);
+          }
+          setStudyState(StudyState.WAITING_FOR_ANSWER);
+          questionDelayTimerId = setTimeout(() => {
+            if (!isPaused) {
+              speakAnswerThenAskDifficulty();
+            }
+          }, delay * 1000);
+        } else {
+          awaitingAnswerSignal = true;
+          setStudyState(StudyState.WAITING_FOR_ANSWER);
+          setStatus("Listening for your answer...");
+          listenForCommand(handleVoiceTranscript);
+        }
+      });
+    }
+
+    // ===================== SILENT MODE =====================
+    function clearSilentHints() {
+      hintAgain.textContent = "";
+      hintHard.textContent = "";
+      hintGood.textContent = "";
+      hintEasy.textContent = "";
+    }
+
+    function updateSilentDueHints() {
+      if (!currentCard || noScheduleChanges) {
+        clearSilentHints();
+        return;
+      }
+      const deckId = currentDeckId;
+      const cardId = currentCard.id;
+
+      // "Again" always means ~5 minutes (back to ladder level 1)
+      hintAgain.textContent = "5 min >";
+
+      const hardMinutes = previewIntervalMinutes(deckId, cardId, "hard");
+      const goodMinutes = previewIntervalMinutes(deckId, cardId, "good");
+      const easyMinutes = previewIntervalMinutes(deckId, cardId, "easy");
+
+      function formatInterval(minutes) {
+        if (minutes < 60) {
+          const m = Math.max(1, Math.round(minutes));
+          return m + " min";
+        }
+        const hours = minutes / 60;
+        if (hours < 24) {
+          const h = Math.max(1, Math.round(hours));
+          return h + " hr" + (h === 1 ? "" : "s");
+        }
+        const days = minutes / MINUTES_PER_DAY;
+        if (days < 14) {
+          const d = Math.max(1, Math.round(days));
+          return d + " day" + (d === 1 ? "" : "s");
+        }
+        const weeks = days / 7;
+        const w = Math.max(1, Math.round(weeks));
+        return w + " wk" + (w === 1 ? "" : "s");
+      }
+
+      hintHard.textContent = "Next in " + formatInterval(hardMinutes);
+      hintGood.textContent = "Next in " + formatInterval(goodMinutes);
+      hintEasy.textContent = "Next in " + formatInterval(easyMinutes);
+    }
+
+    function runSilentLoop() {
+      if (isPaused) {
+        setStatus("Paused.");
+        return;
+      }
+      const deck = getDeckById(currentDeckId);
+      if (!deck || deck.cards.length === 0) {
+        setStatus("This deck has no cards.");
+        silentQuestionText.textContent = "";
+        silentQuestion.classList.remove("hidden");
+        silentAnswer.classList.add("hidden");
+        showAnswerBtn.classList.remove("hidden");
+        silentRatingButtons.classList.add("hidden");
+        silentNextCardBtn.classList.add("hidden");
+        clearSilentHints();
+        silentCompletionControls.classList.add("hidden");
+        silentEditPanel.classList.add("hidden");
+        setStudyState(StudyState.IDLE);
+        return;
+      }
+      const allowAhead = studyAheadSession;
+      const includeOverdue = !noScheduleChanges;
+      const lastId = currentCard ? currentCard.id : null;
+
+      let nextCard = null;
+
+      // Study-ahead (no schedule changes) uses aheadQueue
+      if (noScheduleChanges && allowAhead) {
+        if (!aheadQueue || aheadQueue.length === 0) {
+          aheadQueue = shuffleArray(getDueCardsForDeck(currentDeckId, true, false));
+          aheadQueueIndex = 0;
+        }
+        if (aheadQueueIndex < aheadQueue.length) {
+          nextCard = aheadQueue[aheadQueueIndex++];
+        } else {
+          nextCard = null;
+        }
+      } else {
+        // Normal schedule-changing mode (silent) with randomized mixing
+        const dueCards = getDueCardsForDeck(currentDeckId, false, includeOverdue);
+        nextCard = pickRandomNextCardNormal(dueCards, lastId, true);
+      }
+
+      if (!nextCard && !allowAhead) {
+        setStatus(
+          "Congratulations, you are all caught up, no more cards are due today."
+        );
+        silentQuestionText.textContent = "";
+        silentQuestion.classList.add("hidden");
+        silentAnswer.classList.add("hidden");
+        showAnswerBtn.classList.add("hidden");
+        silentRatingButtons.classList.add("hidden");
+        silentNextCardBtn.classList.add("hidden");
+        clearSilentHints();
+        pauseBtn.classList.add("hidden");
+        resumeBtn.classList.add("hidden");
+        silentCompletionControls.classList.remove("hidden");
+        silentEditPanel.classList.add("hidden");
+        setStudyState(StudyState.IDLE);
+        return;
+      } else if (!nextCard && allowAhead) {
+        setStatus("There are no more cards available to study in this deck right now.");
+        silentQuestionText.textContent = "";
+        silentQuestion.classList.add("hidden");
+        silentAnswer.classList.add("hidden");
+        showAnswerBtn.classList.add("hidden");
+        silentRatingButtons.classList.add("hidden");
+        silentNextCardBtn.classList.add("hidden");
+        clearSilentHints();
+        silentCompletionControls.classList.add("hidden");
+        silentEditPanel.classList.add("hidden");
+        setStudyState(StudyState.IDLE);
+        return;
+      }
+
+      silentCompletionControls.classList.add("hidden");
+      silentQuestion.classList.remove("hidden");
+      showAnswerBtn.classList.remove("hidden");
+      pauseBtn.classList.remove("hidden");
+      resumeBtn.classList.remove("hidden");
+
+      currentCard = nextCard;
+      setStatus("Studying card...");
+      silentQuestionText.textContent = currentCard.question;
+      silentAnswerText.textContent = currentCard.answer;
+      silentAnswer.classList.add("hidden");
+      silentRatingButtons.classList.add("hidden");
+      clearSilentHints();
+      silentEditPanel.classList.add("hidden");
+
+      voiceQuestionText.textContent = currentCard.question;
+      voiceAnswerText.textContent = currentCard.answer;
+
+      if (noScheduleChanges) {
+        silentNextCardBtn.classList.remove("hidden");
+      } else {
+        silentNextCardBtn.classList.add("hidden");
+      }
+
+      setStudyState(StudyState.SHOWING_QUESTION);
+    }
+
+    showAnswerBtn.addEventListener("click", () => {
+      if (!currentCard) return;
+
+      // study-ahead silent: tap once to show answer, second tap goes next
+      if (noScheduleChanges && !silentAnswer.classList.contains("hidden")) {
+        silentAnswer.classList.add("hidden");
+        clearSilentHints();
+        setStudyState(StudyState.IDLE);
+        runSilentLoop();
+        return;
+      }
+
+      silentAnswer.classList.remove("hidden");
+      setStudyState(StudyState.SHOWING_ANSWER);
+      if (noScheduleChanges) {
+        silentRatingButtons.classList.add("hidden");
+        clearSilentHints();
+      } else {
+        silentRatingButtons.classList.remove("hidden");
+        updateSilentDueHints();
+        setStudyState(StudyState.WAITING_FOR_RATING);
+      }
+    });
+
+    silentNextCardBtn.addEventListener("click", () => {
+      if (!currentCard) return;
+      silentAnswer.classList.add("hidden");
+      clearSilentHints();
+      setStudyState(StudyState.IDLE);
+      runSilentLoop();
+    });
+
+    silentRatingButtons.addEventListener("click", (e) => {
+      const btn = e.target;
+      if (!btn.dataset.rating || !currentCard) return;
+      const ratingKey = btn.dataset.rating;
+      if (!noScheduleChanges) {
+        const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
+        if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
+          queueCardForAgain(currentDeckId, currentCard);
+        }
+      }
+      setStudyState(StudyState.IDLE);
+      runSilentLoop();
+    });
+
+    silentMainMenuBtn.addEventListener("click", () => {
+      silentCompletionControls.classList.add("hidden");
+      endStudySession();
+    });
+
+    silentStudyAheadBtn.addEventListener("click", () => {
+      silentCompletionControls.classList.add("hidden");
+      studyAheadSession = true;
+      noScheduleChanges = true;
+
+      aheadQueue = shuffleArray(getDueCardsForDeck(currentDeckId, true, false));
+      aheadQueueIndex = 0;
+
+      silentQuestion.classList.remove("hidden");
+      showAnswerBtn.classList.remove("hidden");
+      pauseBtn.classList.remove("hidden");
+      resumeBtn.classList.remove("hidden");
+      silentNextCardBtn.classList.remove("hidden");
+      runSilentLoop();
+    });
+
+    startSilentBtn.addEventListener("click", () => {
+      currentDeckId = selectedDeckId;
+      if (!currentDeckId) return;
+      skipInstructionsAfterFirst = !!skipInstructionsAfterFirstCheckbox.checked;
+      // Start in normal due-today mode; study-ahead entered from completion controls
+      studyAheadSession = false;
+      noScheduleChanges = false;
+      reviewQueue = [];
+      aheadQueue = [];
+      aheadQueueIndex = 0;
+      silentCompletionControls.classList.add("hidden");
+      silentNextCardBtn.classList.add("hidden");
+
+      silentUI.classList.remove("hidden");
+      voiceUI.classList.add("hidden");
+
+      showStudySection("silent");
+      runSilentLoop();
+    });
+
+    // ===================== INIT & AUTO MODE WIRING =====================
+    // Disable rating select when automatic mode is off (UX polish)
+    autoRatingSelect.disabled = true;
+    autoGoodToggle.addEventListener("change", () => {
+      autoRatingSelect.disabled = !autoGoodToggle.checked;
+    });
+
+    function describeAutoIntro() {
+      const desc = describeAutoModeBehavior();
+      if (autoModeBehavior === "tomorrow") {
+        return "Starting automatic hands free study session. I will read the question, then the answer, and " + desc + ".";
+      }
+      return "Starting automatic hands free study session. I will read the question, then the answer, and " + desc + ".";
+    }
+
+    // >>> MODIFIED: add async + inline mic permission request here <<<
+    startVoiceBtn.addEventListener("click", async () => {
+      // 🔊 Browser-only: Request microphone permission first (required in Safari/etc).
+      // If we're using the native iOS plugin, it handles mic/speech permissions natively.
+      if (!nativeVoicePlugin && !autoGoodMode && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          // Stop tracks immediately; we just needed the permission prompt
+          if (stream && stream.getTracks) {
+            stream.getTracks().forEach(track => track.stop());
+          }
+          console.log("Microphone permission requested.");
+        } catch (err) {
+          console.error("Microphone permission error:", err);
+          alert(
+            "Microphone access is required for hands-free study in the browser. " +
+            "Please enable it in your browser's site settings and try again."
+          );
+          return; // Stop if user denied
+        }
+      }
+
+      currentDeckId = selectedDeckId;
+      if (!currentDeckId) return;
+      autoModeBehavior = autoRatingSelect.value || "good";
+      autoGoodMode = !!autoGoodToggle.checked;
+
+      // If there is NO native plugin and NO browser STT, and we are not in auto mode,
+      // then we can't do voice commands.
+      if (!nativeVoicePlugin && !speechSupported && !autoGoodMode) {
+        alert("Speech recognition not supported in this environment.");
+        return;
+      }
+
+      skipInstructionsAfterFirst = !!skipInstructionsAfterFirstCheckbox.checked;
+      hasSpokenInstructionsOnce = false;
+      // Start in normal "due today" mode; study-ahead is only entered after completion
+      studyAheadSession = false;
+      noScheduleChanges = false;
+      studyAheadPromptedOnceVoice = false;
+      reviewQueue = [];
+      aheadQueue = [];
+      aheadQueueIndex = 0;
+      clearStudyAheadGapTimer();
+      clearQuestionDelayTimer();
+      hasSpokenCurrentQuestion = false;
+      hasSpokenCurrentAnswer = false;
+
+      // If auto mode is on, we force delay mode (no STT needed)
+      if (autoGoodMode) {
+        answerMode = "delay";
+      } else {
+        answerMode = answerModeVoiceRadio.checked ? "voice" : "delay";
+      }
+
+      const secs = parseInt(answerDelaySecondsInput.value, 10);
+      answerDelayMs = isNaN(secs)
+        ? 4000
+        : Math.max(1, Math.min(60, secs)) * 1000;
+
+      const gapSecs = parseInt(studyAheadGapSecondsInput.value, 10);
+      studyAheadGapMs = isNaN(gapSecs)
+        ? 4000
+        : Math.max(1, Math.min(60, gapSecs)) * 1000;
+
+      voiceUI.classList.remove("hidden");
+      silentUI.classList.add("hidden");
+
+      showStudySection("voice");
+      const intro = autoGoodMode
+        ? describeAutoIntro()
+        : "Starting hands free study session. I will read a question, then the answer, then ask how hard it was.";
+      setStudyState(StudyState.IDLE);
+      speak(intro, () => {
+        runVoiceLoop();
+      });
+    });
+    // <<< END MODIFIED HANDLER <<<
+
+    (async function init() {
+  // 1) Start with whatever is in localStorage (or sample deck)
+  loadFromStorage();
+
+  // 2) Then try to overwrite with Supabase state if it exists
+  await loadStateFromSupabase();
+
+  // 3) Finally, draw the UI
+  refreshDeckSelect();
+  refreshCardsList();
+})();
+
+  </script>
+</body>
+</html>
