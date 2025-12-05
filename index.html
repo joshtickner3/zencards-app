@@ -557,9 +557,10 @@ async function signUpWithEmail() {
     return;
   }
 
-  const { data, error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-  redirectTo: "https://joshtickner3.github.io/zencards-app/reset.html"
-});
+  const { data, error } = await supabaseClient.auth.signUp({
+    email,
+    password,
+  });
 
   if (error) {
     console.error("Sign-up error:", error);
@@ -618,8 +619,8 @@ async function sendPasswordReset() {
   }
  
   const { data, error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-    redirectTo: "http://localhost:5500/reset.html"
-  });
+  redirectTo: "https://joshtickner3.github.io/zencards-app/reset.html"
+});
 
   if (error) {
     console.error("Reset password error:", error);
@@ -637,20 +638,20 @@ if (signUpBtn) {
   });
 }
 
-if (logInBtn) {
-  logInBtn.addEventListener("click", () => {
+if (signInBtn) {
+  signInBtn.addEventListener("click", () => {
     signInWithEmail();
   });
 }
 
-if (logOutBtn) {
-  logOutBtn.addEventListener("click", () => {
+if (signOutBtn) {
+  signOutBtn.addEventListener("click", () => {
     signOutFromApp();
   });
 }
 
-if (resetPasswordBtn) {
-  resetPasswordBtn.addEventListener("click", () => {
+if (resetPwBtn) {
+  resetPwBtn.addEventListener("click", () => {
     sendPasswordReset();
   });
 }
