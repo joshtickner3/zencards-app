@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Reset Password</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <h2>Reset Password</h2>
+
+  <p id="status"></p>
+
+  <input id="newPw" type="password" placeholder="New password">
+  <button id="resetBtn">Set New Password</button>
+
+  <script>
+    const supabase = window.supabase.createClient(
+      "https://elpfcnnrripftxoqeckv.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ"
+    );
+
+    document.getElementById("resetBtn").addEventListener("click", async () => {
+      const newPw = document.getElementById("newPw").value.trim();
+      if (!newPw) {
+        document.getElementById("status").textContent = "Enter a password.";
+        return;
+      }
+
+      const { error } = await supabase.auth.updateUser({
+        password: newPw
+      });
+
+      if (error) {
+        document.getElementById("status").textContent = "Error: " + error.message;
+      } else {
+        document.getElementById("status").textContent = "Password updated! You may close this page.";
+      }
+    });
+  </script>
+</body>
+</html>
