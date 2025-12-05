@@ -557,10 +557,9 @@ async function signUpWithEmail() {
     return;
   }
 
-  const { data, error } = await supabaseClient.auth.signUp({
-    email,
-    password,
-  });
+  const { data, error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+  redirectTo: "https://joshtickner3.github.io/zencards-app/reset.html"
+});
 
   if (error) {
     console.error("Sign-up error:", error);
@@ -638,20 +637,20 @@ if (signUpBtn) {
   });
 }
 
-if (signInBtn) {
-  signInBtn.addEventListener("click", () => {
+if (logInBtn) {
+  logInBtn.addEventListener("click", () => {
     signInWithEmail();
   });
 }
 
-if (signOutBtn) {
-  signOutBtn.addEventListener("click", () => {
+if (logOutBtn) {
+  logOutBtn.addEventListener("click", () => {
     signOutFromApp();
   });
 }
 
-if (resetPwBtn) {
-  resetPwBtn.addEventListener("click", () => {
+if (resetPasswordBtn) {
+  resetPasswordBtn.addEventListener("click", () => {
     sendPasswordReset();
   });
 }
