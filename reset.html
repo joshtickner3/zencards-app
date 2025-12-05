@@ -136,8 +136,23 @@
 
       supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-      const url = new URL(window.location.href);
-      const code = url.searchParams.get("code");
+      // Support both ?code=... and #access_token=... shapes
+const url = new URL(window.location.href);
+
+// 1) Try query param ?code=...
+let code = url.searchParams.get("code");
+
+// 2) If not present, parse from the hash fragment
+if (!code && url.hash) {
+  const hashParams = new URLSearchParams(url.hash.substring(1)); // remove '#'
+  // For Supabase "recovery" links, the token is usually in access_token
+  code = hashParams.get("code") || hashParams.get("access_token");
+}
+
+if (!code) {
+  setStatus("Invalid or missing reset code. Please request a new reset email.");
+  return;
+}
 
       if (!code) {
         setStatus("Invalid or missing reset code. Please request a new reset email.");
