@@ -113,10 +113,8 @@
   </div>
 
   <script>
-    // === YOUR SUPABASE PROJECT INFO ===
     const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
-    const SUPABASE_ANON_KEY =
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
 
     let supabaseClient = null;
 
@@ -130,28 +128,24 @@
       statusEl.textContent = msg;
     }
 
-    // Try to get a session either from ?code=... or from #access_token=...
-    async function getRecoverySession() {
-      const url = new URL(window.location.href);
-      const codeFromQuery = url.searchParams.get("code");
+    // Helper: parse "code" from either ?query or #hash
+    function getCodeFromUrl() {
+      const href = window.location.href;
+      const url = new URL(href);
 
-      // New-style (PKCE) links: ?code=...
-      if (codeFromQuery) {
-        return await supabaseClient.auth.exchangeCodeForSession(codeFromQuery);
+      // 1) Try ?code=... first
+      const searchCode = url.searchParams.get("code");
+      if (searchCode) return searchCode;
+
+      // 2) If not there, look in the hash: #access_token=...&type=...&code=...
+      if (url.hash && url.hash.length > 1) {
+        const hash = url.hash.substring(1); // remove leading '#'
+        const params = new URLSearchParams(hash);
+        const hashCode = params.get("code");
+        if (hashCode) return hashCode;
       }
 
-      // Old-style links: #access_token=...&refresh_token=...&type=recovery
-      if (window.location.hash && window.location.hash.length > 1) {
-        return await supabaseClient.auth.getSessionFromUrl({
-          storeSession: false, // we just need it for this page
-        });
-      }
-
-      // Nothing to work with
-      return {
-        data: { session: null },
-        error: new Error("Missing recovery code in URL."),
-      };
+      return null;
     }
 
     async function main() {
@@ -162,14 +156,34 @@
 
       supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+      const code = getCodeFromUrl();
+
+      if (!code) {
+        setStatus("Invalid or missing reset code. Please request a new reset email.");
+        return;
+      }
+
       setStatus("Verifying reset link…");
 
-      const { data, error } = await getRecoverySession();
-      const session = data && data.session ? data.session : null;
-
-      if (error || !session || !session.user) {
-        console.error("Recovery session error:", error);
+      let exchangeResult;
+      try {
+        exchangeResult = await supabaseClient.auth.exchangeCodeForSession(code);
+      } catch (err) {
+        console.error("exchangeCodeForSession threw:", err);
         setStatus("This reset link is invalid or expired. Please request a new reset email.");
+        return;
+      }
+
+      const { data, error } = exchangeResult || {};
+
+      if (error) {
+        console.error("exchangeCodeForSession error:", error);
+        setStatus("This reset link is invalid or expired. Please request a new reset email.");
+        return;
+      }
+
+      if (!data || !data.session) {
+        setStatus("Could not establish a session from this reset link. Please request a new reset email.");
         return;
       }
 
@@ -187,7 +201,7 @@
         resetBtn.disabled = true;
         setStatus("Updating password…");
 
-        const { error: updateError } = await supabaseClient.auth.updateUser({
+        const { data: updateData, error: updateError } = await supabaseClient.auth.updateUser({
           password: newPw,
         });
 
