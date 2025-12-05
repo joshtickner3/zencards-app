@@ -4,10 +4,8 @@
   <meta charset="UTF-8" />
   <title>Reset Password — ZenCards</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  
   <!-- Supabase JS v2 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
   <style>
     body {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
@@ -48,6 +46,11 @@
       box-sizing: border-box;
       font-size: 0.9rem;
     }
+    input[type="password"]:focus {
+      outline: none;
+      border-color: #22c55e;
+      box-shadow: 0 0 0 1px rgba(34,197,94,0.35);
+    }
     button {
       margin-top: 0.75rem;
       width: 100%;
@@ -59,7 +62,21 @@
       color: #020617;
       font-weight: 600;
       font-size: 0.95rem;
+      transition:
+        background 0.15s ease,
+        transform 0.08s ease,
+        box-shadow 0.12s ease;
       box-shadow: 0 8px 18px rgba(16,185,129,0.28);
+    }
+    button:hover:not(:disabled) {
+      background: #22c55e;
+      transform: translateY(-1px);
+      box-shadow: 0 10px 22px rgba(34,197,94,0.35);
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: default;
+      box-shadow: none;
     }
     #status {
       margin-top: 0.75rem;
@@ -67,29 +84,39 @@
       color: #9ca3af;
       min-height: 1.2em;
     }
+    a {
+      color: #22c55e;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
   </style>
 </head>
-
 <body>
   <div class="card">
     <h1>Reset your password</h1>
-    <p id="status">Checking reset link…</p>
+    <p id="status">Checking your reset link…</p>
 
     <div id="formContainer" style="display:none;">
       <label for="newPassword">New password</label>
       <input id="newPassword" type="password" placeholder="Enter a new password" />
+
       <button id="resetBtn">Set new password</button>
     </div>
 
     <p id="doneMessage" style="display:none;margin-top:0.75rem;">
-      Password updated.  
-      <a href="https://joshtickner3.github.io/zencards-app/">Return to ZenCards</a>.
+      Password updated. You can now
+      <a href="https://joshtickner3.github.io/zencards-app/">open ZenCards</a>
+      and log in with your new password.
     </p>
   </div>
 
   <script>
+    // === YOUR SUPABASE PROJECT INFO ===
     const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
+    const SUPABASE_ANON_KEY =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
 
     let supabaseClient = null;
 
@@ -103,31 +130,51 @@
       statusEl.textContent = msg;
     }
 
+    // Try to get a session either from ?code=... or from #access_token=...
+    async function getRecoverySession() {
+      const url = new URL(window.location.href);
+      const codeFromQuery = url.searchParams.get("code");
+
+      // New-style (PKCE) links: ?code=...
+      if (codeFromQuery) {
+        return await supabaseClient.auth.exchangeCodeForSession(codeFromQuery);
+      }
+
+      // Old-style links: #access_token=...&refresh_token=...&type=recovery
+      if (window.location.hash && window.location.hash.length > 1) {
+        return await supabaseClient.auth.getSessionFromUrl({
+          storeSession: false, // we just need it for this page
+        });
+      }
+
+      // Nothing to work with
+      return {
+        data: { session: null },
+        error: new Error("Missing recovery code in URL."),
+      };
+    }
+
     async function main() {
-      supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-      // ⚠️ IMPORTANT: Supabase sends the reset token in the URL fragment:
-      // https://.../reset.html#access_token=XYZ&type=recovery
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const token = hashParams.get("access_token");
-
-      if (!token) {
-        setStatus("Invalid or missing reset code. Please request a new reset email.");
+      if (typeof supabase === "undefined") {
+        setStatus("Error: Supabase library failed to load.");
         return;
       }
+
+      supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
       setStatus("Verifying reset link…");
 
-      // Exchange the token for a session
-      const { data, error } = await supabaseClient.auth.exchangeCodeForSession(token);
+      const { data, error } = await getRecoverySession();
+      const session = data && data.session ? data.session : null;
 
-      if (error) {
-        console.error(error);
-        setStatus("This reset link is invalid or expired.");
+      if (error || !session || !session.user) {
+        console.error("Recovery session error:", error);
+        setStatus("This reset link is invalid or expired. Please request a new reset email.");
         return;
       }
 
-      setStatus("Link verified. Enter your new password.");
+      // We now have a valid session, user is effectively logged in
+      setStatus("Link verified. Enter a new password below.");
       formContainer.style.display = "block";
 
       resetBtn.addEventListener("click", async () => {
@@ -137,25 +184,27 @@
           return;
         }
 
-        setStatus("Updating password…");
         resetBtn.disabled = true;
+        setStatus("Updating password…");
 
-        const { error: updateError } = await supabaseClient.auth.updateUser({ password: newPw });
+        const { error: updateError } = await supabaseClient.auth.updateUser({
+          password: newPw,
+        });
 
         if (updateError) {
-          setStatus("Error: " + updateError.message);
+          console.error("updateUser error:", updateError);
+          setStatus("Error updating password: " + updateError.message);
           resetBtn.disabled = false;
           return;
         }
 
+        setStatus("");
         formContainer.style.display = "none";
         doneMessage.style.display = "block";
-        setStatus("");
       });
     }
 
     main();
   </script>
-
 </body>
 </html>
