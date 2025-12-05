@@ -532,9 +532,10 @@
     // ===================== SUPABASE CONFIG =====================
 const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";  
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Create the Supabase client
-let supabaseClient = null;
+let supabaseClient = supabase;
 let currentUser = null;
 
 // ===== AUTH DOM REFERENCES =====
@@ -690,20 +691,13 @@ function updateAuthButtons() {
   }
 }
 
-if (typeof supabase !== "undefined") {
-  supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  console.log("Supabase client initialized");
-
-  supabaseClient.auth.onAuthStateChange((event, session) => {
-    currentUser = session?.user || null;
-    updateAuthButtons();
-    if (currentUser) {
-      loadStateFromSupabase();
-    }
-  });
-} else {
-  console.error("Supabase library not loaded — check CDN script in <head>.");
-}
+supabaseClient.auth.onAuthStateChange((event, session) => {
+  currentUser = session?.user || null;
+  updateAuthButtons();
+  if (currentUser) {
+    loadStateFromSupabase();
+  }
+});
 
     // ===================== DATA & STORAGE =====================
     let decks = [];
@@ -715,6 +709,12 @@ if (typeof supabase !== "undefined") {
     //   dueTime: ms since epoch
     // }
     let schedule = {};
+function getCurrentState() {
+  return {
+    decks,
+    schedule,
+  };
+}
 
     const MINUTES_PER_DAY = 1440;
     const LADDER_LEVEL_MINUTES = {
@@ -774,18 +774,16 @@ async function saveStateToSupabase() {
   // Only sync when logged in
   if (!supabaseClient || !currentUser) return;
 
-  const payload = {
-    decks,
-    schedule,
-  };
+  const state = getCurrentState();
 
   try {
     const { error } = await supabaseClient
       .from("zencards_state")
       .upsert({
-        user_id: currentUser.id,   // <— row is keyed by logged-in user
-        state_json: payload,
+        user_id: currentUser.id,
+        state_json: state,
       });
+
 
     if (error) {
       console.error("Supabase save error:", error);
