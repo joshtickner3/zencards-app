@@ -538,7 +538,7 @@ const { createClient } = window.supabase;
 const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser = null;
-
+let isSigningOut = false;
 
 // ===== AUTH DOM REFERENCES =====
 const authEmailInput = document.getElementById("authEmail");
@@ -602,26 +602,25 @@ async function signInWithEmail() {
 }
 
 async function signOutFromApp() {
-  const { data } = await supabaseClient.auth.getSession();
+  isSigningOut = true;
 
-  if (!data.session) {
-    // No session in this browser – just clear UI
-    currentUser = null;
-    setAuthStatus("Not signed in.");
-    updateAuthButtons();
-    return;
+  try {
+    const { error } = await supabaseClient.auth.signOut();
+
+    // Ignore "Auth session missing"
+    if (error && error.message !== "Auth session missing") {
+      console.error("Sign-out error:", error);
+    }
+  } catch (err) {
+    console.error("Sign-out exception:", err);
   }
 
-  const { error } = await supabaseClient.auth.signOut();
-  if (error && error.message !== "Auth session missing") {
-    console.error("Sign-out error:", error);
-    setAuthStatus("Sign-out error: " + error.message);
-    return;
-  }
-
+  // Force-clear local auth state
   currentUser = null;
   setAuthStatus("Signed out.");
   updateAuthButtons();
+
+  isSigningOut = false;
 }
    
 async function sendPasswordReset() {
@@ -704,8 +703,12 @@ function updateAuthButtons() {
 }
 
 supabaseClient.auth.onAuthStateChange((event, session) => {
+  // Ignore auth events triggered during manual sign-out
+  if (isSigningOut) return;
+
   currentUser = session?.user || null;
   updateAuthButtons();
+
   if (currentUser) {
     loadStateFromSupabase();
   }
