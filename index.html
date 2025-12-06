@@ -602,8 +602,18 @@ async function signInWithEmail() {
 }
 
 async function signOutFromApp() {
+  const { data } = await supabaseClient.auth.getSession();
+
+  if (!data.session) {
+    // No session in this browser – just clear UI
+    currentUser = null;
+    setAuthStatus("Not signed in.");
+    updateAuthButtons();
+    return;
+  }
+
   const { error } = await supabaseClient.auth.signOut();
-  if (error) {
+  if (error && error.message !== "Auth session missing") {
     console.error("Sign-out error:", error);
     setAuthStatus("Sign-out error: " + error.message);
     return;
