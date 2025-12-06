@@ -602,20 +602,47 @@ async function signInWithEmail() {
 }
 
 async function signOutFromApp() {
+  // We’re explicitly in the middle of a manual sign-out
   isSigningOut = true;
 
   try {
+    // Check if this browser even has a session
+    const { data: sessionData, error: sessionError } =
+      await supabaseClient.auth.getSession();
+
+    if (sessionError) {
+      console.error("getSession error during sign-out:", sessionError);
+    }
+
+    // If there's no session in THIS browser, just clear the UI and bail out
+    if (!sessionData || !sessionData.session) {
+      console.log("No auth session in this browser; treating as signed out.");
+      currentUser = null;
+      setAuthStatus("Not signed in.");
+      updateAuthButtons();
+      isSigningOut = false;
+      return;
+    }
+
+    // There *is* a session here, so try to sign out
     const { error } = await supabaseClient.auth.signOut();
 
-    // Ignore "Auth session missing"
+    // Ignore the special "Auth session missing" case – it just means
+    // Supabase couldn't find a session token, which is fine for log out
     if (error && error.message !== "Auth session missing") {
       console.error("Sign-out error:", error);
+      setAuthStatus("Sign-out error: " + error.message);
+      isSigningOut = false;
+      return;
     }
   } catch (err) {
     console.error("Sign-out exception:", err);
+    setAuthStatus("Sign-out error: " + err.message);
+    isSigningOut = false;
+    return;
   }
 
-  // Force-clear local auth state
+  // If we get here, we’re treating the user as signed out no matter what
   currentUser = null;
   setAuthStatus("Signed out.");
   updateAuthButtons();
