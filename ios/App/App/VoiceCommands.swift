@@ -14,6 +14,8 @@ public class VoiceCommands: CAPPlugin {
     private var hasMicPermission = false
     private var hasSpeechPermission = false
 
+    // MARK: - JS API
+
     // Called from JS to start listening
     @objc func start(_ call: CAPPluginCall) {
         requestPermissionsIfNeeded { granted in
@@ -72,35 +74,75 @@ public class VoiceCommands: CAPPlugin {
         }
     }
 
+    // MARK: - Audio Session
+
+    /// Configure the audio session so:
+    /// - we can record (for STT)
+    /// - audio keeps using AirPods / Bluetooth when connected
+    /// - we do NOT force output back to the phone speaker
+    private func configureAudioSessionForZenCards() {
+        let audioSession = AVAudioSession.sharedInstance()
+        do {
+            try audioSession.setCategory(
+                .playAndRecord,
+                mode: .spokenAudio,
+                options: [
+                    .allowBluetooth,
+                    .allowBluetoothA2DP,
+                    .duckOthers   // optional: gently lower other audio
+                ]
+            )
+
+            // Don't overrideOutputAudioPort(.speaker) — that would force phone speaker.
+            try audioSession.setActive(true, options: [])
+        } catch {
+            print("AudioSession config error: \(error)")
+        }
+    }
+
     // MARK: - Listening
 
     private func startListening() throws {
-        stopListening() // reset any existing recognition
+        // Reset any existing recognition first
+        stopListening()
 
-        let audioSession = AVAudioSession.sharedInstance()
-        try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
-        try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+        // VERY IMPORTANT: configure the audio session before starting the engine
+        configureAudioSessionForZenCards()
 
+        // Create a new recognition request
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         guard let recognitionRequest = recognitionRequest else {
-            throw NSError(domain: "VoiceCommands", code: -1, userInfo: [NSLocalizedDescriptionKey: "Unable to create recognition request"])
+            throw NSError(
+                domain: "VoiceCommands",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Unable to create recognition request"]
+            )
         }
+
         recognitionRequest.shouldReportPartialResults = true
 
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
 
+        // Remove any previous taps
         inputNode.removeTap(onBus: 0)
-        inputNode.installTap(onBus: 0,
-                             bufferSize: 1024,
-                             format: recordingFormat) { [weak self] (buffer, _) in
+
+        // Install a new tap to feed audio into the recognition request
+        inputNode.installTap(
+            onBus: 0,
+            bufferSize: 1024,
+            format: recordingFormat
+        ) { [weak self] (buffer, _) in
             self?.recognitionRequest?.append(buffer)
         }
 
         audioEngine.prepare()
         try audioEngine.start()
 
-        recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+        // Start the recognition task
+        recognitionTask = speechRecognizer?.recognitionTask(
+            with: recognitionRequest
+        ) { [weak self] result, error in
             guard let self = self else { return }
 
             if let result = result {
@@ -134,11 +176,12 @@ public class VoiceCommands: CAPPlugin {
         recognitionRequest = nil
 
         // Stop audio engine
-        audioEngine.stop()
+        if audioEngine.isRunning {
+            audioEngine.stop()
+        }
         audioEngine.inputNode.removeTap(onBus: 0)
 
-        // OPTIONAL BUT HIGHLY RECOMMENDED:
-        // Properly deactivate audio session so the mic is released
+        // Deactivate audio session so the system can route audio normally again
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
@@ -152,4 +195,3 @@ public class VoiceCommands: CAPPlugin {
         }
     }
 }
-

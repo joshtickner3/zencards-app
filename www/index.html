@@ -225,6 +225,41 @@
 </head>
 <body>
   <div class="container">
+        <!-- ========== AUTH / ACCOUNT ========== -->
+    <div id="authSection" class="card">
+      <h2>Account</h2>
+      <p id="authStatus" style="font-size:0.85rem;color:#9ca3af;margin-bottom:0.5rem;">
+        Not signed in.
+      </p>
+
+      <!-- Shown when logged OUT -->
+      <div id="authLoggedOut">
+        <div class="row">
+          <div>
+            <label for="authEmail">Email</label>
+            <input id="authEmail" type="text" placeholder="you@example.com" />
+          </div>
+          <div>
+            <label for="authPassword">Password</label>
+            <input id="authPassword" type="password" placeholder="••••••••" />
+          </div>
+        </div>
+        <div class="row" style="margin-top:0.5rem;">
+          <button id="signUpBtn">Sign Up</button>
+          <button id="logInBtn" class="secondary">Log In</button>
+          <button id="resetPasswordBtn" class="secondary small">Reset Password</button>
+        </div>
+      </div>
+
+      <!-- Shown when logged IN -->
+      <div id="authLoggedIn" class="hidden">
+        <p style="margin-bottom:0.5rem;">
+          Signed in as <strong id="userEmailLabel"></strong>
+        </p>
+        <button id="logOutBtn" class="secondary small">Log Out</button>
+      </div>
+    </div>
+
     <div class="appHeader">
       <div class="logoMark">Z</div>
       <h1 class="appTitle">ZenCards</h1>
@@ -495,18 +530,216 @@
 
   <script>
     // ===================== SUPABASE CONFIG =====================
-const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";  
+const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
 
-// Create the Supabase client
-let supabaseClient = null;
+// Use the UMD global from the CDN
+const { createClient } = window.supabase;
+const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-if (typeof supabase !== "undefined") {
-  supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  console.log("Supabase client initialized");
-} else {
-  console.error("Supabase library not loaded — check CDN script in <head>.");
+let currentUser = null;
+let isSigningOut = false;
+
+// ===== AUTH DOM REFERENCES =====
+const authEmailInput = document.getElementById("authEmail");
+const authPasswordInput = document.getElementById("authPassword");
+
+const signUpBtn = document.getElementById("signUpBtn");
+const signInBtn = document.getElementById("logInBtn");           // correct ID
+const signOutBtn = document.getElementById("logOutBtn");         // correct ID
+const resetPwBtn = document.getElementById("resetPasswordBtn");  // correct ID
+
+const authStatusSpan = document.getElementById("authStatus");
+
+// ===== AUTH FUNCTIONS (SIGN UP / SIGN IN / SIGN OUT / RESET PASSWORD) =====
+async function signUpWithEmail() {
+  const email = authEmailInput.value.trim();
+  const password = authPasswordInput.value.trim();
+  if (!email || !password) {
+    setAuthStatus("Please enter an email and password.");
+    return;
+  }
+
+  const { data, error } = await supabaseClient.auth.signUp({
+    email,
+    password,
+  });
+
+  if (error) {
+    console.error("Sign-up error:", error);
+    setAuthStatus("Sign-up error: " + error.message);
+    return;
+  }
+
+  setAuthStatus("Sign-up successful. Check your email for verification.");
 }
+
+async function signInWithEmail() {
+  const email = authEmailInput.value.trim();
+  const password = authPasswordInput.value.trim();
+  if (!email || !password) {
+    setAuthStatus("Please enter an email and password.");
+    return;
+  }
+
+  const { data, error } = await supabaseClient.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) {
+    console.error("Log-in error:", error);
+    setAuthStatus("Log-in error: " + error.message);
+    return;
+  }
+
+  currentUser = data.user;
+  setAuthStatus("Logged in as: " + currentUser.email);
+  updateAuthButtons();
+  await loadStateFromSupabase();
+  refreshDeckSelect();
+  refreshCardsList();
+}
+
+async function signOutFromApp() {
+  // We’re explicitly in the middle of a manual sign-out
+  isSigningOut = true;
+
+  try {
+    // Check if this browser even has a session
+    const { data: sessionData, error: sessionError } =
+      await supabaseClient.auth.getSession();
+
+    if (sessionError) {
+      console.error("getSession error during sign-out:", sessionError);
+    }
+
+    // If there's no session in THIS browser, just clear the UI and bail out
+    if (!sessionData || !sessionData.session) {
+      console.log("No auth session in this browser; treating as signed out.");
+      currentUser = null;
+      setAuthStatus("Not signed in.");
+      updateAuthButtons();
+      isSigningOut = false;
+      return;
+    }
+
+    // There *is* a session here, so try to sign out
+    const { error } = await supabaseClient.auth.signOut();
+
+    // Ignore the special "Auth session missing" case – it just means
+    // Supabase couldn't find a session token, which is fine for log out
+    if (error && error.message !== "Auth session missing") {
+      console.error("Sign-out error:", error);
+      setAuthStatus("Sign-out error: " + error.message);
+      isSigningOut = false;
+      return;
+    }
+  } catch (err) {
+    console.error("Sign-out exception:", err);
+    setAuthStatus("Sign-out error: " + err.message);
+    isSigningOut = false;
+    return;
+  }
+
+  // If we get here, we’re treating the user as signed out no matter what
+  currentUser = null;
+  setAuthStatus("Signed out.");
+  updateAuthButtons();
+
+  isSigningOut = false;
+}
+   
+async function sendPasswordReset() {
+  const email = authEmailInput.value.trim();
+  if (!email) {
+    setAuthStatus("Enter your email to reset password.");
+    return;
+  }
+ 
+  const { data, error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+  redirectTo: "https://joshtickner3.github.io/zencards-app/reset.html"
+});
+
+  if (error) {
+    console.error("Reset password error:", error);
+    setAuthStatus("Reset error: " + error.message);
+    return;
+  }
+
+  setAuthStatus("Password reset email sent.");
+}
+
+// ===== BUTTON EVENT HOOKS =====
+if (signUpBtn) {
+  signUpBtn.addEventListener("click", () => {
+    signUpWithEmail();
+  });
+}
+
+if (signInBtn) {
+  signInBtn.addEventListener("click", () => {
+    signInWithEmail();
+  });
+}
+
+if (signOutBtn) {
+  signOutBtn.addEventListener("click", () => {
+    signOutFromApp();
+  });
+}
+
+if (resetPwBtn) {
+  resetPwBtn.addEventListener("click", () => {
+    sendPasswordReset();
+  });
+}
+
+function setAuthStatus(message) {
+  if (authStatusSpan) authStatusSpan.textContent = message;
+}
+
+function updateAuthButtons() {
+  if (!currentUser) {
+    // Logged OUT state
+    if (signOutBtn) signOutBtn.disabled = true;
+
+    // Hide logged-in UI
+    const loggedIn = document.getElementById("authLoggedIn");
+    const loggedOut = document.getElementById("authLoggedOut");
+    if (loggedIn) loggedIn.classList.add("hidden");
+    if (loggedOut) loggedOut.classList.remove("hidden");
+
+    setAuthStatus("Not signed in.");
+  } else {
+    // Logged IN state
+    if (signOutBtn) signOutBtn.disabled = false;
+
+    // Update label “Signed in as …”
+    const emailLabel = document.getElementById("userEmailLabel");
+    if (emailLabel) emailLabel.textContent = currentUser.email;
+
+    // Show correct UI blocks
+    const loggedIn = document.getElementById("authLoggedIn");
+    const loggedOut = document.getElementById("authLoggedOut");
+    if (loggedIn) loggedIn.classList.remove("hidden");
+    if (loggedOut) loggedOut.classList.add("hidden");
+
+    setAuthStatus("Signed in as: " + currentUser.email);
+  }
+}
+
+supabaseClient.auth.onAuthStateChange((event, session) => {
+  // Ignore auth events triggered during manual sign-out
+  if (isSigningOut) return;
+
+  currentUser = session?.user || null;
+  updateAuthButtons();
+
+  if (currentUser) {
+    loadStateFromSupabase();
+  }
+});
 
     // ===================== DATA & STORAGE =====================
     let decks = [];
@@ -518,6 +751,12 @@ if (typeof supabase !== "undefined") {
     //   dueTime: ms since epoch
     // }
     let schedule = {};
+function getCurrentState() {
+  return {
+    decks,
+    schedule,
+  };
+}
 
     const MINUTES_PER_DAY = 1440;
     const LADDER_LEVEL_MINUTES = {
@@ -574,45 +813,56 @@ function saveSchedule() {
 
 // ===================== SUPABASE SYNC HELPERS =====================
 async function saveStateToSupabase() {
-  if (!supabaseClient) return;
+  // Only sync when logged in
+  if (!supabaseClient || !currentUser) {
+    console.log("Not saving to Supabase: no client or no currentUser");
+    return;
+  }
 
-  const payload = {
-    decks,
-    schedule,
-  };
+  const state = getCurrentState();
+  console.log("Saving state to Supabase for user:", currentUser.id, state);
 
   try {
-    const { error } = await supabaseClient
+    const { data, error } = await supabaseClient
       .from("zencards_state")
       .upsert({
-        id: "default",          // single row for this user/browser
-        state_json: payload,
-      });
+        user_id: currentUser.id,
+        state_json: state,
+      })
+      .select();
 
     if (error) {
       console.error("Supabase save error:", error);
+      setAuthStatus("Supabase save error: " + error.message);
     } else {
-      console.log("Supabase state saved.");
+      console.log("Supabase state saved. Row:", data);
     }
   } catch (err) {
     console.error("Supabase save exception:", err);
+    setAuthStatus("Supabase save exception: " + err.message);
   }
 }
 
 async function loadStateFromSupabase() {
-  if (!supabaseClient) return;
+  if (!supabaseClient || !currentUser) {
+    console.log("Not loading from Supabase: no client or no currentUser");
+    return;
+  }
 
   try {
     const { data, error } = await supabaseClient
       .from("zencards_state")
       .select("state_json")
-      .eq("id", "default")
+      .eq("user_id", currentUser.id)
       .limit(1);
 
     if (error) {
       console.error("Supabase load error:", error);
+      setAuthStatus("Supabase load error: " + error.message);
       return;
     }
+
+    console.log("Supabase load result:", data);
 
     if (data && data.length > 0 && data[0].state_json) {
       const remote = data[0].state_json;
@@ -624,14 +874,14 @@ async function loadStateFromSupabase() {
         schedule = remote.schedule;
       }
 
-      console.log("Loaded state from Supabase.");
+      console.log("Loaded state from Supabase into app.");
     } else {
-      // No row yet — push our current local state up once
       console.log("No Supabase state yet; saving initial local state.");
       await saveStateToSupabase();
     }
   } catch (err) {
     console.error("Supabase load exception:", err);
+    setAuthStatus("Supabase load exception: " + err.message);
   }
 }
 

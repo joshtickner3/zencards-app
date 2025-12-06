@@ -115,6 +115,7 @@
   <script>
     const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     let supabaseClient = null;
 
@@ -134,27 +135,35 @@
         return;
       }
 
+      // Create client – in a browser, this will automatically
+      // detect the hash (#access_token=...) and set the session.
       supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-      const url = new URL(window.location.href);
-      const code = url.searchParams.get("code");
-
-      if (!code) {
-        setStatus("Invalid or missing reset code. Please request a new reset email.");
-        return;
-      }
 
       setStatus("Verifying reset link…");
 
-      const { data, error } = await supabaseClient.auth.exchangeCodeForSession(code);
-
-      if (error) {
-        console.error("exchangeCodeForSession error:", error);
+      let sessionResult;
+      try {
+        sessionResult = await supabaseClient.auth.getSession();
+      } catch (err) {
+        console.error("getSession threw:", err);
         setStatus("This reset link is invalid or expired. Please request a new reset email.");
         return;
       }
 
-      // We now have a valid session, user is effectively logged in
+      const { data, error } = sessionResult || {};
+      if (error) {
+        console.error("getSession error:", error);
+        setStatus("This reset link is invalid or expired. Please request a new reset email.");
+        return;
+      }
+
+      const session = data && data.session;
+      if (!session) {
+        setStatus("This reset link is invalid or expired. Please request a new reset email.");
+        return;
+      }
+
+      // We now have a valid session from the hash
       setStatus("Link verified. Enter a new password below.");
       formContainer.style.display = "block";
 
@@ -168,9 +177,8 @@
         resetBtn.disabled = true;
         setStatus("Updating password…");
 
-        const { data: updateData, error: updateError } = await supabaseClient.auth.updateUser({
-          password: newPw,
-        });
+        const { data: updateData, error: updateError } =
+          await supabaseClient.auth.updateUser({ password: newPw });
 
         if (updateError) {
           console.error("updateUser error:", updateError);
