@@ -187,14 +187,11 @@ public class VoiceCommands: CAPPlugin {
                     "isFinal": result.isFinal
                 ])
 
-                if result.isFinal {
-                    self.restartListening()
-                }
+              
             }
 
             if let error = error {
                 print("Speech recognition error: \(error)")
-                self.restartListening()
             }
         }
     }
