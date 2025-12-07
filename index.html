@@ -2033,37 +2033,34 @@ function getDeckPhaseCounts(deck) {
 
       hasSpokenCurrentQuestion = true;
       speak(currentCard.question, () => {
-        if (isPaused) return;
+  if (isPaused) return;
+  if (answerMode === "delay") {
+    const delay = Math.max(
+      1,
+      Math.min(60, Math.floor(answerDelayMs / 1000))
+    );
 
-        if (answerMode === "delay") {
-          const delay = Math.max(
-            1,
-            Math.min(60, Math.floor(answerDelayMs / 1000))
-          );
+    // ❌ REMOVE this:
+    // if (!autoGoodMode) {
+    //   listenForCommand(handleVoiceTranscript);
+    // }
 
-          // Allow commands like "repeat question" during the thinking window
-          if (!autoGoodMode) {
-            listenForCommand(handleVoiceTranscript);
-          }
-
-          setStudyState(StudyState.WAITING_FOR_ANSWER);
-
-          questionDelayTimerId = setTimeout(() => {
-            if (!isPaused) {
-              // This will speak the answer and then either:
-              // - ask for difficulty, or
-              // - do auto-good / study-ahead behavior
-              speakAnswerThenAskDifficulty();
-            }
-          }, delay * 1000);
-        } else {
-          // Voice-answer mode: wait for you to speak your answer again
-          awaitingAnswerSignal = true;
-          setStudyState(StudyState.WAITING_FOR_ANSWER);
-          setStatus("Listening for your answer...");
-          listenForCommand(handleVoiceTranscript);
-        }
-      });
+    // ✅ Only tracking that we’re waiting for the answer delay
+    setStudyState(StudyState.WAITING_FOR_ANSWER);
+    questionDelayTimerId = setTimeout(() => {
+      if (!isPaused) {
+        // Here we speak the answer *then* open the mic for rating / pause / menu
+        speakAnswerThenAskDifficulty();
+      }
+    }, delay * 1000);
+  } else {
+    // Voice answer mode stays the same
+    awaitingAnswerSignal = true;
+    setStudyState(StudyState.WAITING_FOR_ANSWER);
+    setStatus("Listening for your answer...");
+    listenForCommand(handleVoiceTranscript);
+  }
+});
     }
 
     function parseRatingFromText(text) {

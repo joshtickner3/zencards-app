@@ -290,8 +290,8 @@
         </div>
         <!-- Legend for counts -->
         <p style="font-size:0.8rem;color:#9ca3af;margin-top:0.35rem;">
-          Legend: <em>Deck name (new / review ≤ level 5 / mature &gt; level 5)</em>
-        </p>
+  Legend: <em>Deck name (new / learning / review)</em>
+</p>
       </div>
 
       <!-- Card editor / viewer -->
@@ -1104,68 +1104,73 @@ async function loadStateFromSupabase() {
       return decks.find(d => d.id === id) || null;
     }
 
-    // New: compute due-today counts per deck (new/ladder/mature)
-    function getDeckDueCounts(deck) {
-      const now = Date.now();
-      let newCount = 0;
-      let ladderCount = 0;
-      let matureCount = 0;
+   // New: compute TOTAL counts per deck (new / learning / review)
+// - new: no schedule yet
+// - learning: phase === "ladder" (levels 1–5)
+// - review: phase === "mature1" or "mature2" (i.e. past level 5)
+function getDeckPhaseCounts(deck) {
+  let newCount = 0;
+  let learningCount = 0;
+  let reviewCount = 0;
 
-      deck.cards.forEach(card => {
-        const key = scheduleKey(deck.id, card.id);
-        const s = schedule[key];
+  deck.cards.forEach(card => {
+    const key = scheduleKey(deck.id, card.id);
+    const s = schedule[key];
 
-        // New card: never scheduled
-        if (!s) {
-          newCount++;
-          return;
-        }
-
-        const normalized = normalizeScheduleEntry(s);
-        const due = normalized.dueTime || now;
-
-        // Only count cards due now or overdue
-        if (due > now) return;
-
-        if (normalized.phase === "ladder") {
-          ladderCount++;
-        } else {
-          // mature1 or mature2
-          matureCount++;
-        }
-      });
-
-      return { newCount, ladderCount, matureCount };
+    // New card: never scheduled
+    if (!s) {
+      newCount++;
+      return;
     }
+
+    const normalized = normalizeScheduleEntry(s);
+    const level = typeof normalized.level === "number" ? normalized.level : 1;
+
+    if (normalized.phase === "ladder" && level <= 5) {
+      // Learning cards (still in the 5-step ladder)
+      learningCount++;
+    } else {
+      // Anything past the ladder is treated as review
+      reviewCount++;
+    }
+  });
+
+  return { newCount, learningCount, reviewCount };
+}
 
     function refreshDeckSelect() {
-      const currentValue = selectedDeckId;
-      deckSelect.innerHTML = "";
-      decks.forEach(deck => {
-        const opt = document.createElement("option");
-        opt.value = deck.id;
+  const currentValue = selectedDeckId;
+  deckSelect.innerHTML = "";
 
-        const counts = getDeckDueCounts(deck);
-        // Format: Deck Name (new/ladder/mature)
-        opt.textContent = `${deck.name} (${counts.newCount}/${counts.ladderCount}/${counts.matureCount})`;
+  decks.forEach(deck => {
+    const opt = document.createElement("option");
+    opt.value = deck.id;
 
-        deckSelect.appendChild(opt);
-      });
-      if (!selectedDeckId && decks.length > 0) {
-        selectedDeckId = decks[0].id;
-      }
-      if (currentValue && decks.some(d => d.id === currentValue)) {
-        selectedDeckId = currentValue;
-      }
-      if (selectedDeckId && decks.some(d => d.id === selectedDeckId)) {
-        deckSelect.value = selectedDeckId;
-      } else if (decks.length > 0) {
-        selectedDeckId = decks[0].id;
-        deckSelect.value = selectedDeckId;
-      } else {
-        selectedDeckId = null;
-      }
-    }
+    const counts = getDeckPhaseCounts(deck);
+    // Format: Deck name (new / learning / review)
+    opt.textContent = `${deck.name} (${counts.newCount}/${counts.learningCount}/${counts.reviewCount})`;
+
+    deckSelect.appendChild(opt);
+  });
+
+  // Preserve previously selected deck if possible
+  if (!selectedDeckId && decks.length > 0) {
+    selectedDeckId = decks[0].id;
+  }
+
+  if (currentValue && decks.some(d => d.id === currentValue)) {
+    selectedDeckId = currentValue;
+  }
+
+  if (selectedDeckId && decks.some(d => d.id === selectedDeckId)) {
+    deckSelect.value = selectedDeckId;
+  } else if (decks.length > 0) {
+    selectedDeckId = decks[0].id;
+    deckSelect.value = selectedDeckId;
+  } else {
+    selectedDeckId = null;
+  }
+}
 
     function refreshCardsList() {
       const deck = getDeckById(selectedDeckId);

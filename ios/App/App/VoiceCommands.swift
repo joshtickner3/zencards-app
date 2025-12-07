@@ -2,6 +2,7 @@ import Foundation
 import Capacitor
 import AVFoundation
 import Speech
+import MediaPlayer
 
 @objc(VoiceCommands)
 public class VoiceCommands: CAPPlugin {
@@ -13,6 +14,26 @@ public class VoiceCommands: CAPPlugin {
 
     private var hasMicPermission = false
     private var hasSpeechPermission = false
+
+    // Remote control helper (AudioRemoteController.swift)
+    private let remoteController = AudioRemoteController.shared
+
+    // Called once when the plugin is loaded
+    public override func load() {
+        super.load()
+
+        // When the steering-wheel/remote buttons pick a rating,
+        // forward it to JS as a "remoteRating" event.
+        remoteController.onRatingChosen = { [weak self] rating in
+            guard let self = self else { return }
+            self.notifyListeners("remoteRating", data: [
+                "rating": rating
+            ])
+        }
+
+        // Set up the MPRemoteCommandCenter handlers
+        remoteController.configureRemoteCommands()
+    }
 
     // MARK: - JS API
 
@@ -38,6 +59,7 @@ public class VoiceCommands: CAPPlugin {
     // Called from JS to stop listening
     @objc func stop(_ call: CAPPluginCall) {
         stopListening()
+        remoteController.teardownRemoteCommands()
         call.resolve()
     }
 
@@ -76,9 +98,18 @@ public class VoiceCommands: CAPPlugin {
 
     // MARK: - Audio Session
 
+    /// Show something in the system Now Playing center (CarPlay / BT head units).
+    private func setNowPlayingInfo(title: String) {
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = [
+            MPMediaItemPropertyTitle: title,
+            MPMediaItemPropertyArtist: "ZenCards",
+            MPNowPlayingInfoPropertyPlaybackRate: 1.0
+        ]
+    }
+
     /// Configure the audio session so:
     /// - we can record (for STT)
-    /// - audio keeps using AirPods / Bluetooth when connected
+    /// - audio keeps using AirPods / Bluetooth / CarPlay
     /// - we do NOT force output back to the phone speaker
     private func configureAudioSessionForZenCards() {
         let audioSession = AVAudioSession.sharedInstance()
@@ -87,14 +118,16 @@ public class VoiceCommands: CAPPlugin {
                 .playAndRecord,
                 mode: .spokenAudio,
                 options: [
-                    .allowBluetooth,
+                    .allowBluetoothHFP,
                     .allowBluetoothA2DP,
                     .duckOthers   // optional: gently lower other audio
                 ]
             )
 
-            // Don't overrideOutputAudioPort(.speaker) — that would force phone speaker.
             try audioSession.setActive(true, options: [])
+
+            // Let iOS / CarPlay know “something audio-like” is happening
+            setNowPlayingInfo(title: "Studying flashcards")
         } catch {
             print("AudioSession config error: \(error)")
         }
@@ -106,7 +139,7 @@ public class VoiceCommands: CAPPlugin {
         // Reset any existing recognition first
         stopListening()
 
-        // VERY IMPORTANT: configure the audio session before starting the engine
+        // Configure the audio session before starting the engine
         configureAudioSessionForZenCards()
 
         // Create a new recognition request
@@ -183,15 +216,5 @@ public class VoiceCommands: CAPPlugin {
 
         // Deactivate audio session so the system can route audio normally again
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-    }
-
-    private func restartListening() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            do {
-                try self.startListening()
-            } catch {
-                print("Failed to restart listening: \(error)")
-            }
-        }
     }
 }
