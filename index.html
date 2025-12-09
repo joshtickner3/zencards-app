@@ -2240,6 +2240,13 @@ setCardContent(silentAnswerText, currentCard.answer);
         t.includes("go to main menu")
       );
     }
+    // NEW: speak confirmation before going to the main menu
+function speakAndGoToMainMenu() {
+  speak("Going to the main menu.", () => {
+    endStudySession();
+  });
+}
+
 
     // NEW helper: fully restart current card flow in hands-free mode
     function restartCurrentCardVoiceFlow() {
@@ -2360,7 +2367,7 @@ if (t.includes("repeat question") && currentMode === "voice" && currentCard) {
         return true;
       }
 
-      // UPDATED: pause only allowed in specific states,
+            // UPDATED: pause only allowed in specific states,
       // and keep listening while paused.
       if (t.includes("pause study session") || (t.includes("pause") && t.includes("study"))) {
         const canPauseNormal =
@@ -2374,34 +2381,41 @@ if (t.includes("repeat question") && currentMode === "voice" && currentCard) {
           studyAheadSession;
 
         if (canPauseNormal || canPauseStudyAheadGap) {
-          isPaused = true;
-          clearStudyAheadGapTimer();
-          clearQuestionDelayTimer();
-          pauseBtn.disabled = true;
-          resumeBtn.disabled = false;
-          setStatus("Paused. Say 'resume study session' or tap Resume.");
-          // NEW: keep listening while paused (voice pause)
-          if (currentMode === "voice" && speechSupported && recognition) {
-            listenForCommand(handleVoiceTranscript);
-          }
+          // 🔊 Speak confirmation first, then actually pause + listen for resume
+          speak("Study session paused.", () => {
+            isPaused = true;
+            clearStudyAheadGapTimer();
+            clearQuestionDelayTimer();
+            pauseBtn.disabled = true;
+            resumeBtn.disabled = false;
+            setStatus("Paused. Say 'resume study session' or tap Resume.");
+
+            // keep listening while paused (voice pause)
+            if (currentMode === "voice" && speechSupported && recognition) {
+              listenForCommand(handleVoiceTranscript);
+            }
+          });
         }
         return true;
       }
 
-      // UPDATED: more robust resume detection
+            // UPDATED: more robust resume detection
       if (
         t.includes("resume study session") ||
         (t.includes("resume") && (t.includes("study") || t.includes("session")))
       ) {
         if (isPaused) {
-          isPaused = false;
-          pauseBtn.disabled = false;
-          resumeBtn.disabled = true;
-          if (currentMode === "voice") {
-            runVoiceLoop();
-          } else if (currentMode === "silent") {
-            runSilentLoop();
-          }
+          // 🔊 Speak confirmation first, then resume the loop
+          speak("Resuming study session.", () => {
+            isPaused = false;
+            pauseBtn.disabled = false;
+            resumeBtn.disabled = true;
+            if (currentMode === "voice") {
+              runVoiceLoop();
+            } else if (currentMode === "silent") {
+              runSilentLoop();
+            }
+          });
         }
         return true;
       }
@@ -2413,7 +2427,7 @@ if (t.includes("repeat question") && currentMode === "voice" && currentCard) {
       if (inStudyAheadAnswerGap && noScheduleChanges && studyAheadSession && isMainMenuCommand(text)) {
         inStudyAheadAnswerGap = false;
         clearStudyAheadGapTimer();
-        endStudySession();
+        speakAndGoToMainMenu();
         return;
       }
 
@@ -2425,7 +2439,7 @@ if (t.includes("repeat question") && currentMode === "voice" && currentCard) {
         awaitingPostCompletionChoice = false;
 
         if (wantsMainMenu) {
-          endStudySession();
+          speakAndGoToMainMenu();
           return;
         }
 
@@ -2458,14 +2472,14 @@ if (t.includes("repeat question") && currentMode === "voice" && currentCard) {
         // NEW: allow "main menu" ONLY while difficulty is being asked (normal mode)
         if (!noScheduleChanges && isMainMenuCommand(t)) {
           awaitingDifficulty = false;
-          endStudySession();
+          speakAndGoToMainMenu();
           return;
         }
 
         if (noScheduleChanges) {
           if (isMainMenuCommand(t)) {
             awaitingDifficulty = false;
-            endStudySession();
+            speakAndGoToMainMenu();
             return;
           }
           speak("I didn't catch that. Say main menu to go to the main menu.", () => {
