@@ -412,6 +412,19 @@
             <span class="badge">New</span>
           </label>
         </div>
+                <!-- NEW: auto study-ahead options -->
+        <div style="margin-top:0.5rem;">
+          <label class="inline">
+            <input type="checkbox" id="autoEnterStudyAhead" />
+            After I finish all due cards, automatically enter study-ahead mode
+          </label>
+        </div>
+        <div>
+          <label class="inline">
+            <input type="checkbox" id="loopStudyAhead" />
+            In study-ahead mode, keep looping the deck automatically
+          </label>
+        </div>
         <div style="margin-top:0.5rem;">
           <strong>Hands-free answer behavior:</strong>
           <div class="row" style="margin-top:0.25rem;">
@@ -1886,7 +1899,8 @@ function getPlainTextFromCard(raw) {
     const answerModeVoiceRadio = document.getElementById("answerModeVoice");
     const answerDelaySecondsInput = document.getElementById("answerDelaySeconds");
     const studyAheadGapSecondsInput = document.getElementById("studyAheadGapSeconds");
-
+const autoEnterStudyAheadCheckbox = document.getElementById("autoEnterStudyAhead");
+const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
     const startVoiceBtn = document.getElementById("startVoiceBtn");
     const startSilentBtn = document.getElementById("startSilentBtn");
 
@@ -1954,6 +1968,8 @@ function getPlainTextFromCard(raw) {
     let studyAheadSession = false;
     let noScheduleChanges = false;
     let studyAheadPromptedOnceVoice = false;
+    let autoEnterStudyAhead = false;  // from Study Options
+let loopStudyAhead = false;       // from Study Options
     let skipInstructionsAfterFirst = true;
     let hasSpokenInstructionsOnce = false;
     let answerMode = "delay";
@@ -2660,33 +2676,66 @@ speak("Answer: " + plainAnswer, () => {
       }
 
       if (!nextCard && !allowAhead) {
-        setStudyState(StudyState.IDLE);
-        awaitingPostCompletionChoice = true;
-        speak(
-          "Congratulations, you are all caught up, no more cards are due today.",
-          () => {
-            speak(
-              "If you'd like to go back to the main menu, say 'main menu'. Otherwise, would you like me to start study ahead mode, which lets you preview future cards without changing their schedule?",
-              () => {
-                listenForCommand(handleVoiceTranscript);
-              }
-            );
-          }
-        );
-        return;
-      } else if (!nextCard && allowAhead) {
-        setStudyState(StudyState.IDLE);
-        awaitingPostCompletionChoice = true;
-        speak(
-          "There are no more cards available to study in this deck right now.",
-          () => {
-            speak("Say main menu to go back.", () =>
-              listenForCommand(handleVoiceTranscript)
-            );
-          }
-        );
-        return;
+  // Finished all due cards (normal mode)
+  if (autoEnterStudyAhead) {
+    // Automatically enter study-ahead mode
+    studyAheadSession = true;
+    noScheduleChanges = true;
+    aheadQueue = shuffleArray(getDueCardsForDeck(currentDeckId, true, false));
+    aheadQueueIndex = 0;
+
+    setStudyState(StudyState.IDLE);
+    speak(
+      "Congratulations, you are all caught up, no more cards are due today. Entering study ahead mode.",
+      () => {
+        runVoiceLoop();
       }
+    );
+    return;
+  }
+
+  // Old behavior: ask if they want study-ahead
+  setStudyState(StudyState.IDLE);
+  awaitingPostCompletionChoice = true;
+  speak(
+    "Congratulations, you are all caught up, no more cards are due today.",
+    () => {
+      speak(
+        "If you'd like to go back to the main menu, say 'main menu'. Otherwise, would you like me to start study ahead mode, which lets you preview future cards without changing their schedule?",
+        () => {
+          listenForCommand(handleVoiceTranscript);
+        }
+      );
+    }
+  );
+  return;
+} else if (!nextCard && allowAhead) {
+  // Finished all cards in study-ahead mode
+  if (noScheduleChanges && studyAheadSession && loopStudyAhead) {
+    // Automatically loop study-ahead again (no extra prompt)
+    aheadQueue = shuffleArray(getDueCardsForDeck(currentDeckId, true, false));
+    aheadQueueIndex = 0;
+
+    if (aheadQueue.length > 0) {
+      setStudyState(StudyState.IDLE);
+      runVoiceLoop();
+      return;
+    }
+    // If for some reason there are no cards, fall through to message below
+  }
+
+  setStudyState(StudyState.IDLE);
+  awaitingPostCompletionChoice = true;
+  speak(
+    "There are no more cards available to study in this deck right now.",
+    () => {
+      speak("Say main menu to go back.", () =>
+        listenForCommand(handleVoiceTranscript)
+      );
+    }
+  );
+  return;
+}
 
       currentCard = nextCard;
       setStatus("Studying card...");
@@ -2824,36 +2873,66 @@ setCardContent(voiceAnswerText, currentCard.answer);
       }
 
       if (!nextCard && !allowAhead) {
-        setStatus(
-          "Congratulations, you are all caught up, no more cards are due today."
-        );
-        silentQuestionText.textContent = "";
-        silentQuestion.classList.add("hidden");
-        silentAnswer.classList.add("hidden");
-        showAnswerBtn.classList.add("hidden");
-        silentRatingButtons.classList.add("hidden");
-        silentNextCardBtn.classList.add("hidden");
-        clearSilentHints();
-        pauseBtn.classList.add("hidden");
-        resumeBtn.classList.add("hidden");
-        silentCompletionControls.classList.remove("hidden");
-        silentEditPanel.classList.add("hidden");
-        setStudyState(StudyState.IDLE);
-        return;
-      } else if (!nextCard && allowAhead) {
-        setStatus("There are no more cards available to study in this deck right now.");
-        silentQuestionText.textContent = "";
-        silentQuestion.classList.add("hidden");
-        silentAnswer.classList.add("hidden");
-        showAnswerBtn.classList.add("hidden");
-        silentRatingButtons.classList.add("hidden");
-        silentNextCardBtn.classList.add("hidden");
-        clearSilentHints();
-        silentCompletionControls.classList.add("hidden");
-        silentEditPanel.classList.add("hidden");
-        setStudyState(StudyState.IDLE);
-        return;
-      }
+  // Finished all due cards (normal mode)
+  if (autoEnterStudyAhead) {
+    setStatus("Congratulations, you are all caught up. Entering study ahead mode.");
+    studyAheadSession = true;
+    noScheduleChanges = true;
+
+    aheadQueue = shuffleArray(getDueCardsForDeck(currentDeckId, true, false));
+    aheadQueueIndex = 0;
+
+    silentCompletionControls.classList.add("hidden");
+    silentNextCardBtn.classList.remove("hidden");
+    setStudyState(StudyState.IDLE);
+    runSilentLoop();
+    return;
+  }
+
+  // Old behavior: show completion controls
+  setStatus(
+    "Congratulations, you are all caught up, no more cards are due today."
+  );
+  silentQuestionText.textContent = "";
+  silentQuestion.classList.add("hidden");
+  silentAnswer.classList.add("hidden");
+  showAnswerBtn.classList.add("hidden");
+  silentRatingButtons.classList.add("hidden");
+  silentNextCardBtn.classList.add("hidden");
+  clearSilentHints();
+  pauseBtn.classList.add("hidden");
+  resumeBtn.classList.add("hidden");
+  silentCompletionControls.classList.remove("hidden");
+  silentEditPanel.classList.add("hidden");
+  setStudyState(StudyState.IDLE);
+  return;
+} else if (!nextCard && allowAhead) {
+  // Finished all cards in study-ahead mode
+  if (noScheduleChanges && studyAheadSession && loopStudyAhead) {
+    aheadQueue = shuffleArray(getDueCardsForDeck(currentDeckId, true, false));
+    aheadQueueIndex = 0;
+
+    if (aheadQueue.length > 0) {
+      setStudyState(StudyState.IDLE);
+      runSilentLoop();
+      return;
+    }
+    // fall through if somehow there are still no cards
+  }
+
+  setStatus("There are no more cards available to study in this deck right now.");
+  silentQuestionText.textContent = "";
+  silentQuestion.classList.add("hidden");
+  silentAnswer.classList.add("hidden");
+  showAnswerBtn.classList.add("hidden");
+  silentRatingButtons.classList.add("hidden");
+  silentNextCardBtn.classList.add("hidden");
+  clearSilentHints();
+  silentCompletionControls.classList.add("hidden");
+  silentEditPanel.classList.add("hidden");
+  setStudyState(StudyState.IDLE);
+  return;
+}
 
       silentCompletionControls.classList.add("hidden");
       silentQuestion.classList.remove("hidden");
@@ -2953,6 +3032,9 @@ setCardContent(voiceAnswerText, currentCard.answer);
       currentDeckId = selectedDeckId;
       if (!currentDeckId) return;
       skipInstructionsAfterFirst = !!skipInstructionsAfterFirstCheckbox.checked;
+      autoEnterStudyAhead = !!autoEnterStudyAheadCheckbox.checked;
+loopStudyAhead = !!loopStudyAheadCheckbox.checked;
+
       // Start in normal due-today mode; study-ahead entered from completion controls
       studyAheadSession = false;
       noScheduleChanges = false;
@@ -3010,6 +3092,8 @@ setCardContent(voiceAnswerText, currentCard.answer);
       if (!currentDeckId) return;
       autoModeBehavior = autoRatingSelect.value || "good";
       autoGoodMode = !!autoGoodToggle.checked;
+      autoEnterStudyAhead = !!autoEnterStudyAheadCheckbox.checked;
+loopStudyAhead = !!loopStudyAheadCheckbox.checked;
 
       // If there is NO native plugin and NO browser STT, and we are not in auto mode,
       // then we can't do voice commands.
