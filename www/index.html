@@ -166,6 +166,20 @@
       gap: 0.75rem;
       align-items: center;
     }
+/* Decks layout fix for mobile */
+.deckRow {
+  align-items: flex-start;
+}
+
+@media (max-width: 600px) {
+  .deckRow {
+    flex-direction: column;
+  }
+  .deckRow > * {
+    width: 100%;
+  }
+}
+
     .row > * {
       flex: 1;
       min-width: 0;
@@ -294,7 +308,7 @@
       <!-- Deck controls -->
       <div class="card">
         <h3>Decks</h3>
-        <div class="row">
+          <div class="row deckRow">
           <div>
             <label for="deckSelect">Select deck:</label>
             <select id="deckSelect"></select>
