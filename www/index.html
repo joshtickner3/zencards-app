@@ -4,8 +4,25 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <meta charset="UTF-8" />
-  <title>ZenCards — Hands-Free & Silent Flashcards</title>
+  <title>ZenCards — Hands-Free Audio Flashcards </title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- MathJax for rendering LaTeX equations in cards -->
+   <script>
+  window.MathJax = {
+    startup: {
+      ready: () => {
+        console.log("MathJax ready");
+        MathJax.startup.defaultReady();
+      }
+    }
+  };
+</script>
+
+<script
+  id="MathJax-script"
+  async
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+</script>
   <style>
     body {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
@@ -95,6 +112,10 @@
     textarea {
       min-height: 60px;
     }
+    textarea.drag-hover {
+  outline: 2px dashed #22c55e;
+}
+
     button {
       margin: 0.25rem 0.25rem 0.25rem 0;
       padding: 0.5rem 1.2rem;
@@ -298,14 +319,38 @@
       <div class="card">
         <h3>Cards (Viewer & Editor)</h3>
         <div class="row">
-          <div>
-            <label for="cardQuestion">Question:</label>
-            <textarea id="cardQuestion" placeholder="Enter question"></textarea>
-          </div>
-          <div>
-            <label for="cardAnswer">Answer:</label>
-            <textarea id="cardAnswer" placeholder="Enter answer"></textarea>
-          </div>
+         <div>
+  <label for="cardQuestion">Question:</label>
+  <textarea id="cardQuestion" placeholder="Enter question"></textarea>
+  
+  <div style="margin-top:0.25rem;font-size:0.8rem;">
+    <button type="button"
+            class="secondary small"
+            data-insert-image
+            data-target="cardQuestion">
+      Insert image…
+    </button>
+    <span style="color:#9ca3af;">
+      (Paste URL, choose file, or drag &amp; drop an image here)
+    </span>
+  </div>
+</div>
+<div>
+  <label for="cardAnswer">Answer:</label>
+  <textarea id="cardAnswer" placeholder="Enter answer"></textarea>
+  
+  <div style="margin-top:0.25rem;font-size:0.8rem;">
+    <button type="button"
+            class="secondary small"
+            data-insert-image
+            data-target="cardAnswer">
+      Insert image…
+    </button>
+    <span style="color:#9ca3af;">
+      (Paste URL, choose file, or drag &amp; drop an image here)
+    </span>
+  </div>
+</div>
         </div>
         <div class="row">
           <div style="flex:0 0 auto;">
@@ -629,12 +674,11 @@ async function signOutFromApp() {
 
     // Ignore the special "Auth session missing" case – it just means
     // Supabase couldn't find a session token, which is fine for log out
-    if (error && error.message !== "Auth session missing") {
-      console.error("Sign-out error:", error);
-      setAuthStatus("Sign-out error: " + error.message);
-      isSigningOut = false;
-      return;
-    }
+   if (error && error.message !== "Auth session missing") {
+  // Log it for debugging, but do NOT surface it to the user
+  console.warn("Non-fatal sign-out error:", error.message);
+}
+ 
   } catch (err) {
     console.error("Sign-out exception:", err);
     setAuthStatus("Sign-out error: " + err.message);
@@ -1092,6 +1136,99 @@ async function loadStateFromSupabase() {
     const cardsListDiv = document.getElementById("cardsList");
     const selectedCardInfo = document.getElementById("selectedCardInfo");
 
+    // ================= IMAGE INSERT HELPERS =================
+function insertImageTagInto(textarea, imgSrc) {
+  if (!textarea || !imgSrc) return;
+
+  const tag = `\n<img src="${imgSrc}" alt="" style="max-width:100%;height:auto;" />\n`;
+
+  const start = textarea.selectionStart ?? textarea.value.length;
+  const end   = textarea.selectionEnd ?? textarea.value.length;
+
+  textarea.value =
+    textarea.value.slice(0, start) +
+    tag +
+    textarea.value.slice(end);
+
+  textarea.focus();
+  const pos = start + tag.length;
+  textarea.selectionStart = textarea.selectionEnd = pos;
+}
+
+// Allow dragging & dropping images directly onto a textarea
+function makeTextareaAcceptImageDrops(textarea) {
+  if (!textarea) return;
+
+  textarea.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    textarea.classList.add("drag-hover");
+  });
+
+  textarea.addEventListener("dragenter", (e) => {
+    e.preventDefault();
+    textarea.classList.add("drag-hover");
+  });
+
+  textarea.addEventListener("dragleave", (e) => {
+    e.preventDefault();
+    textarea.classList.remove("drag-hover");
+  });
+
+  textarea.addEventListener("drop", (e) => {
+    e.preventDefault();
+    textarea.classList.remove("drag-hover");
+
+    const dt = e.dataTransfer;
+    if (!dt || !dt.files || dt.files.length === 0) return;
+
+    const file = dt.files[0];
+    if (!file.type.startsWith("image/")) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      insertImageTagInto(textarea, ev.target.result);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// Enable drag/drop on the main editor textareas
+makeTextareaAcceptImageDrops(cardQuestionInput);
+makeTextareaAcceptImageDrops(cardAnswerInput);
+
+// Insert image button: paste URL or pick a file (stored as data: URL)
+document.querySelectorAll("[data-insert-image]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const targetId = btn.getAttribute("data-target");
+    const textarea = document.getElementById(targetId);
+    if (!textarea) return;
+
+    const url = prompt(
+      "Paste an image URL, or leave blank to choose a file from your device."
+    );
+
+    if (url && url.trim()) {
+      insertImageTagInto(textarea, url.trim());
+      return;
+    }
+
+    // If no URL, open a file picker and embed as data URL
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = "image/*";
+    fileInput.onchange = () => {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        insertImageTagInto(textarea, e.target.result); // data:image/...
+      };
+      reader.readAsDataURL(file);
+    };
+    fileInput.click();
+  });
+});
+
     // NEW: Anki import elements
     const ankiImportInput   = document.getElementById("ankiImport");
     const ankiImportStatus  = document.getElementById("ankiImportStatus");
@@ -1185,7 +1322,7 @@ function getDeckPhaseCounts(deck) {
         row.className = "cardRow";
 
         const span = document.createElement("span");
-        span.textContent = card.question;
+       span.textContent = getPlainTextFromCard(card.question);
         row.appendChild(span);
 
         const editBtn = document.createElement("button");
@@ -1389,7 +1526,28 @@ function getDeckPhaseCounts(deck) {
 
     // ===================== TTS & STT =====================
     const statusDiv = document.getElementById("status");
+// ========== RENDER HELPERS FOR IMAGES + MATH ==========
 
+// Takes card text (which may contain HTML/LaTeX) and renders it into an element.
+// Then asks MathJax to typeset any equations in that element.
+function setCardContent(el, raw) {
+  if (!el) return;
+  el.innerHTML = raw || "";
+
+  // Let MathJax typeset any LaTeX in this element
+  if (window.MathJax && window.MathJax.typesetPromise) {
+    MathJax.typesetPromise([el]).catch(err => {
+      console.error("MathJax error:", err);
+    });
+  }
+}
+
+// Strip HTML tags so TTS doesn't try to read "<img ...>" etc
+function getPlainTextFromCard(raw) {
+  const tmp = document.createElement("div");
+  tmp.innerHTML = raw || "";
+  return tmp.textContent || tmp.innerText || "";
+}
     function setStatus(text) {
       statusDiv.textContent = text;
     }
@@ -1949,10 +2107,10 @@ function getDeckPhaseCounts(deck) {
       const updated = updateCardTextInDeck(currentDeckId, currentCard.id, q, a);
       if (!updated) return;
       currentCard = updated;
-      silentQuestionText.textContent = currentCard.question;
-      silentAnswerText.textContent = currentCard.answer;
-      voiceQuestionText.textContent = currentCard.question;
-      voiceAnswerText.textContent = currentCard.answer;
+      setCardContent(silentQuestionText, currentCard.question);
+setCardContent(silentAnswerText, currentCard.answer);
+      setCardContent(voiceQuestionText, currentCard.question);
+setCardContent(voiceAnswerText, currentCard.answer);
 
       // refresh main card list so changes are visible there too
       refreshCardsList();
@@ -1981,10 +2139,11 @@ function getDeckPhaseCounts(deck) {
       const updated = updateCardTextInDeck(currentDeckId, currentCard.id, q, a);
       if (!updated) return;
       currentCard = updated;
-      voiceQuestionText.textContent = currentCard.question;
-      voiceAnswerText.textContent = currentCard.answer;
-      silentQuestionText.textContent = currentCard.question;
-      silentAnswerText.textContent = currentCard.answer;
+      setCardContent(voiceQuestionText, currentCard.question);
+setCardContent(voiceAnswerText, currentCard.answer);
+
+      setCardContent(silentQuestionText, currentCard.question);
+setCardContent(silentAnswerText, currentCard.answer);
 
       // refresh main card list so changes are visible there too
       refreshCardsList();
@@ -2032,38 +2191,30 @@ function getDeckPhaseCounts(deck) {
       setStudyState(StudyState.SHOWING_QUESTION);
 
       hasSpokenCurrentQuestion = true;
-      speak(currentCard.question, () => {
-        if (isPaused) return;
+        speak(getPlainTextFromCard(currentCard.question), () => {
+    if (isPaused) return;
+    if (answerMode === "delay") {
+      const delay = Math.max(
+        1,
+        Math.min(60, Math.floor(answerDelayMs / 1000))
+      );
 
-        if (answerMode === "delay") {
-          const delay = Math.max(
-            1,
-            Math.min(60, Math.floor(answerDelayMs / 1000))
-          );
-
-          // Allow commands like "repeat question" during the thinking window
-          if (!autoGoodMode) {
-            listenForCommand(handleVoiceTranscript);
-          }
-
-          setStudyState(StudyState.WAITING_FOR_ANSWER);
-
-          questionDelayTimerId = setTimeout(() => {
-            if (!isPaused) {
-              // This will speak the answer and then either:
-              // - ask for difficulty, or
-              // - do auto-good / study-ahead behavior
-              speakAnswerThenAskDifficulty();
-            }
-          }, delay * 1000);
-        } else {
-          // Voice-answer mode: wait for you to speak your answer again
-          awaitingAnswerSignal = true;
-          setStudyState(StudyState.WAITING_FOR_ANSWER);
-          setStatus("Listening for your answer...");
-          listenForCommand(handleVoiceTranscript);
+      // ✅ Only tracking that we’re waiting for the answer delay
+      setStudyState(StudyState.WAITING_FOR_ANSWER);
+      questionDelayTimerId = setTimeout(() => {
+        if (!isPaused) {
+          // Here we speak the answer *then* open the mic for rating / pause / menu
+          speakAnswerThenAskDifficulty();
         }
-      });
+      }, delay * 1000);
+    } else {
+      // Voice answer mode stays the same
+      awaitingAnswerSignal = true;
+      setStudyState(StudyState.WAITING_FOR_ANSWER);
+      setStatus("Listening for your answer...");
+      listenForCommand(handleVoiceTranscript);
+    }
+  });
     }
 
     function parseRatingFromText(text) {
@@ -2092,14 +2243,16 @@ function getDeckPhaseCounts(deck) {
       }
 
       // NEW: repeat answer using state machine
-      if (t.includes("repeat answer") && currentMode === "voice" && currentCard) {
+            if (t.includes("repeat answer") && currentMode === "voice" && currentCard) {
         if (
           studyState === StudyState.SHOWING_ANSWER ||
           studyState === StudyState.WAITING_FOR_RATING ||
           inStudyAheadAnswerGap
         ) {
-          speak("Answer: " + currentCard.answer, () => {
+          const plainAnswer = getPlainTextFromCard(currentCard.answer);
+          speak("Answer: " + plainAnswer, () => {
             if (isPaused) return;
+
             if (awaitingDifficulty) {
               const detailed =
                 !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
@@ -2124,7 +2277,7 @@ function getDeckPhaseCounts(deck) {
           return true;
         }
       }
-
+      
       if (t.includes("end study session")) {
         endStudySession();
         return true;
@@ -2295,8 +2448,8 @@ function getDeckPhaseCounts(deck) {
       }
       hasSpokenCurrentAnswer = true;
       setStudyState(StudyState.SHOWING_ANSWER);
-
-      speak("Answer: " + currentCard.answer, () => {
+      const plainAnswer = getPlainTextFromCard(currentCard.answer);
+speak("Answer: " + plainAnswer, () => {
         // STUDY-AHEAD HANDS-FREE: always respect the study-ahead gap and never schedule
         if (noScheduleChanges && studyAheadSession) {
           startStudyAheadAnswerWindow(false);
@@ -2526,12 +2679,9 @@ function getDeckPhaseCounts(deck) {
       hasSpokenCurrentQuestion = false;
       hasSpokenCurrentAnswer = false;
 
-      if (voiceQuestionText) {
-        voiceQuestionText.textContent = currentCard.question;
-      }
-      if (voiceAnswerText) {
-        voiceAnswerText.textContent = currentCard.answer;
-      }
+      setCardContent(voiceQuestionText, currentCard.question);
+setCardContent(voiceAnswerText, currentCard.answer);
+
       if (voiceAnswer) {
         voiceAnswer.classList.add("hidden");
       }
@@ -2540,7 +2690,7 @@ function getDeckPhaseCounts(deck) {
       hasSpokenCurrentQuestion = true;
       setStudyState(StudyState.SHOWING_QUESTION);
 
-      speak(currentCard.question, () => {
+      speak(getPlainTextFromCard(currentCard.question), () => {
         if (isPaused) return;
         if (answerMode === "delay") {
           const delay = Math.max(
@@ -2699,15 +2849,15 @@ function getDeckPhaseCounts(deck) {
 
       currentCard = nextCard;
       setStatus("Studying card...");
-      silentQuestionText.textContent = currentCard.question;
-      silentAnswerText.textContent = currentCard.answer;
+      setCardContent(silentQuestionText, currentCard.question);
+setCardContent(silentAnswerText, currentCard.answer);
       silentAnswer.classList.add("hidden");
       silentRatingButtons.classList.add("hidden");
       clearSilentHints();
       silentEditPanel.classList.add("hidden");
 
-      voiceQuestionText.textContent = currentCard.question;
-      voiceAnswerText.textContent = currentCard.answer;
+      setCardContent(voiceQuestionText, currentCard.question);
+setCardContent(voiceAnswerText, currentCard.answer);
 
       if (noScheduleChanges) {
         silentNextCardBtn.classList.remove("hidden");
