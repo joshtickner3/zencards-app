@@ -1756,25 +1756,68 @@ function getPlainTextFromCard(raw) {
       }
     }
 
-    function speak(text, onEnd) {
-      if (!window.speechSynthesis) {
-        setStatus("Text-to-speech not supported in this browser.");
-        if (onEnd) onEnd();
-        return;
-      }
-      const utt = new SpeechSynthesisUtterance(text);
-      utt.rate = ttsRate || 1.0;
-      utt.volume = (ttsVolume === 0 || ttsVolume) ? ttsVolume : 1.0;
-      utt.onstart = () => {
-        isSpeaking = true;
-        setStatus("Speaking...");
-      };
-      utt.onend = () => {
-        isSpeaking = false;
-        if (onEnd) onEnd();
-      };
-      window.speechSynthesis.speak(utt);
+  function speak(text, onEnd) {
+  if (!window.speechSynthesis) {
+    setStatus("Text-to-speech not supported in this browser.");
+    if (onEnd) onEnd();
+    return;
+  }
+
+  // 🔇 Make sure NO mic is listening before we start speaking.
+  // This prevents the answer audio from being cut off when
+  // recognition starts or restarts.
+  if (nativeVoicePlugin) {
+    try {
+      nativeVoicePlugin.stop();
+    } catch (e) {
+      console.error("Error stopping native voice plugin before speaking:", e);
     }
+    nativeVoiceActiveCallback = null;
+  }
+
+  if (recognition) {
+    try {
+      keepListening = false;
+      recognition.onresult = null;
+      recognition.onerror = null;
+      recognition.onend = null;
+      recognition.stop();
+    } catch (e) {
+      console.error("Error stopping browser recognition before speaking:", e);
+    }
+  }
+
+  // 🧹 Clear any queued / half-finished utterances so we get a clean read.
+  try {
+    window.speechSynthesis.cancel();
+  } catch (e) {
+    console.error("Error cancelling previous speech:", e);
+  }
+
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.rate = ttsRate || 1.0;
+  utt.volume = (ttsVolume === 0 || ttsVolume) ? ttsVolume : 1.0;
+
+  utt.onstart = () => {
+    isSpeaking = true;
+    setStatus("Speaking...");
+  };
+
+  // Treat both normal end and errors the same from the app’s POV
+  const finish = () => {
+    isSpeaking = false;
+    setStatus("");
+    if (onEnd) onEnd();
+  };
+
+  utt.onend = finish;
+  utt.onerror = (err) => {
+    console.error("TTS error:", err);
+    finish();
+  };
+
+  window.speechSynthesis.speak(utt);
+}
 
     function listenForCommand(callback) {
       // 1) Prefer native iOS plugin when running inside the Capacitor app
