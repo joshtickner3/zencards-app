@@ -541,6 +541,27 @@
             <button id="voiceCancelEditBtn" class="secondary">Cancel</button>
           </div>
         </div>
+                <!-- Rating buttons for hands-free mode (optional tap) -->
+        <div id="voiceRatingButtons" class="hidden" style="margin-top:0.5rem;">
+  <span>How was that?</span><br />
+  <div>
+    <button data-voice-rating="again">Again</button>
+    <span id="voice-hint-again" class="dueHint"></span>
+  </div>
+  <div>
+    <button data-voice-rating="hard">Hard</button>
+    <span id="voice-hint-hard" class="dueHint"></span>
+  </div>
+  <div>
+    <button data-voice-rating="good">Good</button>
+    <span id="voice-hint-good" class="dueHint"></span>
+  </div>
+  <div>
+    <button data-voice-rating="easy">Easy</button>
+    <span id="voice-hint-easy" class="dueHint"></span>
+  </div>
+</div>
+      </div> <!-- end of #voiceUI -->
       </div>
 
       <!-- Silent mode UI -->
@@ -1959,12 +1980,17 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
     const hintHard = document.getElementById("hint-hard");
     const hintGood = document.getElementById("hint-good");
     const hintEasy = document.getElementById("hint-easy");
+    const voiceHintAgain = document.getElementById("voice-hint-again");
+const voiceHintHard = document.getElementById("voice-hint-hard");
+const voiceHintGood = document.getElementById("voice-hint-good");
+const voiceHintEasy = document.getElementById("voice-hint-easy");
 
     const voiceUI = document.getElementById("voiceUI");
     const voiceQuestion = document.getElementById("voiceQuestion");
     const voiceQuestionText = document.getElementById("voiceQuestionText");
     const voiceAnswer = document.getElementById("voiceAnswer");
     const voiceAnswerText = document.getElementById("voiceAnswerText");
+        const voiceRatingButtons = document.getElementById("voiceRatingButtons");
 
     const silentNextCardBtn = document.getElementById("silentNextCardBtn");
 
@@ -2096,6 +2122,7 @@ let loopStudyAhead = false;       // from Study Options
       if (voiceAnswer) voiceAnswer.classList.add("hidden");
       silentEditPanel.classList.add("hidden");
       voiceEditPanel.classList.add("hidden");
+            if (voiceRatingButtons) voiceRatingButtons.classList.add("hidden");
       setStudyState(StudyState.IDLE);
     }
 
@@ -2141,11 +2168,15 @@ let loopStudyAhead = false;       // from Study Options
     });
 
     function endStudySession() {
-      clearStudyAheadGapTimer();
-      clearQuestionDelayTimer();
-      showMainMenu();
-      setStatus("Study session ended.");
-    }
+  clearStudyAheadGapTimer();
+  clearQuestionDelayTimer();
+  if (voiceRatingButtons) {
+    voiceRatingButtons.classList.add("hidden");
+  }
+  clearVoiceHints();
+  showMainMenu();
+  setStatus("Study session ended.");
+}
 
     // ===================== INLINE EDIT HELPERS =====================
     function updateCardTextInDeck(deckId, cardId, newQ, newA) {
@@ -2504,6 +2535,9 @@ if (t.includes("repeat question") && currentMode === "voice" && currentCard) {
             queueCardForAgain(currentDeckId, currentCard);
           }
         }
+         if (voiceRatingButtons) {
+          voiceRatingButtons.classList.add("hidden");
+        }
         awaitingDifficulty = false;
         setStudyState(StudyState.IDLE); // will be set to question again when next card loads
         runVoiceLoop();
@@ -2586,6 +2620,11 @@ speak("Answer: " + plainAnswer, () => {
         const promptText = detailed
           ? "How was that? Say again, hard, good, or easy. You can also say next, repeat question, or repeat answer."
           : "How was that?";
+           // Show tap-to-rate buttons in normal voice mode (not auto mode / study-ahead)
+        if (!noScheduleChanges && voiceRatingButtons) {
+          voiceRatingButtons.classList.remove("hidden");
+          updateVoiceDueHints(); 
+        }
         awaitingDifficulty = true;
         setStudyState(StudyState.WAITING_FOR_RATING);
         speak(promptText, () => {
@@ -2810,6 +2849,10 @@ setCardContent(voiceAnswerText, currentCard.answer);
         voiceAnswer.classList.add("hidden");
       }
       voiceEditPanel.classList.add("hidden");
+            if (voiceRatingButtons) {
+        voiceRatingButtons.classList.add("hidden");
+      }
+
 
       hasSpokenCurrentQuestion = true;
       setStudyState(StudyState.SHOWING_QUESTION);
@@ -2855,6 +2898,53 @@ setCardContent(voiceAnswerText, currentCard.answer);
         clearSilentHints();
         return;
       }
+      function clearVoiceHints() {
+  if (!voiceHintAgain) return; // safety guard
+  voiceHintAgain.textContent = "";
+  voiceHintHard.textContent = "";
+  voiceHintGood.textContent = "";
+  voiceHintEasy.textContent = "";
+}
+
+function updateVoiceDueHints() {
+  if (!currentCard || noScheduleChanges) {
+    clearVoiceHints();
+    return;
+  }
+  const deckId = currentDeckId;
+  const cardId = currentCard.id;
+
+  // "Again" always means ~5 minutes
+  voiceHintAgain.textContent = "5 min >";
+
+  const hardMinutes = previewIntervalMinutes(deckId, cardId, "hard");
+  const goodMinutes = previewIntervalMinutes(deckId, cardId, "good");
+  const easyMinutes = previewIntervalMinutes(deckId, cardId, "easy");
+
+  function formatIntervalVoice(minutes) {
+    if (minutes < 60) {
+      const m = Math.max(1, Math.round(minutes));
+      return m + " min";
+    }
+    const hours = minutes / 60;
+    if (hours < 24) {
+      const h = Math.max(1, Math.round(hours));
+      return h + " hr" + (h === 1 ? "" : "s");
+    }
+    const days = minutes / MINUTES_PER_DAY;
+    if (days < 14) {
+      const d = Math.max(1, Math.round(days));
+      return d + " day" + (d === 1 ? "" : "s");
+    }
+    const weeks = days / 7;
+    const w = Math.max(1, Math.round(weeks));
+    return w + " wk" + (w === 1 ? "" : "s");
+  }
+
+  voiceHintHard.textContent = "Next in " + formatIntervalVoice(hardMinutes);
+  voiceHintGood.textContent = "Next in " + formatIntervalVoice(goodMinutes);
+  voiceHintEasy.textContent = "Next in " + formatIntervalVoice(easyMinutes);
+}
       const deckId = currentDeckId;
       const cardId = currentCard.id;
 
@@ -3066,6 +3156,32 @@ setCardContent(voiceAnswerText, currentCard.answer);
       }
       setStudyState(StudyState.IDLE);
       runSilentLoop();
+    });
+
+        // Rating buttons for voice (hands-free) mode – optional tap instead of speaking
+    voiceRatingButtons.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-voice-rating]");
+      if (!btn || !currentCard) return;
+
+      const ratingKey = btn.dataset.voiceRating;
+
+      // In study-ahead / noScheduleChanges we shouldn't change schedule,
+      // so just ignore taps in that mode.
+      if (!noScheduleChanges) {
+        const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
+        if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
+          queueCardForAgain(currentDeckId, currentCard);
+        }
+      }
+
+      // Done with this card's rating in voice mode
+      awaitingDifficulty = false;
+      if (voiceRatingButtons) {
+        voiceRatingButtons.classList.add("hidden");
+      }
+      clearVoiceHints();
+      setStudyState(StudyState.IDLE);
+      runVoiceLoop();
     });
 
     silentMainMenuBtn.addEventListener("click", () => {
