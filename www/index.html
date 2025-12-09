@@ -2261,16 +2261,20 @@ setCardContent(silentAnswerText, currentCard.answer);
       const t = text.toLowerCase();
 
       // NEW: repeat question using state machine
-      if (t.includes("repeat question") && currentMode === "voice" && currentCard) {
-        if (
-          studyState === StudyState.SHOWING_QUESTION ||
-          studyState === StudyState.WAITING_FOR_ANSWER ||
-          studyState === StudyState.WAITING_FOR_RATING
-        ) {
-          restartCurrentCardVoiceFlow();
-          return true;
-        }
-      }
+if (t.includes("repeat question") && currentMode === "voice" && currentCard) {
+  if (
+    studyState === StudyState.SHOWING_QUESTION ||
+    studyState === StudyState.WAITING_FOR_ANSWER ||
+    studyState === StudyState.WAITING_FOR_RATING ||
+    // allow repeat question during study-ahead answer gap
+    (noScheduleChanges && studyAheadSession && inStudyAheadAnswerGap)
+  ) {
+    // if we were in the gap, stop the gap timer
+    inStudyAheadAnswerGap = false;
+    restartCurrentCardVoiceFlow();
+    return true;
+  }
+}
 
       // NEW: repeat answer using state machine
             if (t.includes("repeat answer") && currentMode === "voice" && currentCard) {
