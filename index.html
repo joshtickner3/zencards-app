@@ -4,7 +4,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <meta charset="UTF-8" />
-  <title>ZenCards — Hands-Free Audio Flashcards TEST </title>
+  <title>ZenCards — Hands-Free Audio Flashcards </title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <!-- MathJax for rendering LaTeX equations in cards -->
    <script>
@@ -694,12 +694,11 @@ async function signOutFromApp() {
 
     // Ignore the special "Auth session missing" case – it just means
     // Supabase couldn't find a session token, which is fine for log out
-    if (error && error.message !== "Auth session missing") {
-      console.error("Sign-out error:", error);
-      setAuthStatus("Sign-out error: " + error.message);
-      isSigningOut = false;
-      return;
-    }
+   if (error && error.message !== "Auth session missing") {
+  // Log it for debugging, but do NOT surface it to the user
+  console.warn("Non-fatal sign-out error:", error.message);
+}
+ 
   } catch (err) {
     console.error("Sign-out exception:", err);
     setAuthStatus("Sign-out error: " + err.message);
