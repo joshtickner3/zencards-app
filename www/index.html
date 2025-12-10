@@ -1871,6 +1871,21 @@ let speakGeneration = 0;
     return;
   }
 
+  // Always sync with the UI controls right before speaking,
+  // so intro + cards all use the exact same volume & rate.
+  if (ttsRateInput) {
+    const v = parseFloat(ttsRateInput.value);
+    if (!isNaN(v)) {
+      ttsRate = Math.max(0.5, Math.min(2, v));
+    }
+  }
+  if (ttsVolumeInput) {
+    const v = parseFloat(ttsVolumeInput.value);
+    if (!isNaN(v)) {
+      ttsVolume = Math.max(0, Math.min(1, v));
+    }
+  }
+
   // 🔇 Make sure NO mic is listening before we start speaking.
   if (nativeVoicePlugin) {
     try {
@@ -1905,21 +1920,19 @@ let speakGeneration = 0;
   const myGeneration = speakGeneration;
 
   const utt = new SpeechSynthesisUtterance(text);
-  utt.rate = ttsRate || 1.0;
-  utt.volume = (ttsVolume === 0 || ttsVolume) ? ttsVolume : 1.0;
+
+  // Use the *same* volume & rate for intro, questions, and answers.
+  utt.rate   = ttsRate || 1.0;
+  utt.volume = (typeof ttsVolume === "number") ? ttsVolume : 1.0;
 
   utt.onstart = () => {
-    // If we were cancelled after starting but before onstart, bail
     if (myGeneration !== speakGeneration) return;
     isSpeaking = true;
     setStatus("Speaking...");
   };
 
   const finish = () => {
-    // If another speak() or stopAllAudio() happened since we started,
-    // do nothing — this callback is stale.
     if (myGeneration !== speakGeneration) return;
-
     isSpeaking = false;
     setStatus("");
     if (onEnd) onEnd();
