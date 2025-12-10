@@ -2254,8 +2254,12 @@ setCardContent(silentAnswerText, currentCard.answer);
         t.includes("go to main menu")
       );
     }
-    // NEW: speak confirmation before going to the main menu
+   // NEW: stop any current audio, then confirm + go to main menu
 function speakAndGoToMainMenu() {
+  // 🔇 cut off any answer TTS or listening that might still be running
+  stopAllAudio();
+
+  // Now speak a quick confirmation, then end the session
   speak("Going to the main menu.", () => {
     endStudySession();
   });
