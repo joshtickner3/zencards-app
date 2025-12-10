@@ -220,6 +220,45 @@
       gap: 0.5rem;
       font-size: 0.9rem;
     }
+
+    #cardsHeader {
+  padding: 0.25rem 0;
+  border-top: 1px solid #111827;
+  border-bottom: 1px solid #111827;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+#cardsHeader span:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+#cardsHeader .dueDateCell {
+  flex: 0 0 130px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.cardRow .dueDateCell {
+  flex: 0 0 130px;
+  text-align: center;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.cardActions {
+  display: flex;
+  gap: 0.25rem;
+  flex: 0 0 auto;
+}
     .cardRow span {
       flex: 1;
       min-width: 0;
@@ -375,7 +414,14 @@
             <span id="selectedCardInfo" style="font-size:0.85rem;color:#9ca3af;"></span>
           </div>
         </div>
+                <!-- Cards table header -->
+        <div id="cardsHeader">
+          <span>Question</span>
+          <span class="dueDateCell">Due date</span>
+          <span style="flex:0 0 auto;text-align:right;">Actions</span>
+        </div>
         <div id="cardsList"></div>
+
         <!-- NEW: Import from Anki block -->
         <div style="margin-top:0.75rem;border-top:1px solid #111827;padding-top:0.5rem;">
           <label for="ankiImport" style="display:block;margin-bottom:0.25rem;">
@@ -541,6 +587,15 @@
             <button id="voiceCancelEditBtn" class="secondary">Cancel</button>
           </div>
         </div>
+                <!-- Rating buttons for hands-free mode (optional tap) -->
+        <div id="voiceRatingButtons" class="hidden" style="margin-top:0.5rem;">
+          <span>How was that?</span><br />
+          <button data-voice-rating="again">Again</button>
+          <button data-voice-rating="hard">Hard</button>
+          <button data-voice-rating="good">Good</button>
+          <button data-voice-rating="easy">Easy</button>
+        </div>
+      </div> <!-- end of #voiceUI -->
       </div>
 
       <!-- Silent mode UI -->
@@ -1335,8 +1390,44 @@ function getDeckPhaseCounts(deck) {
     selectedDeckId = null;
   }
 }
+    // Format the next due date for a given card
+    function formatDueDate(deckId, cardId) {
+      const key = scheduleKey(deckId, cardId);
+      const entry = schedule[key];
+      if (!entry) {
+        // Never scheduled = brand new card
+        return "New";
+      }
 
-    function refreshCardsList() {
+      const normalized = normalizeScheduleEntry(entry);
+      const dueMs = normalized.dueTime;
+      if (typeof dueMs !== "number") return "New";
+
+      const nowMs = Date.now();
+      const due = new Date(dueMs);
+      if (Number.isNaN(due.getTime())) return "New";
+
+      const now = new Date();
+      const todayStr = now.toDateString();
+      const dueStr = due.toDateString();
+
+      if (dueMs <= nowMs) {
+        return "Due now";
+      }
+
+      // Today later
+      if (dueStr === todayStr) {
+        return "Today " + due.toLocaleTimeString([], {
+          hour: "numeric",
+          minute: "2-digit"
+        });
+      }
+
+      // Otherwise just show date (local)
+      return due.toLocaleDateString();
+    }
+
+        function refreshCardsList() {
       const deck = getDeckById(selectedDeckId);
       cardsListDiv.innerHTML = "";
       selectedCardId = null;
@@ -1348,9 +1439,20 @@ function getDeckPhaseCounts(deck) {
         const row = document.createElement("div");
         row.className = "cardRow";
 
-        const span = document.createElement("span");
-       span.textContent = getPlainTextFromCard(card.question);
-        row.appendChild(span);
+        // Question column
+        const questionSpan = document.createElement("span");
+        questionSpan.textContent = getPlainTextFromCard(card.question);
+        row.appendChild(questionSpan);
+
+        // Due date column
+        const dueSpan = document.createElement("span");
+        dueSpan.className = "dueDateCell";
+        dueSpan.textContent = formatDueDate(selectedDeckId, card.id);
+        row.appendChild(dueSpan);
+
+        // Actions column (Edit / Delete)
+        const actionsDiv = document.createElement("div");
+        actionsDiv.className = "cardActions";
 
         const editBtn = document.createElement("button");
         editBtn.textContent = "Edit";
@@ -1362,7 +1464,7 @@ function getDeckPhaseCounts(deck) {
           selectedCardInfo.textContent = `Editing card: ${card.id}`;
           updateCardBtn.disabled = false;
         });
-        row.appendChild(editBtn);
+        actionsDiv.appendChild(editBtn);
 
         const deleteBtn = document.createElement("button");
         deleteBtn.textContent = "Delete";
@@ -1389,8 +1491,9 @@ function getDeckPhaseCounts(deck) {
           refreshCardsList();
           refreshDeckSelect();
         });
-        row.appendChild(deleteBtn);
+        actionsDiv.appendChild(deleteBtn);
 
+        row.appendChild(actionsDiv);
         cardsListDiv.appendChild(row);
       });
     }
@@ -1580,6 +1683,10 @@ function getPlainTextFromCard(raw) {
     }
 
     let isSpeaking = false;
+    // Every time we start or forcibly stop TTS, bump this.
+// Old TTS callbacks check this and no-op if they're "stale".
+let speakGeneration = 0;
+
 
     // ===== Native iOS VoiceCommands plugin (Capacitor) =====
     let nativeVoicePlugin = null;
@@ -1726,6 +1833,7 @@ function getPlainTextFromCard(raw) {
 
     // Helper: stop all audio + listening
     function stopAllAudio() {
+       speakGeneration++;
       if (window.speechSynthesis) {
         window.speechSynthesis.cancel();
       }
@@ -1764,8 +1872,6 @@ function getPlainTextFromCard(raw) {
   }
 
   // 🔇 Make sure NO mic is listening before we start speaking.
-  // This prevents the answer audio from being cut off when
-  // recognition starts or restarts.
   if (nativeVoicePlugin) {
     try {
       nativeVoicePlugin.stop();
@@ -1794,17 +1900,26 @@ function getPlainTextFromCard(raw) {
     console.error("Error cancelling previous speech:", e);
   }
 
+  // This is a new TTS "generation"
+  speakGeneration++;
+  const myGeneration = speakGeneration;
+
   const utt = new SpeechSynthesisUtterance(text);
   utt.rate = ttsRate || 1.0;
   utt.volume = (ttsVolume === 0 || ttsVolume) ? ttsVolume : 1.0;
 
   utt.onstart = () => {
+    // If we were cancelled after starting but before onstart, bail
+    if (myGeneration !== speakGeneration) return;
     isSpeaking = true;
     setStatus("Speaking...");
   };
 
-  // Treat both normal end and errors the same from the app’s POV
   const finish = () => {
+    // If another speak() or stopAllAudio() happened since we started,
+    // do nothing — this callback is stale.
+    if (myGeneration !== speakGeneration) return;
+
     isSpeaking = false;
     setStatus("");
     if (onEnd) onEnd();
@@ -1965,6 +2080,7 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
     const voiceQuestionText = document.getElementById("voiceQuestionText");
     const voiceAnswer = document.getElementById("voiceAnswer");
     const voiceAnswerText = document.getElementById("voiceAnswerText");
+        const voiceRatingButtons = document.getElementById("voiceRatingButtons");
 
     const silentNextCardBtn = document.getElementById("silentNextCardBtn");
 
@@ -2096,6 +2212,7 @@ let loopStudyAhead = false;       // from Study Options
       if (voiceAnswer) voiceAnswer.classList.add("hidden");
       silentEditPanel.classList.add("hidden");
       voiceEditPanel.classList.add("hidden");
+            if (voiceRatingButtons) voiceRatingButtons.classList.add("hidden");
       setStudyState(StudyState.IDLE);
     }
 
@@ -2112,6 +2229,7 @@ let loopStudyAhead = false;       // from Study Options
     }
 
     backToMenuBtn.addEventListener("click", () => {
+      stopAllAudio();
       showMainMenu();
     });
 
@@ -2141,11 +2259,14 @@ let loopStudyAhead = false;       // from Study Options
     });
 
     function endStudySession() {
-      clearStudyAheadGapTimer();
-      clearQuestionDelayTimer();
-      showMainMenu();
-      setStatus("Study session ended.");
-    }
+  clearStudyAheadGapTimer();
+  clearQuestionDelayTimer();
+  if (voiceRatingButtons) {
+    voiceRatingButtons.classList.add("hidden");
+  }
+  showMainMenu();
+  setStatus("Study session ended.");
+}
 
     // ===================== INLINE EDIT HELPERS =====================
     function updateCardTextInDeck(deckId, cardId, newQ, newA) {
@@ -2240,6 +2361,17 @@ setCardContent(silentAnswerText, currentCard.answer);
         t.includes("go to main menu")
       );
     }
+   // NEW: stop any current audio, then confirm + go to main menu
+function speakAndGoToMainMenu() {
+  // 🔇 cut off any answer TTS or listening that might still be running
+  stopAllAudio();
+
+  // Now speak a quick confirmation, then end the session
+  speak("Going to the main menu.", () => {
+    endStudySession();
+  });
+}
+
 
     // NEW helper: fully restart current card flow in hands-free mode
     function restartCurrentCardVoiceFlow() {
@@ -2360,7 +2492,7 @@ if (t.includes("repeat question") && currentMode === "voice" && currentCard) {
         return true;
       }
 
-      // UPDATED: pause only allowed in specific states,
+            // UPDATED: pause only allowed in specific states,
       // and keep listening while paused.
       if (t.includes("pause study session") || (t.includes("pause") && t.includes("study"))) {
         const canPauseNormal =
@@ -2374,34 +2506,41 @@ if (t.includes("repeat question") && currentMode === "voice" && currentCard) {
           studyAheadSession;
 
         if (canPauseNormal || canPauseStudyAheadGap) {
-          isPaused = true;
-          clearStudyAheadGapTimer();
-          clearQuestionDelayTimer();
-          pauseBtn.disabled = true;
-          resumeBtn.disabled = false;
-          setStatus("Paused. Say 'resume study session' or tap Resume.");
-          // NEW: keep listening while paused (voice pause)
-          if (currentMode === "voice" && speechSupported && recognition) {
-            listenForCommand(handleVoiceTranscript);
-          }
+          // 🔊 Speak confirmation first, then actually pause + listen for resume
+          speak("Study session paused.", () => {
+            isPaused = true;
+            clearStudyAheadGapTimer();
+            clearQuestionDelayTimer();
+            pauseBtn.disabled = true;
+            resumeBtn.disabled = false;
+            setStatus("Paused. Say 'resume study session' or tap Resume.");
+
+            // keep listening while paused (voice pause)
+            if (currentMode === "voice" && speechSupported && recognition) {
+              listenForCommand(handleVoiceTranscript);
+            }
+          });
         }
         return true;
       }
 
-      // UPDATED: more robust resume detection
+            // UPDATED: more robust resume detection
       if (
         t.includes("resume study session") ||
         (t.includes("resume") && (t.includes("study") || t.includes("session")))
       ) {
         if (isPaused) {
-          isPaused = false;
-          pauseBtn.disabled = false;
-          resumeBtn.disabled = true;
-          if (currentMode === "voice") {
-            runVoiceLoop();
-          } else if (currentMode === "silent") {
-            runSilentLoop();
-          }
+          // 🔊 Speak confirmation first, then resume the loop
+          speak("Resuming study session.", () => {
+            isPaused = false;
+            pauseBtn.disabled = false;
+            resumeBtn.disabled = true;
+            if (currentMode === "voice") {
+              runVoiceLoop();
+            } else if (currentMode === "silent") {
+              runSilentLoop();
+            }
+          });
         }
         return true;
       }
@@ -2413,7 +2552,7 @@ if (t.includes("repeat question") && currentMode === "voice" && currentCard) {
       if (inStudyAheadAnswerGap && noScheduleChanges && studyAheadSession && isMainMenuCommand(text)) {
         inStudyAheadAnswerGap = false;
         clearStudyAheadGapTimer();
-        endStudySession();
+        speakAndGoToMainMenu();
         return;
       }
 
@@ -2425,7 +2564,7 @@ if (t.includes("repeat question") && currentMode === "voice" && currentCard) {
         awaitingPostCompletionChoice = false;
 
         if (wantsMainMenu) {
-          endStudySession();
+          speakAndGoToMainMenu();
           return;
         }
 
@@ -2458,14 +2597,14 @@ if (t.includes("repeat question") && currentMode === "voice" && currentCard) {
         // NEW: allow "main menu" ONLY while difficulty is being asked (normal mode)
         if (!noScheduleChanges && isMainMenuCommand(t)) {
           awaitingDifficulty = false;
-          endStudySession();
+          speakAndGoToMainMenu();
           return;
         }
 
         if (noScheduleChanges) {
           if (isMainMenuCommand(t)) {
             awaitingDifficulty = false;
-            endStudySession();
+            speakAndGoToMainMenu();
             return;
           }
           speak("I didn't catch that. Say main menu to go to the main menu.", () => {
@@ -2489,6 +2628,9 @@ if (t.includes("repeat question") && currentMode === "voice" && currentCard) {
           if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
             queueCardForAgain(currentDeckId, currentCard);
           }
+        }
+         if (voiceRatingButtons) {
+          voiceRatingButtons.classList.add("hidden");
         }
         awaitingDifficulty = false;
         setStudyState(StudyState.IDLE); // will be set to question again when next card loads
@@ -2572,6 +2714,10 @@ speak("Answer: " + plainAnswer, () => {
         const promptText = detailed
           ? "How was that? Say again, hard, good, or easy. You can also say next, repeat question, or repeat answer."
           : "How was that?";
+           // Show tap-to-rate buttons in normal voice mode (not auto mode / study-ahead)
+        if (!noScheduleChanges && voiceRatingButtons) {
+          voiceRatingButtons.classList.remove("hidden");
+        }
         awaitingDifficulty = true;
         setStudyState(StudyState.WAITING_FOR_RATING);
         speak(promptText, () => {
@@ -2796,6 +2942,10 @@ setCardContent(voiceAnswerText, currentCard.answer);
         voiceAnswer.classList.add("hidden");
       }
       voiceEditPanel.classList.add("hidden");
+            if (voiceRatingButtons) {
+        voiceRatingButtons.classList.add("hidden");
+      }
+
 
       hasSpokenCurrentQuestion = true;
       setStudyState(StudyState.SHOWING_QUESTION);
@@ -3052,6 +3202,31 @@ setCardContent(voiceAnswerText, currentCard.answer);
       }
       setStudyState(StudyState.IDLE);
       runSilentLoop();
+    });
+
+        // Rating buttons for voice (hands-free) mode – optional tap instead of speaking
+    voiceRatingButtons.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-voice-rating]");
+      if (!btn || !currentCard) return;
+
+      const ratingKey = btn.dataset.voiceRating;
+
+      // In study-ahead / noScheduleChanges we shouldn't change schedule,
+      // so just ignore taps in that mode.
+      if (!noScheduleChanges) {
+        const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
+        if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
+          queueCardForAgain(currentDeckId, currentCard);
+        }
+      }
+
+      // Done with this card's rating in voice mode
+      awaitingDifficulty = false;
+      if (voiceRatingButtons) {
+        voiceRatingButtons.classList.add("hidden");
+      }
+      setStudyState(StudyState.IDLE);
+      runVoiceLoop();
     });
 
     silentMainMenuBtn.addEventListener("click", () => {
