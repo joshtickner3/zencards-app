@@ -2483,58 +2483,130 @@ function speakAndGoToMainMenu() {
       return null;
     }
 
-    function handleGlobalVoiceCommands(text) {
+    // Helper: detect "main menu" style commands
+function isMainMenuCommand(text) {
+  const t = text.toLowerCase();
+  return (
+    t.includes("main menu") ||
+    (t.includes("menu") && t.includes("main")) ||
+    t.includes("go back") ||
+    t.includes("back to menu") ||
+    t.includes("back to the menu") ||
+    t.includes("go to the menu") ||
+    t.includes("go to main menu")
+  );
+}
+
+// NEW: stop any current audio, then confirm + go to main menu
+function speakAndGoToMainMenu() {
+  stopAllAudio();
+  speak("Going to the main menu.", () => {
+    endStudySession();
+  });
+}
+
+// NEW helper: fully restart current card flow in hands-free mode
+function restartCurrentCardVoiceFlow() {
+  if (!currentCard) return;
+
+  clearStudyAheadGapTimer();
+  clearQuestionDelayTimer();
+  awaitingDifficulty = false;
+  awaitingAnswerSignal = false;
+  awaitingPostCompletionChoice = false;
+  inStudyAheadAnswerGap = false;
+
+  if (voiceAnswer) {
+    voiceAnswer.classList.add("hidden");
+  }
+  hasSpokenCurrentAnswer = false;
+  hasSpokenCurrentQuestion = false;
+
+  setStatus("Repeating card...");
+  setStudyState(StudyState.SHOWING_QUESTION);
+
+  hasSpokenCurrentQuestion = true;
+  speak(getPlainTextFromCard(currentCard.question), () => {
+    if (isPaused) return;
+
+    if (answerMode === "delay") {
+      const delay = Math.max(
+        1,
+        Math.min(60, Math.floor(answerDelayMs / 1000))
+      );
+
+      setStudyState(StudyState.WAITING_FOR_ANSWER);
+      questionDelayTimerId = setTimeout(() => {
+        if (!isPaused) {
+          speakAnswerThenAskDifficulty();
+        }
+      }, delay * 1000);
+    } else {
+      awaitingAnswerSignal = true;
+      setStudyState(StudyState.WAITING_FOR_ANSWER);
+      setStatus("Listening for your answer...");
+      listenForCommand(handleVoiceTranscript);
+    }
+  });
+}
+
+function handleGlobalVoiceCommands(text) {
   const t = text.toLowerCase();
 
-  // ===== MAIN MENU (always allowed in voice mode) =====
-  if (currentMode === "voice" && isMainMenuCommand(t)) {
-    speakAndGoToMainMenu();
-    return true;
-  }
-
-  // If we don't have a card yet, nothing else to do.
-  if (currentMode !== "voice" || !currentCard) {
-    return false;
-  }
-
-  // ===== REPEAT QUESTION (works in normal + study-ahead, any state) =====
-  if (t.includes("repeat question")) {
+  // 🔁 Repeat question — allowed in ANY voice state when we have a card
+  if (t.includes("repeat question") && currentMode === "voice" && currentCard) {
     restartCurrentCardVoiceFlow();
     return true;
   }
 
-  // ===== REPEAT ANSWER (works in normal + study-ahead, any state) =====
-  if (t.includes("repeat answer")) {
+  // 🔁 Repeat answer — allowed whenever we've already shown an answer
+  if (t.includes("repeat answer") && currentMode === "voice" && currentCard) {
     const plainAnswer = getPlainTextFromCard(currentCard.answer);
     speak("Answer: " + plainAnswer, () => {
       if (isPaused) return;
 
-      // If we're in study-ahead mode, restart the answer gap window
-      if (noScheduleChanges && studyAheadSession) {
+      // If we're in study-ahead + gap, restart the gap window
+      if (noScheduleChanges && studyAheadSession && inStudyAheadAnswerGap) {
         startStudyAheadAnswerWindow(true);
-      } else if (awaitingDifficulty) {
+        return;
+      }
+
+      // If we are waiting for difficulty in normal mode, just re-prompt
+      if (awaitingDifficulty && !noScheduleChanges) {
         const detailed =
           !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
         hasSpokenInstructionsOnce = true;
         const promptText = detailed
-          ? "How was that? Say again, hard, good, or easy. You can also say repeat question or repeat answer."
+          ? "How was that? Say again, hard, good, or easy."
           : "How was that?";
-        awaitingDifficulty = true;
-        setStudyState(StudyState.WAITING_FOR_RATING);
         speak(promptText, () => {
           listenForCommand(handleVoiceTranscript);
         });
-      } else {
-        // Just keep listening for other commands
+        return;
+      }
+
+      // If we're at post-completion choice, re-prompt main menu
+      if (awaitingPostCompletionChoice) {
+        speak("Say main menu to go back.", () => {
+          listenForCommand(handleVoiceTranscript);
+        });
+        return;
+      }
+
+      // Otherwise, just keep listening for the next command
+      if (currentMode === "voice") {
         listenForCommand(handleVoiceTranscript);
       }
     });
     return true;
   }
 
-  // ===== PAUSE STUDY SESSION (no extra gating) =====
-  if (t.includes("pause study session") || (t.includes("pause") && t.includes("study"))) {
-    if (!isPaused) {
+  // 🧊 Pause study session – now allowed ANY time in voice mode
+  if (
+    t.includes("pause study session") ||
+    (t.includes("pause") && (t.includes("study") || t.includes("session")))
+  ) {
+    if (currentMode === "voice" && !isPaused) {
       speak("Study session paused.", () => {
         isPaused = true;
         clearStudyAheadGapTimer();
@@ -2543,8 +2615,11 @@ function speakAndGoToMainMenu() {
         resumeBtn.disabled = false;
         setStatus("Paused. Say 'resume study session' or tap Resume.");
 
-        // Keep listening while paused so "resume study session" works.
-        if (speechSupported && recognition) {
+        // keep listening while paused (applies to study-ahead too)
+        if (speechSupported && recognition && !nativeVoicePlugin) {
+          listenForCommand(handleVoiceTranscript);
+        }
+        if (nativeVoicePlugin) {
           listenForCommand(handleVoiceTranscript);
         }
       });
@@ -2552,7 +2627,7 @@ function speakAndGoToMainMenu() {
     return true;
   }
 
-  // ===== RESUME STUDY SESSION =====
+  // ▶️ Resume study session – allowed anytime we’re paused
   if (
     t.includes("resume study session") ||
     (t.includes("resume") && (t.includes("study") || t.includes("session")))
@@ -2572,103 +2647,114 @@ function speakAndGoToMainMenu() {
     return true;
   }
 
+  // 🏠 Main menu – now allowed in ANY voice state (normal or study-ahead)
+  if (isMainMenuCommand(t) && currentMode === "voice") {
+    speakAndGoToMainMenu();
+    return true;
+  }
+
+  // ❌ End study session
+  if (t.includes("end study session")) {
+    endStudySession();
+    return true;
+  }
+
   return false;
 }
 
     function handleVoiceTranscript(text) {
-      // NEW: allow "main menu" ONLY during study-ahead answer gap window
-      if (inStudyAheadAnswerGap && noScheduleChanges && studyAheadSession && isMainMenuCommand(text)) {
-        inStudyAheadAnswerGap = false;
-        clearStudyAheadGapTimer();
-        speakAndGoToMainMenu();
-        return;
-      }
+  // First, let global commands capture things like pause, resume, main menu, repeats
+  if (handleGlobalVoiceCommands(text)) return;
 
-      if (handleGlobalVoiceCommands(text)) return;
+  // If we were in the study-ahead answer gap, we no longer need a special case here;
+  // main menu / repeat answer are already handled globally.
 
-      if (awaitingPostCompletionChoice) {
-        const wantsMainMenu = isMainMenuCommand(text);
+  // If we're choosing what to do after finishing all due cards
+  if (awaitingPostCompletionChoice) {
+    const wantsMainMenu = isMainMenuCommand(text);
 
-        awaitingPostCompletionChoice = false;
+    awaitingPostCompletionChoice = false;
 
-        if (wantsMainMenu) {
-          speakAndGoToMainMenu();
-          return;
-        }
-
-        // Enter study-ahead mode (no schedule changes)
-        studyAheadSession = true;
-        noScheduleChanges = true;
-        studyAheadPromptedOnceVoice = false;
-
-        aheadQueue = shuffleArray(getDueCardsForDeck(currentDeckId, true, false));
-        aheadQueueIndex = 0;
-
-        speak(
-          "Okay, entering study ahead mode. These reviews will not change your future schedule.",
-          () => {
-            runVoiceLoop();
-          }
-        );
-        return;
-      }
-
-      if (awaitingAnswerSignal) {
-        awaitingAnswerSignal = false;
-        speakAnswerThenAskDifficulty();
-        return;
-      }
-
-      if (awaitingDifficulty) {
-        const t = text.toLowerCase();
-
-        // NEW: allow "main menu" ONLY while difficulty is being asked (normal mode)
-        if (!noScheduleChanges && isMainMenuCommand(t)) {
-          awaitingDifficulty = false;
-          speakAndGoToMainMenu();
-          return;
-        }
-
-        if (noScheduleChanges) {
-          if (isMainMenuCommand(t)) {
-            awaitingDifficulty = false;
-            speakAndGoToMainMenu();
-            return;
-          }
-          speak("I didn't catch that. Say main menu to go to the main menu.", () => {
-            listenForCommand(handleVoiceTranscript);
-          });
-          return;
-        }
-
-        const ratingKey = parseRatingFromText(text);
-        if (!ratingKey) {
-          speak(
-            "I didn't catch that. Please say again, hard, good, or easy.",
-            () => {
-              listenForCommand(handleVoiceTranscript);
-            }
-          );
-          return;
-        }
-        if (!noScheduleChanges) {
-          const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
-          if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
-            queueCardForAgain(currentDeckId, currentCard);
-          }
-        }
-         if (voiceRatingButtons) {
-          voiceRatingButtons.classList.add("hidden");
-        }
-        awaitingDifficulty = false;
-        setStudyState(StudyState.IDLE); // will be set to question again when next card loads
-        runVoiceLoop();
-        return;
-      }
-
-      // Fallback: keep listening
-      listenForCommand(handleVoiceTranscript);
+    if (wantsMainMenu) {
+      speakAndGoToMainMenu();
+      return;
     }
+
+    // Otherwise: enter study-ahead mode (no schedule changes)
+    studyAheadSession = true;
+    noScheduleChanges = true;
+    studyAheadPromptedOnceVoice = false;
+
+    aheadQueue = shuffleArray(getDueCardsForDeck(currentDeckId, true, false));
+    aheadQueueIndex = 0;
+
+    speak(
+      "Okay, entering study ahead mode. These reviews will not change your future schedule.",
+      () => {
+        runVoiceLoop();
+      }
+    );
+    return;
+  }
+
+  // If we're waiting for the user to say "I'm ready" in voice-answer mode
+  if (awaitingAnswerSignal) {
+    awaitingAnswerSignal = false;
+    speakAnswerThenAskDifficulty();
+    return;
+  }
+
+  // Difficulty / rating flow (normal, schedule-changing mode only)
+  if (awaitingDifficulty) {
+    const t = text.toLowerCase();
+
+    // Main menu commands are already handled globally, but just in case:
+    if (isMainMenuCommand(t)) {
+      awaitingDifficulty = false;
+      speakAndGoToMainMenu();
+      return;
+    }
+
+    // In study-ahead (noScheduleChanges) we should never be here,
+    // but if we are, just re-prompt for main menu.
+    if (noScheduleChanges) {
+      speak("Say main menu to go to the main menu.", () => {
+        listenForCommand(handleVoiceTranscript);
+      });
+      return;
+    }
+
+    const ratingKey = parseRatingFromText(text);
+    if (!ratingKey) {
+      speak(
+        "I didn't catch that. Please say again, hard, good, or easy.",
+        () => {
+          listenForCommand(handleVoiceTranscript);
+        }
+      );
+      return;
+    }
+
+    // Apply scheduling normally
+    const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
+    if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
+      queueCardForAgain(currentDeckId, currentCard);
+    }
+
+    awaitingDifficulty = false;
+    if (voiceRatingButtons) {
+      voiceRatingButtons.classList.add("hidden");
+    }
+    setStudyState(StudyState.IDLE);
+    runVoiceLoop();
+    return;
+  }
+
+  // Fallback: keep listening for the next command in voice mode
+  if (currentMode === "voice") {
+    listenForCommand(handleVoiceTranscript);
+  }
+}
 
     function describeAutoModeBehavior() {
       switch (autoModeBehavior) {

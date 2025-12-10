@@ -2484,119 +2484,96 @@ function speakAndGoToMainMenu() {
     }
 
     function handleGlobalVoiceCommands(text) {
-      const t = text.toLowerCase();
+  const t = text.toLowerCase();
 
-      // NEW: repeat question using state machine
-if (t.includes("repeat question") && currentMode === "voice" && currentCard) {
-  if (
-    studyState === StudyState.SHOWING_QUESTION ||
-    studyState === StudyState.WAITING_FOR_ANSWER ||
-    studyState === StudyState.WAITING_FOR_RATING ||
-    // allow repeat question during study-ahead answer gap
-    (noScheduleChanges && studyAheadSession && inStudyAheadAnswerGap)
-  ) {
-    // if we were in the gap, stop the gap timer
-    inStudyAheadAnswerGap = false;
+  // ===== MAIN MENU (always allowed in voice mode) =====
+  if (currentMode === "voice" && isMainMenuCommand(t)) {
+    speakAndGoToMainMenu();
+    return true;
+  }
+
+  // If we don't have a card yet, nothing else to do.
+  if (currentMode !== "voice" || !currentCard) {
+    return false;
+  }
+
+  // ===== REPEAT QUESTION (works in normal + study-ahead, any state) =====
+  if (t.includes("repeat question")) {
     restartCurrentCardVoiceFlow();
     return true;
   }
-}
 
-      // NEW: repeat answer using state machine
-            if (t.includes("repeat answer") && currentMode === "voice" && currentCard) {
-        if (
-          studyState === StudyState.SHOWING_ANSWER ||
-          studyState === StudyState.WAITING_FOR_RATING ||
-          inStudyAheadAnswerGap
-        ) {
-          const plainAnswer = getPlainTextFromCard(currentCard.answer);
-          speak("Answer: " + plainAnswer, () => {
-            if (isPaused) return;
+  // ===== REPEAT ANSWER (works in normal + study-ahead, any state) =====
+  if (t.includes("repeat answer")) {
+    const plainAnswer = getPlainTextFromCard(currentCard.answer);
+    speak("Answer: " + plainAnswer, () => {
+      if (isPaused) return;
 
-            if (awaitingDifficulty) {
-              const detailed =
-                !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
-              hasSpokenInstructionsOnce = true;
-              const promptText = detailed
-                ? "How was that? Say again, hard, good, or easy. You can also say next, repeat question, or repeat answer."
-                : "How was that?";
-              awaitingDifficulty = true;
-              setStudyState(StudyState.WAITING_FOR_RATING);
-              speak(promptText, () => {
-                listenForCommand(handleVoiceTranscript);
-              });
-            } else if (inStudyAheadAnswerGap) {
-              // Re-start the study-ahead gap so you get another window to speak
-              startStudyAheadAnswerWindow(true);
-            } else if (awaitingPostCompletionChoice) {
-              speak("Say main menu to go back.", () => {
-                listenForCommand(handleVoiceTranscript);
-              });
-            }
-          });
-          return true;
+      // If we're in study-ahead mode, restart the answer gap window
+      if (noScheduleChanges && studyAheadSession) {
+        startStudyAheadAnswerWindow(true);
+      } else if (awaitingDifficulty) {
+        const detailed =
+          !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
+        hasSpokenInstructionsOnce = true;
+        const promptText = detailed
+          ? "How was that? Say again, hard, good, or easy. You can also say repeat question or repeat answer."
+          : "How was that?";
+        awaitingDifficulty = true;
+        setStudyState(StudyState.WAITING_FOR_RATING);
+        speak(promptText, () => {
+          listenForCommand(handleVoiceTranscript);
+        });
+      } else {
+        // Just keep listening for other commands
+        listenForCommand(handleVoiceTranscript);
+      }
+    });
+    return true;
+  }
+
+  // ===== PAUSE STUDY SESSION (no extra gating) =====
+  if (t.includes("pause study session") || (t.includes("pause") && t.includes("study"))) {
+    if (!isPaused) {
+      speak("Study session paused.", () => {
+        isPaused = true;
+        clearStudyAheadGapTimer();
+        clearQuestionDelayTimer();
+        pauseBtn.disabled = true;
+        resumeBtn.disabled = false;
+        setStatus("Paused. Say 'resume study session' or tap Resume.");
+
+        // Keep listening while paused so "resume study session" works.
+        if (speechSupported && recognition) {
+          listenForCommand(handleVoiceTranscript);
         }
-      }
-      
-      if (t.includes("end study session")) {
-        endStudySession();
-        return true;
-      }
-
-            // UPDATED: pause only allowed in specific states,
-      // and keep listening while paused.
-      if (t.includes("pause study session") || (t.includes("pause") && t.includes("study"))) {
-        const canPauseNormal =
-          currentMode === "voice" &&
-          awaitingDifficulty &&
-          !noScheduleChanges;
-        const canPauseStudyAheadGap =
-          currentMode === "voice" &&
-          inStudyAheadAnswerGap &&
-          noScheduleChanges &&
-          studyAheadSession;
-
-        if (canPauseNormal || canPauseStudyAheadGap) {
-          // 🔊 Speak confirmation first, then actually pause + listen for resume
-          speak("Study session paused.", () => {
-            isPaused = true;
-            clearStudyAheadGapTimer();
-            clearQuestionDelayTimer();
-            pauseBtn.disabled = true;
-            resumeBtn.disabled = false;
-            setStatus("Paused. Say 'resume study session' or tap Resume.");
-
-            // keep listening while paused (voice pause)
-            if (currentMode === "voice" && speechSupported && recognition) {
-              listenForCommand(handleVoiceTranscript);
-            }
-          });
-        }
-        return true;
-      }
-
-            // UPDATED: more robust resume detection
-      if (
-        t.includes("resume study session") ||
-        (t.includes("resume") && (t.includes("study") || t.includes("session")))
-      ) {
-        if (isPaused) {
-          // 🔊 Speak confirmation first, then resume the loop
-          speak("Resuming study session.", () => {
-            isPaused = false;
-            pauseBtn.disabled = false;
-            resumeBtn.disabled = true;
-            if (currentMode === "voice") {
-              runVoiceLoop();
-            } else if (currentMode === "silent") {
-              runSilentLoop();
-            }
-          });
-        }
-        return true;
-      }
-      return false;
+      });
     }
+    return true;
+  }
+
+  // ===== RESUME STUDY SESSION =====
+  if (
+    t.includes("resume study session") ||
+    (t.includes("resume") && (t.includes("study") || t.includes("session")))
+  ) {
+    if (isPaused) {
+      speak("Resuming study session.", () => {
+        isPaused = false;
+        pauseBtn.disabled = false;
+        resumeBtn.disabled = true;
+        if (currentMode === "voice") {
+          runVoiceLoop();
+        } else if (currentMode === "silent") {
+          runSilentLoop();
+        }
+      });
+    }
+    return true;
+  }
+
+  return false;
+}
 
     function handleVoiceTranscript(text) {
       // NEW: allow "main menu" ONLY during study-ahead answer gap window
@@ -2798,7 +2775,7 @@ speak("Answer: " + plainAnswer, () => {
 
       if (!restartOnly && !studyAheadPromptedOnceVoice) {
         studyAheadPromptedOnceVoice = true;
-        speak("You are in study ahead mode. You can say repeat answer or main menu before the next card.", () => {
+        speak("You are in study ahead mode. You can say repeat answer, repeat question, pause study session, resume study session, or main menu before the next card.", () => {
           if (isPaused) return;
           startListeningAndTimer();
         });
@@ -2952,7 +2929,7 @@ if (overdue.length > 0) {
     "Congratulations, you are all caught up, no more cards are due today.",
     () => {
       speak(
-        "If you'd like to go back to the main menu, say 'main menu'. Otherwise, say 'study ahead mode', which lets you review all cards in this deck without affecting their future due dates.",
+        "If you'd like to go back to the main menu, say 'main menu'. Otherwise, say 'study ahead mode' to enter study ahead mode, which lets you review all cards in this deck without affecting their future due dates.",
         () => {
           listenForCommand(handleVoiceTranscript);
         }
