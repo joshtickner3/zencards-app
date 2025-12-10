@@ -220,6 +220,45 @@
       gap: 0.5rem;
       font-size: 0.9rem;
     }
+
+    #cardsHeader {
+  padding: 0.25rem 0;
+  border-top: 1px solid #111827;
+  border-bottom: 1px solid #111827;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+#cardsHeader span:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+#cardsHeader .dueDateCell {
+  flex: 0 0 130px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.cardRow .dueDateCell {
+  flex: 0 0 130px;
+  text-align: center;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.cardActions {
+  display: flex;
+  gap: 0.25rem;
+  flex: 0 0 auto;
+}
     .cardRow span {
       flex: 1;
       min-width: 0;
@@ -375,7 +414,14 @@
             <span id="selectedCardInfo" style="font-size:0.85rem;color:#9ca3af;"></span>
           </div>
         </div>
+                <!-- Cards table header -->
+        <div id="cardsHeader">
+          <span>Question</span>
+          <span class="dueDateCell">Due date</span>
+          <span style="flex:0 0 auto;text-align:right;">Actions</span>
+        </div>
         <div id="cardsList"></div>
+
         <!-- NEW: Import from Anki block -->
         <div style="margin-top:0.75rem;border-top:1px solid #111827;padding-top:0.5rem;">
           <label for="ankiImport" style="display:block;margin-bottom:0.25rem;">
@@ -1344,8 +1390,44 @@ function getDeckPhaseCounts(deck) {
     selectedDeckId = null;
   }
 }
+    // Format the next due date for a given card
+    function formatDueDate(deckId, cardId) {
+      const key = scheduleKey(deckId, cardId);
+      const entry = schedule[key];
+      if (!entry) {
+        // Never scheduled = brand new card
+        return "New";
+      }
 
-    function refreshCardsList() {
+      const normalized = normalizeScheduleEntry(entry);
+      const dueMs = normalized.dueTime;
+      if (typeof dueMs !== "number") return "New";
+
+      const nowMs = Date.now();
+      const due = new Date(dueMs);
+      if (Number.isNaN(due.getTime())) return "New";
+
+      const now = new Date();
+      const todayStr = now.toDateString();
+      const dueStr = due.toDateString();
+
+      if (dueMs <= nowMs) {
+        return "Due now";
+      }
+
+      // Today later
+      if (dueStr === todayStr) {
+        return "Today " + due.toLocaleTimeString([], {
+          hour: "numeric",
+          minute: "2-digit"
+        });
+      }
+
+      // Otherwise just show date (local)
+      return due.toLocaleDateString();
+    }
+
+        function refreshCardsList() {
       const deck = getDeckById(selectedDeckId);
       cardsListDiv.innerHTML = "";
       selectedCardId = null;
@@ -1357,9 +1439,20 @@ function getDeckPhaseCounts(deck) {
         const row = document.createElement("div");
         row.className = "cardRow";
 
-        const span = document.createElement("span");
-       span.textContent = getPlainTextFromCard(card.question);
-        row.appendChild(span);
+        // Question column
+        const questionSpan = document.createElement("span");
+        questionSpan.textContent = getPlainTextFromCard(card.question);
+        row.appendChild(questionSpan);
+
+        // Due date column
+        const dueSpan = document.createElement("span");
+        dueSpan.className = "dueDateCell";
+        dueSpan.textContent = formatDueDate(selectedDeckId, card.id);
+        row.appendChild(dueSpan);
+
+        // Actions column (Edit / Delete)
+        const actionsDiv = document.createElement("div");
+        actionsDiv.className = "cardActions";
 
         const editBtn = document.createElement("button");
         editBtn.textContent = "Edit";
@@ -1371,7 +1464,7 @@ function getDeckPhaseCounts(deck) {
           selectedCardInfo.textContent = `Editing card: ${card.id}`;
           updateCardBtn.disabled = false;
         });
-        row.appendChild(editBtn);
+        actionsDiv.appendChild(editBtn);
 
         const deleteBtn = document.createElement("button");
         deleteBtn.textContent = "Delete";
@@ -1398,8 +1491,9 @@ function getDeckPhaseCounts(deck) {
           refreshCardsList();
           refreshDeckSelect();
         });
-        row.appendChild(deleteBtn);
+        actionsDiv.appendChild(deleteBtn);
 
+        row.appendChild(actionsDiv);
         cardsListDiv.appendChild(row);
       });
     }
