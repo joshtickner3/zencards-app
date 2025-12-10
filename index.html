@@ -543,24 +543,12 @@
         </div>
                 <!-- Rating buttons for hands-free mode (optional tap) -->
         <div id="voiceRatingButtons" class="hidden" style="margin-top:0.5rem;">
-  <span>How was that?</span><br />
-  <div>
-    <button data-voice-rating="again">Again</button>
-    <span id="voice-hint-again" class="dueHint"></span>
-  </div>
-  <div>
-    <button data-voice-rating="hard">Hard</button>
-    <span id="voice-hint-hard" class="dueHint"></span>
-  </div>
-  <div>
-    <button data-voice-rating="good">Good</button>
-    <span id="voice-hint-good" class="dueHint"></span>
-  </div>
-  <div>
-    <button data-voice-rating="easy">Easy</button>
-    <span id="voice-hint-easy" class="dueHint"></span>
-  </div>
-</div>
+          <span>How was that?</span><br />
+          <button data-voice-rating="again">Again</button>
+          <button data-voice-rating="hard">Hard</button>
+          <button data-voice-rating="good">Good</button>
+          <button data-voice-rating="easy">Easy</button>
+        </div>
       </div> <!-- end of #voiceUI -->
       </div>
 
@@ -1980,10 +1968,6 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
     const hintHard = document.getElementById("hint-hard");
     const hintGood = document.getElementById("hint-good");
     const hintEasy = document.getElementById("hint-easy");
-    const voiceHintAgain = document.getElementById("voice-hint-again");
-const voiceHintHard = document.getElementById("voice-hint-hard");
-const voiceHintGood = document.getElementById("voice-hint-good");
-const voiceHintEasy = document.getElementById("voice-hint-easy");
 
     const voiceUI = document.getElementById("voiceUI");
     const voiceQuestion = document.getElementById("voiceQuestion");
@@ -2173,7 +2157,6 @@ let loopStudyAhead = false;       // from Study Options
   if (voiceRatingButtons) {
     voiceRatingButtons.classList.add("hidden");
   }
-  clearVoiceHints();
   showMainMenu();
   setStatus("Study session ended.");
 }
@@ -2623,7 +2606,6 @@ speak("Answer: " + plainAnswer, () => {
            // Show tap-to-rate buttons in normal voice mode (not auto mode / study-ahead)
         if (!noScheduleChanges && voiceRatingButtons) {
           voiceRatingButtons.classList.remove("hidden");
-          updateVoiceDueHints(); 
         }
         awaitingDifficulty = true;
         setStudyState(StudyState.WAITING_FOR_RATING);
@@ -2898,53 +2880,6 @@ setCardContent(voiceAnswerText, currentCard.answer);
         clearSilentHints();
         return;
       }
-      function clearVoiceHints() {
-  if (!voiceHintAgain) return; // safety guard
-  voiceHintAgain.textContent = "";
-  voiceHintHard.textContent = "";
-  voiceHintGood.textContent = "";
-  voiceHintEasy.textContent = "";
-}
-
-function updateVoiceDueHints() {
-  if (!currentCard || noScheduleChanges) {
-    clearVoiceHints();
-    return;
-  }
-  const deckId = currentDeckId;
-  const cardId = currentCard.id;
-
-  // "Again" always means ~5 minutes
-  voiceHintAgain.textContent = "5 min >";
-
-  const hardMinutes = previewIntervalMinutes(deckId, cardId, "hard");
-  const goodMinutes = previewIntervalMinutes(deckId, cardId, "good");
-  const easyMinutes = previewIntervalMinutes(deckId, cardId, "easy");
-
-  function formatIntervalVoice(minutes) {
-    if (minutes < 60) {
-      const m = Math.max(1, Math.round(minutes));
-      return m + " min";
-    }
-    const hours = minutes / 60;
-    if (hours < 24) {
-      const h = Math.max(1, Math.round(hours));
-      return h + " hr" + (h === 1 ? "" : "s");
-    }
-    const days = minutes / MINUTES_PER_DAY;
-    if (days < 14) {
-      const d = Math.max(1, Math.round(days));
-      return d + " day" + (d === 1 ? "" : "s");
-    }
-    const weeks = days / 7;
-    const w = Math.max(1, Math.round(weeks));
-    return w + " wk" + (w === 1 ? "" : "s");
-  }
-
-  voiceHintHard.textContent = "Next in " + formatIntervalVoice(hardMinutes);
-  voiceHintGood.textContent = "Next in " + formatIntervalVoice(goodMinutes);
-  voiceHintEasy.textContent = "Next in " + formatIntervalVoice(easyMinutes);
-}
       const deckId = currentDeckId;
       const cardId = currentCard.id;
 
@@ -3179,7 +3114,6 @@ setCardContent(voiceAnswerText, currentCard.answer);
       if (voiceRatingButtons) {
         voiceRatingButtons.classList.add("hidden");
       }
-      clearVoiceHints();
       setStudyState(StudyState.IDLE);
       runVoiceLoop();
     });
