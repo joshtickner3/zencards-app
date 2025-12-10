@@ -253,6 +253,15 @@
   font-size: 0.75rem;
   color: #9ca3af;
 }
+/* Visually mark overdue cards in the card list */
+.cardRow.overdue .dueDateCell {
+  color: #f97373;
+  font-weight: 600;
+}
+
+.cardRow.overdue span:first-child {
+  color: #f97373;
+}
 
 .cardActions {
   display: flex;
@@ -2006,6 +2015,35 @@ let speakGeneration = 0;
     }
 
     // ===================== STUDY LOGIC (DUE / AHEAD) =====================
+    function splitOverdueAndDue(deckId, cards) {
+  const now = Date.now();
+  const overdue = [];
+  const due = [];
+
+  cards.forEach(card => {
+    const key = scheduleKey(deckId, card.id);
+    const s = schedule[key];
+
+    // New cards = due today (not overdue)
+    if (!s) {
+      due.push(card);
+      return;
+    }
+
+    const { dueTime } = normalizeScheduleEntry(s);
+    if (dueTime <= now) {
+      // Overdue if it was due before *today*
+      if (now - dueTime > 60 * 1000) {
+        overdue.push(card);
+      } else {
+        due.push(card);
+      }
+    }
+  });
+
+  return { overdue, due };
+}
+
     function getDueCardsForDeck(deckId, allowAhead, includeOverdue) {
       const deck = getDeckById(deckId);
       if (!deck) return [];
@@ -2878,7 +2916,14 @@ speak("Answer: " + plainAnswer, () => {
       } else {
         // Normal schedule-changing mode with randomized mixing
         const dueCards = getDueCardsForDeck(currentDeckId, false, includeOverdue);
-        nextCard = pickRandomNextCardNormal(dueCards, lastId, false);
+const { overdue, due } = splitOverdueAndDue(currentDeckId, dueCards);
+
+// 🚨 Always exhaust overdue cards first
+if (overdue.length > 0) {
+  nextCard = pickRandomNextCardNormal(overdue, lastId, false);
+} else {
+  nextCard = pickRandomNextCardNormal(due, lastId, false);
+}
       }
 
       if (!nextCard && !allowAhead) {
@@ -3079,7 +3124,13 @@ setCardContent(voiceAnswerText, currentCard.answer);
       } else {
         // Normal schedule-changing mode (silent) with randomized mixing
         const dueCards = getDueCardsForDeck(currentDeckId, false, includeOverdue);
-        nextCard = pickRandomNextCardNormal(dueCards, lastId, true);
+const { overdue, due } = splitOverdueAndDue(currentDeckId, dueCards);
+
+if (overdue.length > 0) {
+  nextCard = pickRandomNextCardNormal(overdue, lastId, true);
+} else {
+  nextCard = pickRandomNextCardNormal(due, lastId, true);
+}
       }
 
       if (!nextCard && !allowAhead) {
