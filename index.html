@@ -1589,6 +1589,10 @@ function getPlainTextFromCard(raw) {
     }
 
     let isSpeaking = false;
+    // Every time we start or forcibly stop TTS, bump this.
+// Old TTS callbacks check this and no-op if they're "stale".
+let speakGeneration = 0;
+
 
     // ===== Native iOS VoiceCommands plugin (Capacitor) =====
     let nativeVoicePlugin = null;
@@ -1735,6 +1739,7 @@ function getPlainTextFromCard(raw) {
 
     // Helper: stop all audio + listening
     function stopAllAudio() {
+       speakGeneration++;
       if (window.speechSynthesis) {
         window.speechSynthesis.cancel();
       }
@@ -1773,8 +1778,6 @@ function getPlainTextFromCard(raw) {
   }
 
   // 🔇 Make sure NO mic is listening before we start speaking.
-  // This prevents the answer audio from being cut off when
-  // recognition starts or restarts.
   if (nativeVoicePlugin) {
     try {
       nativeVoicePlugin.stop();
@@ -1803,17 +1806,26 @@ function getPlainTextFromCard(raw) {
     console.error("Error cancelling previous speech:", e);
   }
 
+  // This is a new TTS "generation"
+  speakGeneration++;
+  const myGeneration = speakGeneration;
+
   const utt = new SpeechSynthesisUtterance(text);
   utt.rate = ttsRate || 1.0;
   utt.volume = (ttsVolume === 0 || ttsVolume) ? ttsVolume : 1.0;
 
   utt.onstart = () => {
+    // If we were cancelled after starting but before onstart, bail
+    if (myGeneration !== speakGeneration) return;
     isSpeaking = true;
     setStatus("Speaking...");
   };
 
-  // Treat both normal end and errors the same from the app’s POV
   const finish = () => {
+    // If another speak() or stopAllAudio() happened since we started,
+    // do nothing — this callback is stale.
+    if (myGeneration !== speakGeneration) return;
+
     isSpeaking = false;
     setStatus("");
     if (onEnd) onEnd();
