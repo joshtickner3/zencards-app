@@ -220,6 +220,24 @@
       gap: 0.5rem;
       font-size: 0.9rem;
     }
+    /* Horizontal rating layout */
+.ratingRow {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;          /* wraps nicely on small screens */
+  align-items: flex-start;
+  margin-top: 0.5rem;
+}
+
+.ratingItem {
+  display: flex;
+  flex-direction: column;   /* button on top, hint under it */
+  gap: 0.25rem;
+}
+
+.ratingItem .dueHint {
+  margin: 0;                /* remove extra spacing */
+}
 
     #cardsHeader {
   padding: 0.25rem 0;
@@ -637,24 +655,30 @@
           <button id="silentNextCardBtn" class="secondary hidden">Next Card</button>
         </div>
         <div id="silentRatingButtons" class="hidden" style="margin-top:0.5rem;">
-          <span>How was that?</span><br />
-          <div>
-            <button data-rating="again">Again</button>
-            <span id="hint-again" class="dueHint"></span>
-          </div>
-          <div>
-            <button data-rating="hard">Hard</button>
-            <span id="hint-hard" class="dueHint"></span>
-          </div>
-          <div>
-            <button data-rating="good">Good</button>
-            <span id="hint-good" class="dueHint"></span>
-          </div>
-          <div>
-            <button data-rating="easy">Easy</button>
-            <span id="hint-easy" class="dueHint"></span>
-          </div>
-        </div>
+  <span>How was that?</span>
+
+  <div class="ratingRow">
+    <div class="ratingItem">
+      <button data-rating="again">Again</button>
+      <span id="hint-again" class="dueHint"></span>
+    </div>
+
+    <div class="ratingItem">
+      <button data-rating="hard">Hard</button>
+      <span id="hint-hard" class="dueHint"></span>
+    </div>
+
+    <div class="ratingItem">
+      <button data-rating="good">Good</button>
+      <span id="hint-good" class="dueHint"></span>
+    </div>
+
+    <div class="ratingItem">
+      <button data-rating="easy">Easy</button>
+      <span id="hint-easy" class="dueHint"></span>
+    </div>
+  </div>
+</div>
         <!-- Completion controls for silent mode -->
         <div id="silentCompletionControls" class="hidden" style="margin-top:0.75rem;">
           <button id="silentMainMenuBtn">Main Menu</button>
@@ -1983,10 +2007,29 @@ let speakGeneration = 0;
       keepListening = true;
 
       recognition.onresult = (event) => {
-        keepListening = false; // we got something, don't auto-restart this cycle
-        const transcript = event.results[0][0].transcript;
-        callback(transcript);
-      };
+  keepListening = false;
+
+  const res = event.results && event.results[0];
+  if (!res) return callback("");
+
+  // Collect all alternatives (you set recognition.maxAlternatives = 3)
+  const alts = [];
+  for (let i = 0; i < res.length; i++) {
+    if (res[i] && res[i].transcript) alts.push(res[i].transcript);
+  }
+  if (alts.length === 0) return callback("");
+
+  // Pick the first alternative that parses into a rating command
+  for (const alt of alts) {
+    if (parseRatingFromText(alt)) {
+      callback(alt);
+      return;
+    }
+  }
+
+  // Otherwise fall back to the top alternative for global commands, etc.
+  callback(alts[0]);
+};
       recognition.onerror = (event) => {
         console.error("STT error:", event.error);
         keepListening = false;
@@ -2473,15 +2516,84 @@ function speakAndGoToMainMenu() {
   });
     }
 
-    function parseRatingFromText(text) {
-      const t = text.toLowerCase();
-      if (t.includes("again")) return "again";
-      if (t.includes("hard")) return "hard";
-      if (t.includes("easy")) return "easy";
-      if (t.includes("good") || t.includes("fine") || t.includes("okay")) return "good";
-      if (t.includes("next")) return "good";
-      return null;
+    function normalizeCmdText(x) {
+  return String(x || "")
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// tiny Levenshtein distance (fast enough for 1–2 word commands)
+function levenshtein(a, b) {
+  if (a === b) return 0;
+  const al = a.length, bl = b.length;
+  if (!al) return bl;
+  if (!bl) return al;
+
+  const dp = Array.from({ length: al + 1 }, () => new Array(bl + 1).fill(0));
+  for (let i = 0; i <= al; i++) dp[i][0] = i;
+  for (let j = 0; j <= bl; j++) dp[0][j] = j;
+
+  for (let i = 1; i <= al; i++) {
+    for (let j = 1; j <= bl; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost
+      );
     }
+  }
+  return dp[al][bl];
+}
+
+function parseRatingFromText(text) {
+  const t = normalizeCmdText(text);
+  if (!t) return null;
+
+  // Prefer matching the FIRST word for rating commands (reduces false hits)
+  const first = t.split(" ")[0] || "";
+
+  // Direct phrase matches
+  if (t.includes("repeat question") || t.includes("repeat answer")) return null; // handled elsewhere
+  if (t.includes("main menu") || t.includes("go to the main menu")) return null; // handled elsewhere
+
+  // Easy wins
+  if (t.includes("again")) return "again";
+  if (t.includes("hard")) return "hard";
+  if (t.includes("easy")) return "easy";
+  if (t.includes("next")) return "good";
+
+  // “Good” synonyms / common mishears
+  // (Web Speech often returns could/hood/gud/go when you say "good")
+  const goodLike = new Set([
+    "good", "fine", "okay", "ok", "k",
+    "could", "hood", "gud", "go", "goo", "gould"
+  ]);
+  if (goodLike.has(first) || t.includes(" good ") || t.endsWith(" good")) return "good";
+
+  // Fuzzy match the FIRST word to the 4 commands
+  const targets = ["again", "hard", "good", "easy"];
+  let best = null;
+  let bestDist = 999;
+
+  for (const cmd of targets) {
+    const d = levenshtein(first, cmd);
+    if (d < bestDist) {
+      bestDist = d;
+      best = cmd;
+    }
+  }
+
+  // Thresholds: short words need tighter thresholds
+  // - good/easy/hard: allow distance 1 (e.g., gud -> good)
+  // - again: allow distance 2 (it’s longer)
+  if (best === "again" && bestDist <= 2) return "again";
+  if (best !== "again" && bestDist <= 1) return best;
+
+  return null;
+}
 
     // Helper: detect "main menu" style commands
 function isMainMenuCommand(text) {
