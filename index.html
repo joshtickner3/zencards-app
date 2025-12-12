@@ -464,6 +464,16 @@
             <span id="selectedCardInfo" style="font-size:0.85rem;color:#9ca3af;"></span>
           </div>
         </div>
+        <!-- Move card to another deck -->
+<div class="row" style="margin-top:0.5rem;">
+  <div>
+    <label for="moveDeckSelect">Move selected card to deck:</label>
+    <select id="moveDeckSelect"></select>
+  </div>
+  <div style="flex:0 0 auto;">
+    <button id="moveCardBtn" class="secondary" disabled>Move Card</button>
+  </div>
+</div>
                 <!-- Cards table header -->
         <div id="cardsHeader">
           <span>Question</span>
@@ -1312,6 +1322,32 @@ async function loadStateFromSupabase() {
     const updateCardBtn = document.getElementById("updateCardBtn");
     const cardsListDiv = document.getElementById("cardsList");
     const selectedCardInfo = document.getElementById("selectedCardInfo");
+    // ===== Move card UI =====
+const moveDeckSelect = document.getElementById("moveDeckSelect");
+const moveCardBtn = document.getElementById("moveCardBtn");
+
+function refreshMoveDeckSelect() {
+  if (!moveDeckSelect) return;
+  moveDeckSelect.innerHTML = "";
+
+  decks.forEach(deck => {
+    const opt = document.createElement("option");
+    opt.value = deck.id;
+    opt.textContent = deck.name;
+    moveDeckSelect.appendChild(opt);
+  });
+
+  // Default to current deck (or first deck)
+  if (selectedDeckId) moveDeckSelect.value = selectedDeckId;
+
+  // Enable button only when a card is selected and there's at least 1 other deck
+  const hasOtherDeck =
+    decks.filter(d => d.id !== selectedDeckId).length > 0;
+
+  if (moveCardBtn) {
+    moveCardBtn.disabled = !selectedCardId || !hasOtherDeck;
+  }
+}
 
     // ================= IMAGE INSERT HELPERS =================
 function insertImageTagInto(textarea, imgSrc) {
@@ -1484,6 +1520,7 @@ function getDeckPhaseCounts(deck) {
   } else {
     selectedDeckId = null;
   }
+  refreshMoveDeckSelect();
 }
     // Format the next due date for a given card
     function formatDueDate(deckId, cardId) {
@@ -1558,6 +1595,7 @@ function getDeckPhaseCounts(deck) {
           cardAnswerInput.value = card.answer;
           selectedCardInfo.textContent = `Editing card: ${card.id}`;
           updateCardBtn.disabled = false;
+          refreshMoveDeckSelect();
         });
         actionsDiv.appendChild(editBtn);
 
@@ -1669,6 +1707,49 @@ function getDeckPhaseCounts(deck) {
       refreshCardsList();
       selectedCardInfo.textContent = `Updated card: ${selectedCardId}`;
     });
+    if (moveCardBtn) {
+  moveCardBtn.addEventListener("click", () => {
+    if (!selectedCardId) return;
+    const fromDeckId = selectedDeckId;
+    const toDeckId = moveDeckSelect ? moveDeckSelect.value : null;
+
+    if (!fromDeckId || !toDeckId) return;
+    if (fromDeckId === toDeckId) return;
+
+    const fromDeck = getDeckById(fromDeckId);
+    const toDeck = getDeckById(toDeckId);
+    if (!fromDeck || !toDeck) return;
+
+    const idx = fromDeck.cards.findIndex(c => c.id === selectedCardId);
+    if (idx === -1) return;
+
+    // Move the card object
+    const [movedCard] = fromDeck.cards.splice(idx, 1);
+    toDeck.cards.push(movedCard);
+
+    // Move schedule entry (because key includes deckId)
+    const oldKey = scheduleKey(fromDeckId, movedCard.id);
+    const newKey = scheduleKey(toDeckId, movedCard.id);
+
+    if (schedule[oldKey]) {
+      schedule[newKey] = schedule[oldKey];
+      delete schedule[oldKey];
+      saveSchedule();
+    }
+
+    // Persist + reset editor selection
+    saveDecks();
+
+    selectedCardId = null;
+    cardQuestionInput.value = "";
+    cardAnswerInput.value = "";
+    selectedCardInfo.textContent = "";
+    updateCardBtn.disabled = true;
+
+    refreshCardsList();
+    refreshDeckSelect();     // also refreshes move dropdown + counts
+  });
+}
 
     // NEW: Anki import help button
     ankiImportHelpBtn.addEventListener("click", () => {
