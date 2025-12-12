@@ -2237,6 +2237,12 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
     const voiceAnswer = document.getElementById("voiceAnswer");
     const voiceAnswerText = document.getElementById("voiceAnswerText");
         const voiceRatingButtons = document.getElementById("voiceRatingButtons");
+        function setVoiceRatingButtonsEnabled(enabled) {
+  if (!voiceRatingButtons) return;
+  voiceRatingButtons
+    .querySelectorAll('button[data-voice-rating]')
+    .forEach(b => (b.disabled = !enabled));
+}
 
     const silentNextCardBtn = document.getElementById("silentNextCardBtn");
 
@@ -3037,6 +3043,7 @@ function handleGlobalVoiceCommands(text) {
       if (voiceAnswer) {
         voiceAnswer.classList.remove("hidden");
       }
+      
       hasSpokenCurrentAnswer = true;
       setStudyState(StudyState.SHOWING_ANSWER);
       const plainAnswer = getPlainTextFromCard(currentCard.answer);
@@ -3087,9 +3094,11 @@ speak("Answer: " + plainAnswer, () => {
           ? "How was that? Say again, hard, good, or easy. You can also say next, repeat question, or repeat answer."
           : "How was that?";
            // Show tap-to-rate buttons in normal voice mode (not auto mode / study-ahead)
-        if (!noScheduleChanges && voiceRatingButtons) {
-          voiceRatingButtons.classList.remove("hidden");
-        }
+        // Buttons are already visible; enable them now that the answer is being shown
+if (!noScheduleChanges && !autoGoodMode && voiceRatingButtons) {
+  voiceRatingButtons.classList.remove("hidden");
+  setVoiceRatingButtonsEnabled(true);
+}
         awaitingDifficulty = true;
         setStudyState(StudyState.WAITING_FOR_RATING);
         speak(promptText, () => {
@@ -3321,10 +3330,13 @@ setCardContent(voiceAnswerText, currentCard.answer);
         voiceAnswer.classList.add("hidden");
       }
       voiceEditPanel.classList.add("hidden");
-            if (voiceRatingButtons) {
-        voiceRatingButtons.classList.add("hidden");
-      }
-
+   // Show rating buttons immediately AND make them clickable right away
+if (!noScheduleChanges && !autoGoodMode && voiceRatingButtons) {
+  voiceRatingButtons.classList.remove("hidden");
+  setVoiceRatingButtonsEnabled(true);
+} else if (voiceRatingButtons) {
+  voiceRatingButtons.classList.add("hidden");
+}
 
       hasSpokenCurrentQuestion = true;
       setStudyState(StudyState.SHOWING_QUESTION);
@@ -3591,28 +3603,36 @@ setCardContent(voiceAnswerText, currentCard.answer);
 
         // Rating buttons for voice (hands-free) mode – optional tap instead of speaking
     voiceRatingButtons.addEventListener("click", (e) => {
-      const btn = e.target.closest("button[data-voice-rating]");
-      if (!btn || !currentCard) return;
+  const btn = e.target.closest("button[data-voice-rating]");
+  if (!btn || !currentCard) return;
 
-      const ratingKey = btn.dataset.voiceRating;
+  const ratingKey = btn.dataset.voiceRating;
 
-      // In study-ahead / noScheduleChanges we shouldn't change schedule,
-      // so just ignore taps in that mode.
-      if (!noScheduleChanges) {
-        const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
-        if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
-          queueCardForAgain(currentDeckId, currentCard);
-        }
-      }
+  // If user taps early (on question screen), we should immediately stop
+  // any timers/listening/TTS so we don't speak the answer after they rated.
+  clearQuestionDelayTimer();
+  clearStudyAheadGapTimer();
+  awaitingAnswerSignal = false;
+  awaitingDifficulty = false;
 
-      // Done with this card's rating in voice mode
-      awaitingDifficulty = false;
-      if (voiceRatingButtons) {
-        voiceRatingButtons.classList.add("hidden");
-      }
-      setStudyState(StudyState.IDLE);
-      runVoiceLoop();
-    });
+  // Stop any current TTS + stop mic listening
+  stopAllAudio();
+
+  // Apply scheduling ONLY in normal mode
+  if (!noScheduleChanges) {
+    const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
+    if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
+      queueCardForAgain(currentDeckId, currentCard);
+    }
+  }
+
+  // Hide buttons + move on immediately
+  if (voiceRatingButtons) voiceRatingButtons.classList.add("hidden");
+  setStudyState(StudyState.IDLE);
+
+  // Important: run the next card loop now
+  runVoiceLoop();
+});
 
     silentMainMenuBtn.addEventListener("click", () => {
       silentCompletionControls.classList.add("hidden");
