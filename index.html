@@ -634,6 +634,11 @@
         <div id="voiceAnswer" class="hidden">
           <strong>Answer:</strong> <span id="voiceAnswerText"></span>
         </div>
+        <div id="micMuteTimer" class="hidden" style="margin-top:0.5rem;">
+  <span class="badge">
+    Mic muted: <span id="micMuteSeconds">0</span>s
+  </span>
+</div>
 
         <!-- Inline edit for voice mode -->
         <div style="margin-top:0.5rem;">
@@ -2123,6 +2128,10 @@ let speakGeneration = 0;
 }
 
     function listenForCommand(callback) {
+      if (isMicMuted) {
+  // Don’t listen while muted
+  return;
+}
       // 1) Prefer native iOS plugin when running inside the Capacitor app
       if (nativeVoicePlugin) {
         setStatus("Listening...");
@@ -2182,16 +2191,14 @@ let speakGeneration = 0;
         }
       };
       recognition.onend = () => {
-        // If the recognizer stopped *without* hearing anything, gently restart.
-        // We now allow this even while paused, so "resume study session" always works.
-        if (keepListening && currentMode === "voice") {
-          try {
-            recognition.start();
-          } catch (e) {
-            console.error("Error restarting recognition:", e);
-          }
-        }
-      };
+  if (keepListening && currentMode === "voice" && !isMicMuted) {
+    try {
+      recognition.start();
+    } catch (e) {
+      console.error("Error restarting recognition:", e);
+    }
+  }
+};
       try {
         recognition.start();
       } catch (e) {
@@ -2390,6 +2397,16 @@ let loopStudyAhead = false;       // from Study Options
     let reviewQueue = [];
     let aheadQueue = [];
     let aheadQueueIndex = 0;
+// ===== Mic mute feature (voice-answer gap only) =====
+let isMicMuted = false;
+let micMutedUntilMs = 0;
+let micMuteIntervalId = null;
+let awaitingMuteSeconds = false;
+
+// DOM refs (safe here because index.html already loaded)
+const micMuteTimerEl = document.getElementById("micMuteTimer");
+const micMuteSecondsEl = document.getElementById("micMuteSeconds");
+
 
     // NEW: track if question/answer have been spoken for current card
     let hasSpokenCurrentQuestion = false;
@@ -2412,6 +2429,73 @@ let loopStudyAhead = false;       // from Study Options
         questionDelayTimerId = null;
       }
     }
+    function clearMicMuteTimer() {
+  if (micMuteIntervalId !== null) {
+    clearInterval(micMuteIntervalId);
+    micMuteIntervalId = null;
+  }
+  isMicMuted = false;
+  micMutedUntilMs = 0;
+  awaitingMuteSeconds = false;
+  if (micMuteTimerEl) micMuteTimerEl.classList.add("hidden");
+}
+
+function updateMicMuteCountdownUI() {
+  if (!micMuteTimerEl || !micMuteSecondsEl) return;
+  const remainingMs = Math.max(0, micMutedUntilMs - Date.now());
+  const remainingSec = Math.ceil(remainingMs / 1000);
+  micMuteSecondsEl.textContent = String(remainingSec);
+}
+
+function startMicMute(seconds) {
+  const sec = Math.max(10, Math.min(60, seconds));
+  isMicMuted = true;
+  setStatus("Mic muted...");
+  micMutedUntilMs = Date.now() + sec * 1000;
+
+  // Stop any live listening immediately
+  keepListening = false;
+  if (nativeVoicePlugin) {
+    try { nativeVoicePlugin.stop(); } catch (_) {}
+    nativeVoiceActiveCallback = null;
+  }
+  if (recognition) {
+    try { recognition.stop(); } catch (_) {}
+  }
+
+  if (micMuteTimerEl) micMuteTimerEl.classList.remove("hidden");
+  updateMicMuteCountdownUI();
+
+  if (micMuteIntervalId !== null) clearInterval(micMuteIntervalId);
+  micMuteIntervalId = setInterval(() => {
+    const remaining = micMutedUntilMs - Date.now();
+    if (remaining <= 0) {
+      clearInterval(micMuteIntervalId);
+      micMuteIntervalId = null;
+      isMicMuted = false;
+      if (micMuteTimerEl) micMuteTimerEl.classList.add("hidden");
+
+      // If we are STILL in the answer gap, resume listening for the “answer to show answer”
+      if (!isPaused && currentMode === "voice" && awaitingAnswerSignal) {
+        setStatus("Listening for your answer...");
+        listenForCommand(handleVoiceTranscript);
+      }
+      return;
+    }
+    updateMicMuteCountdownUI();
+  }, 250);
+}
+function stopMicMute() {
+  if (micMuteTimerId !== null) {
+    clearInterval(micMuteTimerId);
+    micMuteTimerId = null;
+  }
+
+  isMicMuted = false;
+  micMuteRemainingSeconds = 0;
+  updateMicMuteUI();
+}
+
 
     function queueCardForAgain(deckId, cardObj) {
       if (!cardObj) return;
@@ -2779,6 +2863,35 @@ function levenshtein(a, b) {
   }
   return dp[al][bl];
 }
+function parseMuteSeconds(text) {
+  const t = normalizeCmdText(text);
+
+  // Accept “10”, “ten”, “20”, “twenty”, etc.
+  const map = {
+    "10": 10, "ten": 10,
+    "20": 20, "twenty": 20,
+    "30": 30, "thirty": 30,
+    "40": 40, "forty": 40,
+    "50": 50, "fifty": 50,
+    "60": 60, "sixty": 60,
+  };
+
+  // Look for any token that matches
+  const parts = t.split(" ");
+  for (const p of parts) {
+    if (map[p]) return map[p];
+  }
+
+  // Handle phrases like "20 seconds"
+  if (t.includes("10")) return 10;
+  if (t.includes("20")) return 20;
+  if (t.includes("30")) return 30;
+  if (t.includes("40")) return 40;
+  if (t.includes("50")) return 50;
+  if (t.includes("60")) return 60;
+
+  return null;
+}
 
 function parseRatingFromText(text) {
   const t = normalizeCmdText(text);
@@ -3009,6 +3122,48 @@ function handleGlobalVoiceCommands(text) {
     function handleVoiceTranscript(text) {
   // First, let global commands capture things like pause, resume, main menu, repeats
   if (handleGlobalVoiceCommands(text)) return;
+  // ===== Mic mute command: ONLY during voice-answer gap (after question, before answer) =====
+if (awaitingAnswerSignal && currentMode === "voice") {
+  const t = normalizeCmdText(text);
+
+  if (!awaitingMuteSeconds && (t === "mute microphone" || t.includes("mute microphone"))) {
+    awaitingMuteSeconds = true;
+
+    // Speak the allowed options and then listen for a number
+    speak("10, 20, 30, 40, 50, or 60 seconds?", () => {
+      listenForCommand((numText) => {
+        const n = parseMuteSeconds(numText);
+        if (!n) {
+          // reprompt once (safe, minimal)
+          speak("Please say 10, 20, 30, 40, 50, or 60.", () => {
+            awaitingMuteSeconds = true;
+            listenForCommand((numText2) => {
+              const n2 = parseMuteSeconds(numText2);
+              awaitingMuteSeconds = false;
+              if (!n2) {
+                speak("Okay, not muting.", () => {
+                  // resume listening for the answer
+                  if (!isPaused && awaitingAnswerSignal) {
+                    setStatus("Listening for your answer...");
+                    listenForCommand(handleVoiceTranscript);
+                  }
+                });
+                return;
+              }
+              startMicMute(n2);
+            });
+          });
+          return;
+        }
+
+        awaitingMuteSeconds = false;
+        startMicMute(n);
+      });
+    });
+
+    return; // important: don’t fall through
+  }
+}
 
   // If we were in the study-ahead answer gap, we no longer need a special case here;
   // main menu / repeat answer are already handled globally.
