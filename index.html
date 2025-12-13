@@ -3535,7 +3535,7 @@ if (overdue.length > 0) {
   speak(
     "There are no more cards available to study in this deck right now.",
     () => {
-      speak("Say main menu to go back.", () =>
+      speak("Say main menu to go back, or study ahead to enter review all cards in this deck again.", () =>
         listenForCommand(handleVoiceTranscript)
       );
     }
