@@ -2586,7 +2586,7 @@ function closeAddCardModal() {
   if (currentMode === "voice" && currentCard) {
     restartCardOnResumeVoice = true;
   }
-
+stopAllAudio();  
   clearStudyAheadGapTimer();
   clearQuestionDelayTimer();
 
@@ -3066,36 +3066,36 @@ function handleGlobalVoiceCommands(text) {
     return true;
   }
 
-  // 🧊 Pause study session – now allowed ANY time in voice mode
-  if (
-    t.includes("pause study session") ||
-    (t.includes("pause") && (t.includes("study") || t.includes("session")))
-  ) {
-    if (currentMode === "voice" && !isPaused) {
-      speak("Study session paused.", () => {
-        isPaused = true;
+  // 🧊 Pause study session – pause IMMEDIATELY (before speaking)
+if (
+  t.includes("pause study session") ||
+  (t.includes("pause") && (t.includes("study") || t.includes("session")))
+) {
+  if (currentMode === "voice" && !isPaused) {
 
-// NEW: make Resume replay the SAME card in hands-free mode
-if (currentMode === "voice" && currentCard) {
-  restartCardOnResumeVoice = true;
-}
-        clearStudyAheadGapTimer();
-        clearQuestionDelayTimer();
-        pauseBtn.disabled = true;
-        resumeBtn.disabled = false;
-        setStatus("Paused. Say 'resume study session' or tap Resume.");
+    // ✅ pause right now (not inside speak callback)
+    isPaused = true;
 
-        // keep listening while paused (applies to study-ahead too)
-        if (speechSupported && recognition && !nativeVoicePlugin) {
-          listenForCommand(handleVoiceTranscript);
-        }
-        if (nativeVoicePlugin) {
-          listenForCommand(handleVoiceTranscript);
-        }
-      });
-    }
-    return true;
+    // ✅ ensure resume replays same card
+    if (currentCard) restartCardOnResumeVoice = true;
+
+    // ✅ kill anything that could advance the session
+    stopAllAudio();
+    clearStudyAheadGapTimer();
+    clearQuestionDelayTimer();
+
+    pauseBtn.disabled = true;
+    resumeBtn.disabled = false;
+    setStatus("Paused. Say 'resume study session' or tap Resume.");
+
+    // optional: quick confirmation, but it won't affect pause state
+    speak("Paused.", () => {
+      // keep listening while paused so you can say "resume study session"
+      listenForCommand(handleVoiceTranscript);
+    });
   }
+  return true;
+}
 
   // ▶️ Resume study session – allowed anytime we’re paused
   if (
