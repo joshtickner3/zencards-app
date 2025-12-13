@@ -2450,7 +2450,7 @@ function updateMicMuteCountdownUI() {
 function startMicMute(seconds) {
   const sec = Math.max(10, Math.min(60, seconds));
   isMicMuted = true;
-  setStatus("Mic muted...");
+  setStatus("Mic temporarily muted...");
   micMutedUntilMs = Date.now() + sec * 1000;
 
   // Stop any live listening immediately
@@ -2485,17 +2485,6 @@ function startMicMute(seconds) {
     updateMicMuteCountdownUI();
   }, 250);
 }
-function stopMicMute() {
-  if (micMuteTimerId !== null) {
-    clearInterval(micMuteTimerId);
-    micMuteTimerId = null;
-  }
-
-  isMicMuted = false;
-  micMuteRemainingSeconds = 0;
-  updateMicMuteUI();
-}
-
 
     function queueCardForAgain(deckId, cardObj) {
       if (!cardObj) return;
@@ -2835,7 +2824,8 @@ function speakAndGoToMainMenu() {
     function normalizeCmdText(x) {
   return String(x || "")
     .toLowerCase()
-    .replace(/[^a-z\s]/g, " ")
+    // ✅ allow digits too, so "10" survives
+    .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
