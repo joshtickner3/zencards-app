@@ -2390,6 +2390,7 @@ let loopStudyAhead = false;       // from Study Options
     let studyAheadGapTimerId = null;
 
     let isPaused = false;
+    let restartCardOnResumeVoice = false; // NEW: when resuming voice mode, replay current card
     let awaitingDifficulty = false;
     let awaitingAnswerSignal = false;
     let awaitingPostCompletionChoice = false;
@@ -2579,29 +2580,46 @@ function closeAddCardModal() {
     });
 
     pauseBtn.addEventListener("click", () => {
-      isPaused = true;
-      clearStudyAheadGapTimer();
-      clearQuestionDelayTimer();
-      pauseBtn.disabled = true;
-      resumeBtn.disabled = false;
-      setStatus("Paused. Say 'resume study session' or tap Resume.");
-      // keep listening while paused when paused via button
-      if (currentMode === "voice" && speechSupported && recognition) {
-        listenForCommand(handleVoiceTranscript);
-      }
-    });
+  isPaused = true;
+
+  // NEW: make Resume replay the SAME card in hands-free mode
+  if (currentMode === "voice" && currentCard) {
+    restartCardOnResumeVoice = true;
+  }
+
+  clearStudyAheadGapTimer();
+  clearQuestionDelayTimer();
+
+  pauseBtn.disabled = true;
+  resumeBtn.disabled = false;
+  setStatus("Paused. Say 'resume study session' or tap Resume.");
+
+  // keep listening while paused when paused via button
+  if (currentMode === "voice" && speechSupported && recognition) {
+    listenForCommand(handleVoiceTranscript);
+  }
+});
 
     resumeBtn.addEventListener("click", () => {
-      if (!currentMode) return;
-      isPaused = false;
-      pauseBtn.disabled = false;
-      resumeBtn.disabled = true;
-      if (currentMode === "voice") {
-        runVoiceLoop();
-      } else {
-        runSilentLoop();
-      }
-    });
+  if (!currentMode) return;
+
+  isPaused = false;
+  pauseBtn.disabled = false;
+  resumeBtn.disabled = true;
+
+  if (currentMode === "voice") {
+    // NEW: replay the paused card instead of advancing
+    if (restartCardOnResumeVoice && currentCard) {
+      restartCardOnResumeVoice = false;
+      restartCurrentCardVoiceFlow();
+      return;
+    }
+    runVoiceLoop();
+  } else {
+    runSilentLoop();
+  }
+});
+
 if (studyAddCardBtn) {
   studyAddCardBtn.addEventListener("click", () => {
     if (!currentDeckId) return;
@@ -3056,6 +3074,11 @@ function handleGlobalVoiceCommands(text) {
     if (currentMode === "voice" && !isPaused) {
       speak("Study session paused.", () => {
         isPaused = true;
+
+// NEW: make Resume replay the SAME card in hands-free mode
+if (currentMode === "voice" && currentCard) {
+  restartCardOnResumeVoice = true;
+}
         clearStudyAheadGapTimer();
         clearQuestionDelayTimer();
         pauseBtn.disabled = true;
@@ -3080,17 +3103,23 @@ function handleGlobalVoiceCommands(text) {
     (t.includes("resume") && (t.includes("study") || t.includes("session")))
   ) {
     if (isPaused) {
-      speak("Resuming study session.", () => {
-        isPaused = false;
-        pauseBtn.disabled = false;
-        resumeBtn.disabled = true;
-        if (currentMode === "voice") {
-          runVoiceLoop();
-        } else if (currentMode === "silent") {
-          runSilentLoop();
-        }
-      });
+  speak("Resuming study session.", () => {
+    isPaused = false;
+    pauseBtn.disabled = false;
+    resumeBtn.disabled = true;
+
+    if (currentMode === "voice") {
+      if (restartCardOnResumeVoice && currentCard) {
+        restartCardOnResumeVoice = false;
+        restartCurrentCardVoiceFlow();
+        return;
+      }
+      runVoiceLoop();
+    } else if (currentMode === "silent") {
+      runSilentLoop();
     }
+  });
+}
     return true;
   }
 
