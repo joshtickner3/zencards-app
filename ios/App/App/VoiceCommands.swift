@@ -120,18 +120,17 @@ public class VoiceCommands: CAPPlugin {
                 options: [
                     .allowBluetoothHFP,
                     .allowBluetoothA2DP,
-                    .duckOthers   // optional: gently lower other audio
+                    .mixWithOthers
                 ]
             )
 
             try audioSession.setActive(true, options: [])
-
-            // Let iOS / CarPlay know “something audio-like” is happening
             setNowPlayingInfo(title: "Studying flashcards")
         } catch {
             print("AudioSession config error: \(error)")
         }
     }
+
 
     // MARK: - Listening
 
