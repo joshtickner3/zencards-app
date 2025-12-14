@@ -116,7 +116,7 @@ public class VoiceCommands: CAPPlugin {
         do {
             try audioSession.setCategory(
                 .playAndRecord,
-                mode: .spokenAudio,
+                mode: .default,
                 options: [
                     .allowBluetoothHFP,
                     .allowBluetoothA2DP,
