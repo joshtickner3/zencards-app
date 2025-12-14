@@ -220,6 +220,24 @@
       gap: 0.5rem;
       font-size: 0.9rem;
     }
+    /* Horizontal rating layout */
+.ratingRow {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;          /* wraps nicely on small screens */
+  align-items: flex-start;
+  margin-top: 0.5rem;
+}
+
+.ratingItem {
+  display: flex;
+  flex-direction: column;   /* button on top, hint under it */
+  gap: 0.25rem;
+}
+
+.ratingItem .dueHint {
+  margin: 0;                /* remove extra spacing */
+}
 
     #cardsHeader {
   padding: 0.25rem 0;
@@ -282,6 +300,29 @@
     .hidden {
       display: none;
     }
+    /* ===== Modal styling ===== */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+}
+
+.modalBackdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+}
+
+.modalCard {
+  position: relative;
+  width: min(720px, calc(100% - 2rem));
+  margin: 10vh auto;
+  background: #020617;
+  border: 1px solid #1f2937;
+  border-radius: 0.9rem;
+  padding: 1rem;
+  box-shadow: 0 25px 60px rgba(0,0,0,0.6);
+}
     #studySection {
       margin-top: 1rem;
     }
@@ -423,6 +464,16 @@
             <span id="selectedCardInfo" style="font-size:0.85rem;color:#9ca3af;"></span>
           </div>
         </div>
+        <!-- Move card to another deck -->
+<div class="row" style="margin-top:0.5rem;">
+  <div>
+    <label for="moveDeckSelect">Move selected card to deck (edit a card to select one):</label>
+    <select id="moveDeckSelect"></select>
+  </div>
+  <div style="flex:0 0 auto;">
+    <button id="moveCardBtn" class="secondary" disabled>Move Card</button>
+  </div>
+</div>
                 <!-- Cards table header -->
         <div id="cardsHeader">
           <span>Question</span>
@@ -561,11 +612,13 @@
     <!-- ========== STUDY SECTION ========== -->
     <div id="studySection" class="card hidden">
       <div class="row" style="justify-content:space-between;">
-        <h2>
-          Study Session
-          <span id="modeBadge" class="badge"></span>
-        </h2>
+        <h2 style="margin:0;">
+  Study Session
+  <span id="modeBadge" class="badge"></span>
+  <span id="deckBadge" class="badge" style="margin-left:0.5rem;"></span>
+</h2>
         <div>
+            <button id="studyAddCardBtn" class="secondary small">Add Card</button>
           <button id="backToMenuBtn" class="secondary small">Main Menu</button>
           <button id="pauseBtn" class="secondary small">Pause</button>
           <button id="resumeBtn" class="secondary small" disabled>Resume</button>
@@ -581,6 +634,11 @@
         <div id="voiceAnswer" class="hidden">
           <strong>Answer:</strong> <span id="voiceAnswerText"></span>
         </div>
+        <div id="micMuteTimer" class="hidden" style="margin-top:0.5rem;">
+  <span class="badge">
+    Mic muted: <span id="micMuteSeconds">0</span>s
+  </span>
+</div>
 
         <!-- Inline edit for voice mode -->
         <div style="margin-top:0.5rem;">
@@ -605,7 +663,6 @@
           <button data-voice-rating="easy">Easy</button>
         </div>
       </div> <!-- end of #voiceUI -->
-      </div>
 
       <!-- Silent mode UI -->
       <div id="silentUI" class="hidden">
@@ -637,24 +694,30 @@
           <button id="silentNextCardBtn" class="secondary hidden">Next Card</button>
         </div>
         <div id="silentRatingButtons" class="hidden" style="margin-top:0.5rem;">
-          <span>How was that?</span><br />
-          <div>
-            <button data-rating="again">Again</button>
-            <span id="hint-again" class="dueHint"></span>
-          </div>
-          <div>
-            <button data-rating="hard">Hard</button>
-            <span id="hint-hard" class="dueHint"></span>
-          </div>
-          <div>
-            <button data-rating="good">Good</button>
-            <span id="hint-good" class="dueHint"></span>
-          </div>
-          <div>
-            <button data-rating="easy">Easy</button>
-            <span id="hint-easy" class="dueHint"></span>
-          </div>
-        </div>
+  <span>How was that?</span>
+
+  <div class="ratingRow">
+    <div class="ratingItem">
+      <button data-rating="again">Again</button>
+      <span id="hint-again" class="dueHint"></span>
+    </div>
+
+    <div class="ratingItem">
+      <button data-rating="hard">Hard</button>
+      <span id="hint-hard" class="dueHint"></span>
+    </div>
+
+    <div class="ratingItem">
+      <button data-rating="good">Good</button>
+      <span id="hint-good" class="dueHint"></span>
+    </div>
+
+    <div class="ratingItem">
+      <button data-rating="easy">Easy</button>
+      <span id="hint-easy" class="dueHint"></span>
+    </div>
+  </div>
+</div>
         <!-- Completion controls for silent mode -->
         <div id="silentCompletionControls" class="hidden" style="margin-top:0.75rem;">
           <button id="silentMainMenuBtn">Main Menu</button>
@@ -663,6 +726,33 @@
       </div>
     </div>
   </div>
+<!-- ===== Add Card Modal (during study) ===== -->
+<div id="addCardModal" class="modal hidden" aria-hidden="true">
+  <div class="modalBackdrop"></div>
+
+  <div class="modalCard" role="dialog" aria-modal="true" aria-labelledby="addCardModalTitle">
+    <div class="row" style="justify-content:space-between;align-items:center;">
+      <h3 id="addCardModalTitle" style="margin:0;">Add a card to this deck</h3>
+      <button id="addCardModalCloseBtn" class="secondary small" type="button">Close</button>
+    </div>
+
+    <div style="margin-top:0.75rem;">
+      <label for="addCardModalQuestion">Question</label>
+      <textarea id="addCardModalQuestion" placeholder="Enter question"></textarea>
+    </div>
+
+    <div style="margin-top:0.75rem;">
+      <label for="addCardModalAnswer">Answer</label>
+      <textarea id="addCardModalAnswer" placeholder="Enter answer"></textarea>
+    </div>
+
+    <div class="row" style="margin-top:0.75rem;">
+      <button id="addCardModalSaveBtn" type="button">Save Card</button>
+      <button id="addCardModalCancelBtn" class="secondary" type="button">Cancel</button>
+      <span id="addCardModalStatus" style="font-size:0.85rem;color:#9ca3af;"></span>
+    </div>
+  </div>
+</div>
 
   <script>
     // ===================== SUPABASE CONFIG =====================
@@ -686,6 +776,16 @@ const signOutBtn = document.getElementById("logOutBtn");         // correct ID
 const resetPwBtn = document.getElementById("resetPasswordBtn");  // correct ID
 
 const authStatusSpan = document.getElementById("authStatus");
+const deckBadge = document.getElementById("deckBadge");
+
+const studyAddCardBtn = document.getElementById("studyAddCardBtn");
+const addCardModal = document.getElementById("addCardModal");
+const addCardModalCloseBtn = document.getElementById("addCardModalCloseBtn");
+const addCardModalCancelBtn = document.getElementById("addCardModalCancelBtn");
+const addCardModalSaveBtn = document.getElementById("addCardModalSaveBtn");
+const addCardModalQuestion = document.getElementById("addCardModalQuestion");
+const addCardModalAnswer = document.getElementById("addCardModalAnswer");
+const addCardModalStatus = document.getElementById("addCardModalStatus");
 
 // ===== AUTH FUNCTIONS (SIGN UP / SIGN IN / SIGN OUT / RESET PASSWORD) =====
 async function signUpWithEmail() {
@@ -1226,6 +1326,32 @@ async function loadStateFromSupabase() {
     const updateCardBtn = document.getElementById("updateCardBtn");
     const cardsListDiv = document.getElementById("cardsList");
     const selectedCardInfo = document.getElementById("selectedCardInfo");
+    // ===== Move card UI =====
+const moveDeckSelect = document.getElementById("moveDeckSelect");
+const moveCardBtn = document.getElementById("moveCardBtn");
+
+function refreshMoveDeckSelect() {
+  if (!moveDeckSelect) return;
+  moveDeckSelect.innerHTML = "";
+
+  decks.forEach(deck => {
+    const opt = document.createElement("option");
+    opt.value = deck.id;
+    opt.textContent = deck.name;
+    moveDeckSelect.appendChild(opt);
+  });
+
+  // Default to current deck (or first deck)
+  if (selectedDeckId) moveDeckSelect.value = selectedDeckId;
+
+  // Enable button only when a card is selected and there's at least 1 other deck
+  const hasOtherDeck =
+    decks.filter(d => d.id !== selectedDeckId).length > 0;
+
+  if (moveCardBtn) {
+    moveCardBtn.disabled = !selectedCardId || !hasOtherDeck;
+  }
+}
 
     // ================= IMAGE INSERT HELPERS =================
 function insertImageTagInto(textarea, imgSrc) {
@@ -1398,6 +1524,7 @@ function getDeckPhaseCounts(deck) {
   } else {
     selectedDeckId = null;
   }
+  refreshMoveDeckSelect();
 }
     // Format the next due date for a given card
     function formatDueDate(deckId, cardId) {
@@ -1472,6 +1599,7 @@ function getDeckPhaseCounts(deck) {
           cardAnswerInput.value = card.answer;
           selectedCardInfo.textContent = `Editing card: ${card.id}`;
           updateCardBtn.disabled = false;
+          refreshMoveDeckSelect();
         });
         actionsDiv.appendChild(editBtn);
 
@@ -1583,17 +1711,60 @@ function getDeckPhaseCounts(deck) {
       refreshCardsList();
       selectedCardInfo.textContent = `Updated card: ${selectedCardId}`;
     });
+    if (moveCardBtn) {
+  moveCardBtn.addEventListener("click", () => {
+    if (!selectedCardId) return;
+    const fromDeckId = selectedDeckId;
+    const toDeckId = moveDeckSelect ? moveDeckSelect.value : null;
+
+    if (!fromDeckId || !toDeckId) return;
+    if (fromDeckId === toDeckId) return;
+
+    const fromDeck = getDeckById(fromDeckId);
+    const toDeck = getDeckById(toDeckId);
+    if (!fromDeck || !toDeck) return;
+
+    const idx = fromDeck.cards.findIndex(c => c.id === selectedCardId);
+    if (idx === -1) return;
+
+    // Move the card object
+    const [movedCard] = fromDeck.cards.splice(idx, 1);
+    toDeck.cards.push(movedCard);
+
+    // Move schedule entry (because key includes deckId)
+    const oldKey = scheduleKey(fromDeckId, movedCard.id);
+    const newKey = scheduleKey(toDeckId, movedCard.id);
+
+    if (schedule[oldKey]) {
+      schedule[newKey] = schedule[oldKey];
+      delete schedule[oldKey];
+      saveSchedule();
+    }
+
+    // Persist + reset editor selection
+    saveDecks();
+
+    selectedCardId = null;
+    cardQuestionInput.value = "";
+    cardAnswerInput.value = "";
+    selectedCardInfo.textContent = "";
+    updateCardBtn.disabled = true;
+
+    refreshCardsList();
+    refreshDeckSelect();     // also refreshes move dropdown + counts
+  });
+}
 
     // NEW: Anki import help button
     ankiImportHelpBtn.addEventListener("click", () => {
       alert(
         "How to export from Anki:\n\n" +
-        "1. Open Anki on desktop and click 'Browse'.\n" +
-        "2. Select the deck or the notes you want.\n" +
-        "3. Go to File → Export.\n" +
-        "4. In 'Export format', choose 'Notes in plain text (*.txt)'.\n" +
-        "5. Make sure fields are separated by TAB, then export.\n\n" +
-        "Save that file, then choose it here to import."
+        "1. Open Anki on desktop and select settings next to the deck you would like to export.\n" +
+        "2. Hit export.\n" +
+        "3. Set export format to 'notes in plain text', include the deck you wish to export, and select 'include HTML and media references' as well as 'include tags'.\n" +
+        "4. Hit Export... and then save to your computer.\n" +
+        "5. Choose that file from your computer to import.\n\n" +
+        "You're done!"
       );
     });
 
@@ -1957,6 +2128,10 @@ let speakGeneration = 0;
 }
 
     function listenForCommand(callback) {
+      if (isMicMuted) {
+  // Don’t listen while muted
+  return;
+}
       // 1) Prefer native iOS plugin when running inside the Capacitor app
       if (nativeVoicePlugin) {
         setStatus("Listening...");
@@ -1983,10 +2158,29 @@ let speakGeneration = 0;
       keepListening = true;
 
       recognition.onresult = (event) => {
-        keepListening = false; // we got something, don't auto-restart this cycle
-        const transcript = event.results[0][0].transcript;
-        callback(transcript);
-      };
+  keepListening = false;
+
+  const res = event.results && event.results[0];
+  if (!res) return callback("");
+
+  // Collect all alternatives (you set recognition.maxAlternatives = 3)
+  const alts = [];
+  for (let i = 0; i < res.length; i++) {
+    if (res[i] && res[i].transcript) alts.push(res[i].transcript);
+  }
+  if (alts.length === 0) return callback("");
+
+  // Pick the first alternative that parses into a rating command
+  for (const alt of alts) {
+    if (parseRatingFromText(alt)) {
+      callback(alt);
+      return;
+    }
+  }
+
+  // Otherwise fall back to the top alternative for global commands, etc.
+  callback(alts[0]);
+};
       recognition.onerror = (event) => {
         console.error("STT error:", event.error);
         keepListening = false;
@@ -1997,16 +2191,14 @@ let speakGeneration = 0;
         }
       };
       recognition.onend = () => {
-        // If the recognizer stopped *without* hearing anything, gently restart.
-        // We now allow this even while paused, so "resume study session" always works.
-        if (keepListening && currentMode === "voice") {
-          try {
-            recognition.start();
-          } catch (e) {
-            console.error("Error restarting recognition:", e);
-          }
-        }
-      };
+  if (keepListening && currentMode === "voice" && !isMicMuted) {
+    try {
+      recognition.start();
+    } catch (e) {
+      console.error("Error restarting recognition:", e);
+    }
+  }
+};
       try {
         recognition.start();
       } catch (e) {
@@ -2132,6 +2324,12 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
     const voiceAnswer = document.getElementById("voiceAnswer");
     const voiceAnswerText = document.getElementById("voiceAnswerText");
         const voiceRatingButtons = document.getElementById("voiceRatingButtons");
+        function setVoiceRatingButtonsEnabled(enabled) {
+  if (!voiceRatingButtons) return;
+  voiceRatingButtons
+    .querySelectorAll('button[data-voice-rating]')
+    .forEach(b => (b.disabled = !enabled));
+}
 
     const silentNextCardBtn = document.getElementById("silentNextCardBtn");
 
@@ -2192,6 +2390,7 @@ let loopStudyAhead = false;       // from Study Options
     let studyAheadGapTimerId = null;
 
     let isPaused = false;
+    let restartCardOnResumeVoice = false; // NEW: when resuming voice mode, replay current card
     let awaitingDifficulty = false;
     let awaitingAnswerSignal = false;
     let awaitingPostCompletionChoice = false;
@@ -2199,6 +2398,16 @@ let loopStudyAhead = false;       // from Study Options
     let reviewQueue = [];
     let aheadQueue = [];
     let aheadQueueIndex = 0;
+// ===== Mic mute feature (voice-answer gap only) =====
+let isMicMuted = false;
+let micMutedUntilMs = 0;
+let micMuteIntervalId = null;
+let awaitingMuteSeconds = false;
+
+// DOM refs (safe here because index.html already loaded)
+const micMuteTimerEl = document.getElementById("micMuteTimer");
+const micMuteSecondsEl = document.getElementById("micMuteSeconds");
+
 
     // NEW: track if question/answer have been spoken for current card
     let hasSpokenCurrentQuestion = false;
@@ -2221,6 +2430,62 @@ let loopStudyAhead = false;       // from Study Options
         questionDelayTimerId = null;
       }
     }
+    function clearMicMuteTimer() {
+  if (micMuteIntervalId !== null) {
+    clearInterval(micMuteIntervalId);
+    micMuteIntervalId = null;
+  }
+  isMicMuted = false;
+  micMutedUntilMs = 0;
+  awaitingMuteSeconds = false;
+  if (micMuteTimerEl) micMuteTimerEl.classList.add("hidden");
+}
+
+function updateMicMuteCountdownUI() {
+  if (!micMuteTimerEl || !micMuteSecondsEl) return;
+  const remainingMs = Math.max(0, micMutedUntilMs - Date.now());
+  const remainingSec = Math.ceil(remainingMs / 1000);
+  micMuteSecondsEl.textContent = String(remainingSec);
+}
+
+function startMicMute(seconds) {
+  const sec = Math.max(10, Math.min(60, seconds));
+  isMicMuted = true;
+  setStatus("Mic temporarily muted...");
+  micMutedUntilMs = Date.now() + sec * 1000;
+
+  // Stop any live listening immediately
+  keepListening = false;
+  if (nativeVoicePlugin) {
+    try { nativeVoicePlugin.stop(); } catch (_) {}
+    nativeVoiceActiveCallback = null;
+  }
+  if (recognition) {
+    try { recognition.stop(); } catch (_) {}
+  }
+
+  if (micMuteTimerEl) micMuteTimerEl.classList.remove("hidden");
+  updateMicMuteCountdownUI();
+
+  if (micMuteIntervalId !== null) clearInterval(micMuteIntervalId);
+  micMuteIntervalId = setInterval(() => {
+    const remaining = micMutedUntilMs - Date.now();
+    if (remaining <= 0) {
+      clearInterval(micMuteIntervalId);
+      micMuteIntervalId = null;
+      isMicMuted = false;
+      if (micMuteTimerEl) micMuteTimerEl.classList.add("hidden");
+
+      // If we are STILL in the answer gap, resume listening for the “answer to show answer”
+      if (!isPaused && currentMode === "voice" && awaitingAnswerSignal) {
+        setStatus("Listening for your answer...");
+        listenForCommand(handleVoiceTranscript);
+      }
+      return;
+    }
+    updateMicMuteCountdownUI();
+  }, 250);
+}
 
     function queueCardForAgain(deckId, cardObj) {
       if (!cardObj) return;
@@ -2266,6 +2531,35 @@ let loopStudyAhead = false;       // from Study Options
             if (voiceRatingButtons) voiceRatingButtons.classList.add("hidden");
       setStudyState(StudyState.IDLE);
     }
+function updateDeckBadge() {
+  if (!deckBadge) return;
+  const deck = getDeckById(currentDeckId);
+  deckBadge.textContent = deck ? `Deck: ${deck.name}` : "";
+}
+
+function openAddCardModal() {
+  // Stop audio/listening so the modal is calm in hands-free mode
+  stopAllAudio();
+  clearStudyAheadGapTimer();
+  clearQuestionDelayTimer();
+
+  if (addCardModalStatus) addCardModalStatus.textContent = "";
+  if (addCardModalQuestion) addCardModalQuestion.value = "";
+  if (addCardModalAnswer) addCardModalAnswer.value = "";
+
+  addCardModal.classList.remove("hidden");
+  addCardModal.setAttribute("aria-hidden", "false");
+  if (addCardModalQuestion) addCardModalQuestion.focus();
+}
+
+function closeAddCardModal() {
+  addCardModal.classList.add("hidden");
+  addCardModal.setAttribute("aria-hidden", "true");
+
+  // If you were in voice mode, resume your normal loop
+  if (currentMode === "voice" && !isPaused) runVoiceLoop();
+  if (currentMode === "silent" && !isPaused) runSilentLoop();
+}
 
     function showStudySection(mode) {
       currentMode = mode;
@@ -2277,6 +2571,7 @@ let loopStudyAhead = false;       // from Study Options
       pauseBtn.disabled = false;
       pauseBtn.classList.remove("hidden");
       resumeBtn.classList.remove("hidden");
+      updateDeckBadge();
     }
 
     backToMenuBtn.addEventListener("click", () => {
@@ -2285,30 +2580,101 @@ let loopStudyAhead = false;       // from Study Options
     });
 
     pauseBtn.addEventListener("click", () => {
-      isPaused = true;
-      clearStudyAheadGapTimer();
-      clearQuestionDelayTimer();
-      pauseBtn.disabled = true;
-      resumeBtn.disabled = false;
-      setStatus("Paused. Say 'resume study session' or tap Resume.");
-      // keep listening while paused when paused via button
-      if (currentMode === "voice" && speechSupported && recognition) {
-        listenForCommand(handleVoiceTranscript);
-      }
-    });
+  isPaused = true;
+
+  // NEW: make Resume replay the SAME card in hands-free mode
+  if (currentMode === "voice" && currentCard) {
+    restartCardOnResumeVoice = true;
+  }
+stopAllAudio();  
+  clearStudyAheadGapTimer();
+  clearQuestionDelayTimer();
+
+  pauseBtn.disabled = true;
+  resumeBtn.disabled = false;
+  setStatus("Paused. Say 'resume study session' or tap Resume.");
+
+  // keep listening while paused when paused via button
+  if (currentMode === "voice" && speechSupported && recognition) {
+    listenForCommand(handleVoiceTranscript);
+  }
+});
 
     resumeBtn.addEventListener("click", () => {
-      if (!currentMode) return;
-      isPaused = false;
-      pauseBtn.disabled = false;
-      resumeBtn.disabled = true;
-      if (currentMode === "voice") {
-        runVoiceLoop();
-      } else {
-        runSilentLoop();
-      }
-    });
+  if (!currentMode) return;
 
+  isPaused = false;
+  pauseBtn.disabled = false;
+  resumeBtn.disabled = true;
+
+  if (currentMode === "voice") {
+    // NEW: replay the paused card instead of advancing
+    if (restartCardOnResumeVoice && currentCard) {
+      restartCardOnResumeVoice = false;
+      restartCurrentCardVoiceFlow();
+      return;
+    }
+    runVoiceLoop();
+  } else {
+    runSilentLoop();
+  }
+});
+
+if (studyAddCardBtn) {
+  studyAddCardBtn.addEventListener("click", () => {
+    if (!currentDeckId) return;
+    openAddCardModal();
+  });
+}
+
+if (addCardModalCloseBtn) addCardModalCloseBtn.addEventListener("click", closeAddCardModal);
+if (addCardModalCancelBtn) addCardModalCancelBtn.addEventListener("click", closeAddCardModal);
+
+// Close when clicking backdrop
+if (addCardModal) {
+  addCardModal.addEventListener("click", (e) => {
+    if (e.target && e.target.classList && e.target.classList.contains("modalBackdrop")) {
+      closeAddCardModal();
+    }
+  });
+}
+
+// Save card into CURRENT deck
+if (addCardModalSaveBtn) {
+  addCardModalSaveBtn.addEventListener("click", () => {
+    const q = (addCardModalQuestion?.value || "").trim();
+    const a = (addCardModalAnswer?.value || "").trim();
+
+    if (!q || !a) {
+      if (addCardModalStatus) addCardModalStatus.textContent = "Please enter both a question and an answer.";
+      return;
+    }
+
+    const deck = getDeckById(currentDeckId);
+    if (!deck) {
+      if (addCardModalStatus) addCardModalStatus.textContent = "Deck not found.";
+      return;
+    }
+
+    const id = "c_" + Date.now();
+    deck.cards.push({ id, question: q, answer: a });
+
+    saveDecks();
+    refreshDeckSelect();
+    refreshCardsList();
+
+    if (addCardModalStatus) addCardModalStatus.textContent = "Saved!";
+    closeAddCardModal();
+  });
+}
+
+// ESC to close
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && addCardModal && !addCardModal.classList.contains("hidden")) {
+    closeAddCardModal();
+  }
+});
+    
     function endStudySession() {
   clearStudyAheadGapTimer();
   clearQuestionDelayTimer();
@@ -2473,15 +2839,114 @@ function speakAndGoToMainMenu() {
   });
     }
 
-    function parseRatingFromText(text) {
-      const t = text.toLowerCase();
-      if (t.includes("again")) return "again";
-      if (t.includes("hard")) return "hard";
-      if (t.includes("easy")) return "easy";
-      if (t.includes("good") || t.includes("fine") || t.includes("okay")) return "good";
-      if (t.includes("next")) return "good";
-      return null;
+    function normalizeCmdText(x) {
+  return String(x || "")
+    .toLowerCase()
+    // ✅ allow digits too, so "10" survives
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// tiny Levenshtein distance (fast enough for 1–2 word commands)
+function levenshtein(a, b) {
+  if (a === b) return 0;
+  const al = a.length, bl = b.length;
+  if (!al) return bl;
+  if (!bl) return al;
+
+  const dp = Array.from({ length: al + 1 }, () => new Array(bl + 1).fill(0));
+  for (let i = 0; i <= al; i++) dp[i][0] = i;
+  for (let j = 0; j <= bl; j++) dp[0][j] = j;
+
+  for (let i = 1; i <= al; i++) {
+    for (let j = 1; j <= bl; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost
+      );
     }
+  }
+  return dp[al][bl];
+}
+function parseMuteSeconds(text) {
+  const t = normalizeCmdText(text);
+
+  // Accept “10”, “ten”, “20”, “twenty”, etc.
+  const map = {
+    "10": 10, "ten": 10,
+    "20": 20, "twenty": 20,
+    "30": 30, "thirty": 30,
+    "40": 40, "forty": 40,
+    "50": 50, "fifty": 50,
+    "60": 60, "sixty": 60,
+  };
+
+  // Look for any token that matches
+  const parts = t.split(" ");
+  for (const p of parts) {
+    if (map[p]) return map[p];
+  }
+
+  // Handle phrases like "20 seconds"
+  if (t.includes("10")) return 10;
+  if (t.includes("20")) return 20;
+  if (t.includes("30")) return 30;
+  if (t.includes("40")) return 40;
+  if (t.includes("50")) return 50;
+  if (t.includes("60")) return 60;
+
+  return null;
+}
+
+function parseRatingFromText(text) {
+  const t = normalizeCmdText(text);
+  if (!t) return null;
+
+  // Prefer matching the FIRST word for rating commands (reduces false hits)
+  const first = t.split(" ")[0] || "";
+
+  // Direct phrase matches
+  if (t.includes("repeat question") || t.includes("repeat answer")) return null; // handled elsewhere
+  if (t.includes("main menu") || t.includes("go to the main menu")) return null; // handled elsewhere
+
+  // Easy wins
+  if (t.includes("again")) return "again";
+  if (t.includes("hard")) return "hard";
+  if (t.includes("easy")) return "easy";
+  if (t.includes("next")) return "good";
+
+  // “Good” synonyms / common mishears
+  // (Web Speech often returns could/hood/gud/go when you say "good")
+  const goodLike = new Set([
+    "good", "fine", "okay", "ok", "k",
+    "could", "hood", "gud", "go", "goo", "gould"
+  ]);
+  if (goodLike.has(first) || t.includes(" good ") || t.endsWith(" good")) return "good";
+
+  // Fuzzy match the FIRST word to the 4 commands
+  const targets = ["again", "hard", "good", "easy"];
+  let best = null;
+  let bestDist = 999;
+
+  for (const cmd of targets) {
+    const d = levenshtein(first, cmd);
+    if (d < bestDist) {
+      bestDist = d;
+      best = cmd;
+    }
+  }
+
+  // Thresholds: short words need tighter thresholds
+  // - good/easy/hard: allow distance 1 (e.g., gud -> good)
+  // - again: allow distance 2 (it’s longer)
+  if (best === "again" && bestDist <= 2) return "again";
+  if (best !== "again" && bestDist <= 1) return best;
+
+  return null;
+}
 
     // Helper: detect "main menu" style commands
 function isMainMenuCommand(text) {
@@ -2601,31 +3066,36 @@ function handleGlobalVoiceCommands(text) {
     return true;
   }
 
-  // 🧊 Pause study session – now allowed ANY time in voice mode
-  if (
-    t.includes("pause study session") ||
-    (t.includes("pause") && (t.includes("study") || t.includes("session")))
-  ) {
-    if (currentMode === "voice" && !isPaused) {
-      speak("Study session paused.", () => {
-        isPaused = true;
-        clearStudyAheadGapTimer();
-        clearQuestionDelayTimer();
-        pauseBtn.disabled = true;
-        resumeBtn.disabled = false;
-        setStatus("Paused. Say 'resume study session' or tap Resume.");
+  // 🧊 Pause study session – pause IMMEDIATELY (before speaking)
+if (
+  t.includes("pause study session") ||
+  (t.includes("pause") && (t.includes("study") || t.includes("session")))
+) {
+  if (currentMode === "voice" && !isPaused) {
 
-        // keep listening while paused (applies to study-ahead too)
-        if (speechSupported && recognition && !nativeVoicePlugin) {
-          listenForCommand(handleVoiceTranscript);
-        }
-        if (nativeVoicePlugin) {
-          listenForCommand(handleVoiceTranscript);
-        }
-      });
-    }
-    return true;
+    // ✅ pause right now (not inside speak callback)
+    isPaused = true;
+
+    // ✅ ensure resume replays same card
+    if (currentCard) restartCardOnResumeVoice = true;
+
+    // ✅ kill anything that could advance the session
+    stopAllAudio();
+    clearStudyAheadGapTimer();
+    clearQuestionDelayTimer();
+
+    pauseBtn.disabled = true;
+    resumeBtn.disabled = false;
+    setStatus("Paused. Say 'resume study session' or tap Resume.");
+
+    // optional: quick confirmation, but it won't affect pause state
+    speak("Paused.", () => {
+      // keep listening while paused so you can say "resume study session"
+      listenForCommand(handleVoiceTranscript);
+    });
   }
+  return true;
+}
 
   // ▶️ Resume study session – allowed anytime we’re paused
   if (
@@ -2633,17 +3103,23 @@ function handleGlobalVoiceCommands(text) {
     (t.includes("resume") && (t.includes("study") || t.includes("session")))
   ) {
     if (isPaused) {
-      speak("Resuming study session.", () => {
-        isPaused = false;
-        pauseBtn.disabled = false;
-        resumeBtn.disabled = true;
-        if (currentMode === "voice") {
-          runVoiceLoop();
-        } else if (currentMode === "silent") {
-          runSilentLoop();
-        }
-      });
+  speak("Resuming study session.", () => {
+    isPaused = false;
+    pauseBtn.disabled = false;
+    resumeBtn.disabled = true;
+
+    if (currentMode === "voice") {
+      if (restartCardOnResumeVoice && currentCard) {
+        restartCardOnResumeVoice = false;
+        restartCurrentCardVoiceFlow();
+        return;
+      }
+      runVoiceLoop();
+    } else if (currentMode === "silent") {
+      runSilentLoop();
     }
+  });
+}
     return true;
   }
 
@@ -2665,6 +3141,48 @@ function handleGlobalVoiceCommands(text) {
     function handleVoiceTranscript(text) {
   // First, let global commands capture things like pause, resume, main menu, repeats
   if (handleGlobalVoiceCommands(text)) return;
+  // ===== Mic mute command: ONLY during voice-answer gap (after question, before answer) =====
+if (awaitingAnswerSignal && currentMode === "voice") {
+  const t = normalizeCmdText(text);
+
+  if (!awaitingMuteSeconds && (t === "mute microphone" || t.includes("mute microphone"))) {
+    awaitingMuteSeconds = true;
+
+    // Speak the allowed options and then listen for a number
+    speak("10, 20, 30, 40, 50, or 60 seconds?", () => {
+      listenForCommand((numText) => {
+        const n = parseMuteSeconds(numText);
+        if (!n) {
+          // reprompt once (safe, minimal)
+          speak("Please say 10, 20, 30, 40, 50, or 60.", () => {
+            awaitingMuteSeconds = true;
+            listenForCommand((numText2) => {
+              const n2 = parseMuteSeconds(numText2);
+              awaitingMuteSeconds = false;
+              if (!n2) {
+                speak("Okay, not muting.", () => {
+                  // resume listening for the answer
+                  if (!isPaused && awaitingAnswerSignal) {
+                    setStatus("Listening for your answer...");
+                    listenForCommand(handleVoiceTranscript);
+                  }
+                });
+                return;
+              }
+              startMicMute(n2);
+            });
+          });
+          return;
+        }
+
+        awaitingMuteSeconds = false;
+        startMicMute(n);
+      });
+    });
+
+    return; // important: don’t fall through
+  }
+}
 
   // If we were in the study-ahead answer gap, we no longer need a special case here;
   // main menu / repeat answer are already handled globally.
@@ -2779,6 +3297,7 @@ function handleGlobalVoiceCommands(text) {
       if (voiceAnswer) {
         voiceAnswer.classList.remove("hidden");
       }
+      
       hasSpokenCurrentAnswer = true;
       setStudyState(StudyState.SHOWING_ANSWER);
       const plainAnswer = getPlainTextFromCard(currentCard.answer);
@@ -2829,9 +3348,11 @@ speak("Answer: " + plainAnswer, () => {
           ? "How was that? Say again, hard, good, or easy. You can also say next, repeat question, or repeat answer."
           : "How was that?";
            // Show tap-to-rate buttons in normal voice mode (not auto mode / study-ahead)
-        if (!noScheduleChanges && voiceRatingButtons) {
-          voiceRatingButtons.classList.remove("hidden");
-        }
+        // Buttons are already visible; enable them now that the answer is being shown
+if (!noScheduleChanges && !autoGoodMode && voiceRatingButtons) {
+  voiceRatingButtons.classList.remove("hidden");
+  setVoiceRatingButtonsEnabled(true);
+}
         awaitingDifficulty = true;
         setStudyState(StudyState.WAITING_FOR_RATING);
         speak(promptText, () => {
@@ -3043,7 +3564,7 @@ if (overdue.length > 0) {
   speak(
     "There are no more cards available to study in this deck right now.",
     () => {
-      speak("Say main menu to go back.", () =>
+      speak("Say main menu to go back, or study ahead to enter review all cards in this deck again.", () =>
         listenForCommand(handleVoiceTranscript)
       );
     }
@@ -3063,10 +3584,13 @@ setCardContent(voiceAnswerText, currentCard.answer);
         voiceAnswer.classList.add("hidden");
       }
       voiceEditPanel.classList.add("hidden");
-            if (voiceRatingButtons) {
-        voiceRatingButtons.classList.add("hidden");
-      }
-
+   // Show rating buttons immediately AND make them clickable right away
+if (!noScheduleChanges && !autoGoodMode && voiceRatingButtons) {
+  voiceRatingButtons.classList.remove("hidden");
+  setVoiceRatingButtonsEnabled(true);
+} else if (voiceRatingButtons) {
+  voiceRatingButtons.classList.add("hidden");
+}
 
       hasSpokenCurrentQuestion = true;
       setStudyState(StudyState.SHOWING_QUESTION);
@@ -3333,28 +3857,36 @@ setCardContent(voiceAnswerText, currentCard.answer);
 
         // Rating buttons for voice (hands-free) mode – optional tap instead of speaking
     voiceRatingButtons.addEventListener("click", (e) => {
-      const btn = e.target.closest("button[data-voice-rating]");
-      if (!btn || !currentCard) return;
+  const btn = e.target.closest("button[data-voice-rating]");
+  if (!btn || !currentCard) return;
 
-      const ratingKey = btn.dataset.voiceRating;
+  const ratingKey = btn.dataset.voiceRating;
 
-      // In study-ahead / noScheduleChanges we shouldn't change schedule,
-      // so just ignore taps in that mode.
-      if (!noScheduleChanges) {
-        const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
-        if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
-          queueCardForAgain(currentDeckId, currentCard);
-        }
-      }
+  // If user taps early (on question screen), we should immediately stop
+  // any timers/listening/TTS so we don't speak the answer after they rated.
+  clearQuestionDelayTimer();
+  clearStudyAheadGapTimer();
+  awaitingAnswerSignal = false;
+  awaitingDifficulty = false;
 
-      // Done with this card's rating in voice mode
-      awaitingDifficulty = false;
-      if (voiceRatingButtons) {
-        voiceRatingButtons.classList.add("hidden");
-      }
-      setStudyState(StudyState.IDLE);
-      runVoiceLoop();
-    });
+  // Stop any current TTS + stop mic listening
+  stopAllAudio();
+
+  // Apply scheduling ONLY in normal mode
+  if (!noScheduleChanges) {
+    const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
+    if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
+      queueCardForAgain(currentDeckId, currentCard);
+    }
+  }
+
+  // Hide buttons + move on immediately
+  if (voiceRatingButtons) voiceRatingButtons.classList.add("hidden");
+  setStudyState(StudyState.IDLE);
+
+  // Important: run the next card loop now
+  runVoiceLoop();
+});
 
     silentMainMenuBtn.addEventListener("click", () => {
       silentCompletionControls.classList.add("hidden");
