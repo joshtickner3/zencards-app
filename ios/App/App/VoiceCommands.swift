@@ -116,13 +116,20 @@ public class VoiceCommands: CAPPlugin {
         do {
             try audioSession.setCategory(
                 .playAndRecord,
-                mode: .default,
+                mode: .spokenAudio,
                 options: [
+                    .defaultToSpeaker,
                     .allowBluetoothHFP,
                     .allowBluetoothA2DP,
                     .mixWithOthers
                 ]
             )
+
+            // Prefer the built-in mic so AirPods stay in A2DP playback (no "call mode" volume drop)
+            if let builtInMic = audioSession.availableInputs?
+                .first(where: { $0.portType == .builtInMic }) {
+                try audioSession.setPreferredInput(builtInMic)
+            }
 
             try audioSession.setActive(true, options: [])
             setNowPlayingInfo(title: "Studying flashcards")
