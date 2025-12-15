@@ -3604,10 +3604,6 @@ if (!noScheduleChanges && !autoGoodMode && voiceRatingButtons) {
           );
           // In auto mode we do NOT start listening here,
           // so the mic isn't open while you're silently thinking.
-          if (!autoGoodMode) {
-            // start listening so "repeat question" etc. work before the answer
-            listenForCommand(handleVoiceTranscript);
-          }
           setStudyState(StudyState.WAITING_FOR_ANSWER);
           questionDelayTimerId = setTimeout(() => {
             if (!isPaused) {

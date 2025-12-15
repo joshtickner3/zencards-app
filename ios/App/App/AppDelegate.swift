@@ -33,19 +33,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     // MARK: - Audio Session
     private func configureAudioSession() {
         let session = AVAudioSession.sharedInstance()
-
         do {
             try session.setCategory(
                 .playback,
-                mode: .default,
+                mode: .spokenAudio,
                 options: [.allowBluetoothA2DP]
             )
             try session.setActive(true)
-            print("✅ AppDelegate: AVAudioSession configured for background playback")
+            print("✅ Global audio session set")
         } catch {
-            print("❌ AppDelegate: Failed to configure AVAudioSession: \(error)")
+            print("❌ Audio session error: \(error)")
         }
     }
+
 
     // MARK: - URL / Deep Link Handling (Capacitor)
     func application(

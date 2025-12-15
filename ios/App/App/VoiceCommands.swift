@@ -11,53 +11,32 @@ public class VoiceCommands: CAPPlugin {
     private let audioEngine = AVAudioEngine()
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
+
     private var suspendedForTTS = false
-    private var hasMicPermission = false
-    private var hasSpeechPermission = false
-   
 
-
-    // Remote control helper (AudioRemoteController.swift)
     private let remoteController = AudioRemoteController.shared
 
-    // Called once when the plugin is loaded
     public override func load() {
-            super.load()
+        super.load()
 
-            NotificationCenter.default.addObserver(self,
-                                                   selector: #selector(onTTSWillSpeak),
-                                                   name: .zenTTSWillSpeak,
-                                                   object: nil)
+        NotificationCenter.default.addObserver(self,
+                                               selector: #selector(onTTSWillSpeak),
+                                               name: .zenTTSWillSpeak,
+                                               object: nil)
 
-            NotificationCenter.default.addObserver(self,
-                                                   selector: #selector(onTTSDidFinish),
-                                                   name: .zenTTSDidFinish,
-                                                   object: nil)
+        NotificationCenter.default.addObserver(self,
+                                               selector: #selector(onTTSDidFinish),
+                                               name: .zenTTSDidFinish,
+                                               object: nil)
 
-            remoteController.onRatingChosen = { [weak self] rating in
-                guard let self = self else { return }
-                self.notifyListeners("remoteRating", data: ["rating": rating])
-            }
-            remoteController.configureRemoteCommands()
+        remoteController.onRatingChosen = { [weak self] rating in
+            self?.notifyListeners("remoteRating", data: ["rating": rating])
         }
-
-        @objc private func onTTSWillSpeak() {
-            if audioEngine.isRunning {
-                suspendedForTTS = true
-                stopListening(deactivateSession: false)
-            }
-        }
-
-        @objc private func onTTSDidFinish() {
-            guard suspendedForTTS else { return }
-            suspendedForTTS = false
-            try? startListening()
-        }
-
+        remoteController.configureRemoteCommands()
+    }
 
     // MARK: - JS API
 
-    // Called from JS to start listening
     @objc func start(_ call: CAPPluginCall) {
         requestPermissionsIfNeeded { granted in
             if !granted {
@@ -76,9 +55,8 @@ public class VoiceCommands: CAPPlugin {
         }
     }
 
-    // Called from JS to stop listening
     @objc func stop(_ call: CAPPluginCall) {
-        stopListening()
+        stopListening(deactivateSession: true)
         remoteController.teardownRemoteCommands()
         call.resolve()
     }
@@ -90,83 +68,45 @@ public class VoiceCommands: CAPPlugin {
         var micOK = false
         var speechOK = false
 
-        // Microphone
         group.enter()
         AVAudioSession.sharedInstance().requestRecordPermission { granted in
             micOK = granted
             group.leave()
         }
 
-        // Speech recognition
         group.enter()
         SFSpeechRecognizer.requestAuthorization { status in
-            switch status {
-            case .authorized:
-                speechOK = true
-            default:
-                speechOK = false
-            }
+            speechOK = (status == .authorized)
             group.leave()
         }
 
-        group.notify(queue: .main) {
-            self.hasMicPermission = micOK
-            self.hasSpeechPermission = speechOK
-            completion(micOK && speechOK)
-        }
+        group.notify(queue: .main) { completion(micOK && speechOK) }
     }
 
-    // MARK: - Audio Session
+    // MARK: - Audio Session (LISTENING)
 
-    /// Show something in the system Now Playing center (CarPlay / BT head units).
-    private func setNowPlayingInfo(title: String) {
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = [
-            MPMediaItemPropertyTitle: title,
-            MPMediaItemPropertyArtist: "ZenCards",
-            MPNowPlayingInfoPropertyPlaybackRate: 1.0
-        ]
-    }
-
-    /// Configure the audio session so:
-    /// - we can record (for STT)
-    /// - audio keeps using AirPods / Bluetooth / CarPlay
-    /// - we do NOT force output back to the phone speaker
-    private func configureAudioSessionForZenCards() {
-        let audioSession = AVAudioSession.sharedInstance()
+    private func configureAudioSessionForListening() {
+        let session = AVAudioSession.sharedInstance()
         do {
-            // Listening ONLY. No need for playAndRecord because you stop listening during TTS.
-            try audioSession.setCategory(
-                .record,
-                mode: .measurement,
-                options: []
-            )
-
-            try audioSession.setActive(true, options: [])
-            setNowPlayingInfo(title: "Studying flashcards")
+            // IMPORTANT: record-only session while listening
+            try session.setCategory(.record, mode: .measurement, options: [])
+            try session.setActive(true, options: [])
         } catch {
-            print("AudioSession config error: \(error)")
+            print("AudioSession listening config error: \(error)")
         }
     }
-
-
 
     // MARK: - Listening
 
     private func startListening() throws {
-        // Reset any existing recognition first
-        stopListening()
+        stopListening(deactivateSession: false)
 
-        // Configure the audio session before starting the engine
-        configureAudioSessionForZenCards()
+        configureAudioSessionForListening()
 
-        // Create a new recognition request
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         guard let recognitionRequest = recognitionRequest else {
-            throw NSError(
-                domain: "VoiceCommands",
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "Unable to create recognition request"]
-            )
+            throw NSError(domain: "VoiceCommands", code: -1,
+                          userInfo: [NSLocalizedDescriptionKey: "Unable to create recognition request"])
         }
 
         recognitionRequest.shouldReportPartialResults = true
@@ -174,37 +114,22 @@ public class VoiceCommands: CAPPlugin {
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
 
-        // Remove any previous taps
         inputNode.removeTap(onBus: 0)
-
-        // Install a new tap to feed audio into the recognition request
-        inputNode.installTap(
-            onBus: 0,
-            bufferSize: 1024,
-            format: recordingFormat
-        ) { [weak self] (buffer, _) in
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
             self?.recognitionRequest?.append(buffer)
         }
 
         audioEngine.prepare()
         try audioEngine.start()
 
-        // Start the recognition task
-        recognitionTask = speechRecognizer?.recognitionTask(
-            with: recognitionRequest
-        ) { [weak self] result, error in
+        recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
             guard let self = self else { return }
 
             if let result = result {
-                let text = result.bestTranscription.formattedString
-
-                // Notify JS about speech results
                 self.notifyListeners("speechResult", data: [
-                    "text": text,
+                    "text": result.bestTranscription.formattedString,
                     "isFinal": result.isFinal
                 ])
-
-              
             }
 
             if let error = error {
@@ -230,8 +155,23 @@ public class VoiceCommands: CAPPlugin {
         }
     }
 
-    // Keep this wrapper so your existing stop() call still works
-    private func stopListening() {
-        stopListening(deactivateSession: true)
+    // MARK: - TTS coordination
+
+    @objc private func onTTSWillSpeak() {
+        if audioEngine.isRunning {
+            suspendedForTTS = true
+            // Stop listening but DON'T deactivate session (prevents volume shift + sluggishness)
+            stopListening(deactivateSession: false)
+        }
+    }
+
+    @objc private func onTTSDidFinish() {
+        guard suspendedForTTS else { return }
+        suspendedForTTS = false
+
+        // Let the system settle before re-activating the mic session
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            try? self.startListening()
+        }
     }
 }

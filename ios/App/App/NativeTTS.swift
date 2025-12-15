@@ -5,20 +5,22 @@ import AVFoundation
 @objc(NativeTTS)
 public class NativeTTS: CAPPlugin, AVSpeechSynthesizerDelegate {
 
-    nonisolated(unsafe) private let synthesizer = AVSpeechSynthesizer()
+    // Keep synthesizer on main thread (avoids Sendable/concurrency warnings)
+    @MainActor private let synthesizer = AVSpeechSynthesizer()
 
     public override func load() {
         super.load()
-        synthesizer.delegate = self
+        Task { @MainActor in
+            synthesizer.delegate = self
+        }
     }
 
     private func configureSessionForTTS() {
         let session = AVAudioSession.sharedInstance()
         do {
+            // Strong, clean playback session (NO ducking)
             try session.setCategory(.playback, mode: .spokenAudio, options: [.allowBluetoothA2DP])
             try session.setActive(true, options: [])
-            // If you want to force speaker when NOT using AirPods:
-            // try session.overrideOutputAudioPort(.speaker)
         } catch {
             print("❌ NativeTTS: Failed to configure session: \(error)")
         }
@@ -31,29 +33,36 @@ public class NativeTTS: CAPPlugin, AVSpeechSynthesizerDelegate {
             return
         }
 
-        // Tell VoiceCommands to stop listening while TTS plays
+        // Stop STT while TTS plays
         NotificationCenter.default.post(name: .zenTTSWillSpeak, object: nil)
 
         configureSessionForTTS()
 
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.rate = call.getFloat("rate") ?? AVSpeechUtteranceDefaultSpeechRate
-        utterance.volume = call.getFloat("volume") ?? 1.0
+        let rate = call.getFloat("rate") ?? AVSpeechUtteranceDefaultSpeechRate
+        let vol  = call.getFloat("volume") ?? 1.0
 
-        if synthesizer.isSpeaking {
-            synthesizer.stopSpeaking(at: .immediate)
+        Task { @MainActor in
+            if synthesizer.isSpeaking {
+                synthesizer.stopSpeaking(at: .immediate)
+            }
+
+            let utterance = AVSpeechUtterance(string: text)
+            utterance.rate = rate
+            utterance.volume = vol
+
+            synthesizer.speak(utterance)
+            call.resolve()
         }
-
-        synthesizer.speak(utterance)
-        call.resolve()
     }
 
     @objc func stop(_ call: CAPPluginCall) {
-        if synthesizer.isSpeaking {
-            synthesizer.stopSpeaking(at: .immediate)
+        Task { @MainActor in
+            if synthesizer.isSpeaking {
+                synthesizer.stopSpeaking(at: .immediate)
+            }
+            NotificationCenter.default.post(name: .zenTTSDidFinish, object: nil)
+            call.resolve()
         }
-        NotificationCenter.default.post(name: .zenTTSDidFinish, object: nil)
-        call.resolve()
     }
 
     public func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
