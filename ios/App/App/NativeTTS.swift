@@ -10,32 +10,37 @@ public class NativeTTS: CAPPlugin, AVSpeechSynthesizerDelegate {
     public override func load() {
         super.load()
         synthesizer.delegate = self
+        // ✅ Don’t lock the session category here.
+        // VoiceCommands may need playAndRecord; we’ll switch to playback only when speaking.
+    }
 
-        // Make sure audio session is ready for playback.
-        // Safe to do here even though AppDelegate configures it too.
+    private func configureSessionForTTS() {
         let session = AVAudioSession.sharedInstance()
         do {
+            // ✅ Playback-focused session for loud/clean TTS
             try session.setCategory(
                 .playback,
-                mode: .default,
-                options: [.allowBluetoothA2DP, .duckOthers]
+                mode: .spokenAudio,
+                options: [
+                    .allowBluetoothA2DP,
+                    .mixWithOthers
+                ]
             )
-            try session.setActive(true)
-            print("✅ NativeTTS: AVAudioSession ready for TTS")
+            try session.setActive(true, options: [])
         } catch {
-            print("❌ NativeTTS: Failed to configure AVAudioSession: \(error)")
+            print("❌ NativeTTS: Failed to configure AVAudioSession for TTS: \(error)")
         }
     }
 
-    // MARK: - Plugin methods
-
-    /// Speak text using AVSpeechSynthesizer
     @objc func speak(_ call: CAPPluginCall) {
         let text = call.getString("text") ?? ""
         if text.isEmpty {
             call.reject("Missing 'text' parameter")
             return
         }
+
+        // ✅ Ensure session is in playback mode right before speaking
+        configureSessionForTTS()
 
         let rate = call.getFloat("rate") ?? AVSpeechUtteranceDefaultSpeechRate
         let volume = call.getFloat("volume") ?? 1.0
@@ -52,7 +57,6 @@ public class NativeTTS: CAPPlugin, AVSpeechSynthesizerDelegate {
         call.resolve()
     }
 
-    /// Stop speaking immediately
     @objc func stop(_ call: CAPPluginCall) {
         if synthesizer.isSpeaking {
             synthesizer.stopSpeaking(at: .immediate)
@@ -60,11 +64,7 @@ public class NativeTTS: CAPPlugin, AVSpeechSynthesizerDelegate {
         call.resolve()
     }
 
-    // Optional: delegate callback just for logging
-    public func speechSynthesizer(
-        _ synthesizer: AVSpeechSynthesizer,
-        didFinish utterance: AVSpeechUtterance
-    ) {
+    public func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
         print("NativeTTS: finished utterance")
     }
 }
