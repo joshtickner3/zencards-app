@@ -11,29 +11,49 @@ public class VoiceCommands: CAPPlugin {
     private let audioEngine = AVAudioEngine()
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
-
+    private var suspendedForTTS = false
     private var hasMicPermission = false
     private var hasSpeechPermission = false
+   
+
 
     // Remote control helper (AudioRemoteController.swift)
     private let remoteController = AudioRemoteController.shared
 
     // Called once when the plugin is loaded
     public override func load() {
-        super.load()
+            super.load()
 
-        // When the steering-wheel/remote buttons pick a rating,
-        // forward it to JS as a "remoteRating" event.
-        remoteController.onRatingChosen = { [weak self] rating in
-            guard let self = self else { return }
-            self.notifyListeners("remoteRating", data: [
-                "rating": rating
-            ])
+            NotificationCenter.default.addObserver(self,
+                                                   selector: #selector(onTTSWillSpeak),
+                                                   name: .zenTTSWillSpeak,
+                                                   object: nil)
+
+            NotificationCenter.default.addObserver(self,
+                                                   selector: #selector(onTTSDidFinish),
+                                                   name: .zenTTSDidFinish,
+                                                   object: nil)
+
+            remoteController.onRatingChosen = { [weak self] rating in
+                guard let self = self else { return }
+                self.notifyListeners("remoteRating", data: ["rating": rating])
+            }
+            remoteController.configureRemoteCommands()
         }
 
-        // Set up the MPRemoteCommandCenter handlers
-        remoteController.configureRemoteCommands()
-    }
+        @objc private func onTTSWillSpeak() {
+            if audioEngine.isRunning {
+                suspendedForTTS = true
+                stopListening()
+            }
+        }
+
+        @objc private func onTTSDidFinish() {
+            guard suspendedForTTS else { return }
+            suspendedForTTS = false
+            try? startListening()
+        }
+
 
     // MARK: - JS API
 
@@ -120,7 +140,7 @@ public class VoiceCommands: CAPPlugin {
                 options: [
                     .defaultToSpeaker,
                     .allowBluetoothHFP,
-                    .allowBluetoothA2DP,
+                    .allowBluetoothA2DP
                 ]
             )
 
