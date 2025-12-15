@@ -5,12 +5,11 @@ import AVFoundation
 @objc(NativeTTS)
 public class NativeTTS: CAPPlugin, AVSpeechSynthesizerDelegate {
 
-    private let synthesizer = AVSpeechSynthesizer()
+    nonisolated(unsafe) private let synthesizer = AVSpeechSynthesizer()
 
     public override func load() {
         super.load()
         synthesizer.delegate = self
-        // Don't lock session here.
     }
 
     private func configureSessionForTTS() {
@@ -18,6 +17,8 @@ public class NativeTTS: CAPPlugin, AVSpeechSynthesizerDelegate {
         do {
             try session.setCategory(.playback, mode: .spokenAudio, options: [.allowBluetoothA2DP])
             try session.setActive(true, options: [])
+            // If you want to force speaker when NOT using AirPods:
+            // try session.overrideOutputAudioPort(.speaker)
         } catch {
             print("❌ NativeTTS: Failed to configure session: \(error)")
         }

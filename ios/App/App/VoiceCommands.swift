@@ -44,7 +44,7 @@ public class VoiceCommands: CAPPlugin {
         @objc private func onTTSWillSpeak() {
             if audioEngine.isRunning {
                 suspendedForTTS = true
-                stopListening()
+                stopListening(deactivateSession: false)
             }
         }
 
@@ -134,21 +134,12 @@ public class VoiceCommands: CAPPlugin {
     private func configureAudioSessionForZenCards() {
         let audioSession = AVAudioSession.sharedInstance()
         do {
+            // Listening ONLY. No need for playAndRecord because you stop listening during TTS.
             try audioSession.setCategory(
-                .playAndRecord,
+                .record,
                 mode: .measurement,
-                options: [
-                    .defaultToSpeaker,
-                    .allowBluetoothHFP,
-                    .allowBluetoothA2DP
-                ]
+                options: []
             )
-
-            // Prefer the built-in mic so AirPods stay in A2DP playback (no "call mode" volume drop)
-            if let builtInMic = audioSession.availableInputs?
-                .first(where: { $0.portType == .builtInMic }) {
-                try audioSession.setPreferredInput(builtInMic)
-            }
 
             try audioSession.setActive(true, options: [])
             setNowPlayingInfo(title: "Studying flashcards")
@@ -156,6 +147,7 @@ public class VoiceCommands: CAPPlugin {
             print("AudioSession config error: \(error)")
         }
     }
+
 
 
     // MARK: - Listening
@@ -221,22 +213,25 @@ public class VoiceCommands: CAPPlugin {
         }
     }
 
-    private func stopListening() {
-        // Stop recognition task
+    private func stopListening(deactivateSession: Bool) {
         recognitionTask?.cancel()
         recognitionTask = nil
 
-        // Stop recognition request
         recognitionRequest?.endAudio()
         recognitionRequest = nil
 
-        // Stop audio engine
         if audioEngine.isRunning {
             audioEngine.stop()
         }
         audioEngine.inputNode.removeTap(onBus: 0)
 
-        // Deactivate audio session so the system can route audio normally again
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        if deactivateSession {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
+    }
+
+    // Keep this wrapper so your existing stop() call still works
+    private func stopListening() {
+        stopListening(deactivateSession: true)
     }
 }
