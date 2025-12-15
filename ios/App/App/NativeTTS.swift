@@ -22,9 +22,7 @@ public class NativeTTS: CAPPlugin, AVSpeechSynthesizerDelegate {
                 .playback,
                 mode: .spokenAudio,
                 options: [
-                    .allowBluetoothA2DP,
-                    .mixWithOthers
-                ]
+                    .allowBluetoothA2DP]
             )
             try session.setActive(true, options: [])
         } catch {
@@ -38,6 +36,16 @@ public class NativeTTS: CAPPlugin, AVSpeechSynthesizerDelegate {
             call.reject("Missing 'text' parameter")
             return
         }
+        
+        let session = AVAudioSession.sharedInstance()
+        do {
+            // Force a strong "speech playback" session for the utterance
+            try session.setCategory(.playback, mode: .spokenAudio, options: [.allowBluetoothA2DP])
+            try session.setActive(true)
+        } catch {
+            print("❌ NativeTTS: speak() audio session set failed: \(error)")
+        }
+
 
         // ✅ Ensure session is in playback mode right before speaking
         configureSessionForTTS()

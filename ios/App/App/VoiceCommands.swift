@@ -116,12 +116,11 @@ public class VoiceCommands: CAPPlugin {
         do {
             try audioSession.setCategory(
                 .playAndRecord,
-                mode: .spokenAudio,
+                mode: .measurement,
                 options: [
                     .defaultToSpeaker,
                     .allowBluetoothHFP,
                     .allowBluetoothA2DP,
-                    .mixWithOthers
                 ]
             )
 

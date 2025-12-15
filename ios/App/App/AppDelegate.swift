@@ -38,7 +38,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             try session.setCategory(
                 .playback,
                 mode: .default,
-                options: [.allowBluetoothA2DP, .duckOthers]
+                options: [.allowBluetoothA2DP]
             )
             try session.setActive(true)
             print("✅ AppDelegate: AVAudioSession configured for background playback")
