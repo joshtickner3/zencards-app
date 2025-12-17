@@ -36,6 +36,11 @@
       margin: 0.5rem 0;
     }
 
+    button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
     /* App header + logo */
     .appHeader {
       display: flex;
@@ -404,7 +409,7 @@
           </div>
           <div>
             <label for="newDeckName">New deck name:</label>
-            <input id="newDeckName" type="text" placeholder="e.g. MCAT Bio, Anatomy, etc." />
+            <input id="newDeckName" type="text" placeholder="e.g. Bio, Anatomy, etc." />
           </div>
           <div style="flex:0 0 auto;">
             <button id="addDeckBtn">Add Deck</button>
@@ -871,6 +876,7 @@ const resetPwBtn = document.getElementById("resetPasswordBtn");  // correct ID
 
 const authStatusSpan = document.getElementById("authStatus");
 const deckBadge = document.getElementById("deckBadge");
+
 
 const studyAddCardBtn = document.getElementById("studyAddCardBtn");
 const addCardModal = document.getElementById("addCardModal");
@@ -1419,6 +1425,20 @@ async function loadStateFromSupabase() {
     const addDeckBtn = document.getElementById("addDeckBtn");
     const deleteDeckBtn = document.getElementById("deleteDeckBtn");
 
+    // Disable/enable Add Deck button based on input
+function updateAddDeckButtonState() {
+  const name = (newDeckNameInput?.value || "").trim();
+  if (addDeckBtn) addDeckBtn.disabled = name.length === 0;
+}
+
+// Run once on load
+updateAddDeckButtonState();
+
+// Update live while typing
+if (newDeckNameInput) {
+  newDeckNameInput.addEventListener("input", updateAddDeckButtonState);
+}
+
     const cardQuestionInput = document.getElementById("cardQuestion");
     const cardAnswerInput = document.getElementById("cardAnswer");
     const addCardBtn = document.getElementById("addCardBtn");
@@ -1735,12 +1755,14 @@ function getDeckPhaseCounts(deck) {
     }
 
     addDeckBtn.addEventListener("click", () => {
+      if (!newDeckNameInput.value.trim()) return;
       const name = newDeckNameInput.value.trim();
       if (!name) return;
       const id = "deck_" + Date.now();
       decks.push({ id, name, cards: [] });
       saveDecks();
       newDeckNameInput.value = "";
+      updateAddDeckButtonState();
       selectedDeckId = id;
       refreshDeckSelect();
       refreshCardsList();
