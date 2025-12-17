@@ -1935,6 +1935,39 @@ let speakGeneration = 0;
     let ttsRate = 1.0;
     let ttsVolume = 1.0;
     const TTS_SETTINGS_KEY = "srsTtsSettings";
+    function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
+
+// Reads the full settings object (rate, volume, + new delay)
+function getTtsSettingsObj() {
+  const raw = localStorage.getItem(TTS_SETTINGS_KEY);
+  let s = {};
+  try { s = raw ? JSON.parse(raw) : {}; } catch { s = {}; }
+
+  // existing
+  if (typeof s.rate !== "number") s.rate = 1.0;
+  if (typeof s.volume !== "number") s.volume = 1.0;
+
+  // NEW: default instant
+  if (typeof s.answerDelayAfterSpeechSec !== "number") s.answerDelayAfterSpeechSec = 0;
+
+  // clamp
+  s.rate = clamp(s.rate, 0.5, 2.0);
+  s.volume = clamp(s.volume, 0.0, 1.0);
+  s.answerDelayAfterSpeechSec = clamp(Math.round(s.answerDelayAfterSpeechSec), 0, 30);
+
+  return s;
+}
+
+function saveTtsSettingsObj(s) {
+  const out = {
+    rate: clamp(Number(s.rate ?? 1.0), 0.5, 2.0),
+    volume: clamp(Number(s.volume ?? 1.0), 0.0, 1.0),
+    answerDelayAfterSpeechSec: clamp(Math.round(Number(s.answerDelayAfterSpeechSec ?? 0)), 0, 30),
+  };
+  localStorage.setItem(TTS_SETTINGS_KEY, JSON.stringify(out));
+}
 
     const toggleAudioSettingsBtn = document.getElementById("toggleAudioSettingsBtn");
     const audioSettingsPanel = document.getElementById("audioSettingsPanel");
@@ -1943,38 +1976,25 @@ let speakGeneration = 0;
 
     // Load TTS settings from storage
     (function loadTtsSettings() {
-      try {
-        const raw = localStorage.getItem(TTS_SETTINGS_KEY);
-        if (raw) {
-          const s = JSON.parse(raw);
-          if (typeof s.rate === "number") {
-            ttsRate = Math.max(0.5, Math.min(2, s.rate));
-          }
-          if (typeof s.volume === "number") {
-            ttsVolume = Math.max(0, Math.min(1, s.volume));
-          }
-        }
-      } catch (_) {
-        // ignore, fall back to defaults
-      }
-      if (ttsRateInput) {
-        ttsRateInput.value = String(ttsRate);
-      }
-      if (ttsVolumeInput) {
-        ttsVolumeInput.value = String(ttsVolume);
-      }
-    })();
+  const s = getTtsSettingsObj();
+
+  ttsRate = s.rate;
+  ttsVolume = s.volume;
+
+  if (ttsRateInput) ttsRateInput.value = String(ttsRate);
+  if (ttsVolumeInput) ttsVolumeInput.value = String(ttsVolume);
+
+  // NOTE: we’ll wire the UI control for answerDelayAfterSpeechSec next
+})();
 
     function saveTtsSettings() {
-      try {
-        localStorage.setItem(
-          TTS_SETTINGS_KEY,
-          JSON.stringify({ rate: ttsRate, volume: ttsVolume })
-        );
-      } catch (_) {
-        // ignore storage errors
-      }
-    }
+  const current = getTtsSettingsObj();
+  current.rate = ttsRate;
+  current.volume = ttsVolume;
+
+  // keep existing value unless you set it elsewhere
+  saveTtsSettingsObj(current);
+}
 
     if (toggleAudioSettingsBtn && audioSettingsPanel) {
       toggleAudioSettingsBtn.addEventListener("click", () => {
@@ -3604,6 +3624,10 @@ if (!noScheduleChanges && !autoGoodMode && voiceRatingButtons) {
           );
           // In auto mode we do NOT start listening here,
           // so the mic isn't open while you're silently thinking.
+          if (!autoGoodMode) {
+            // start listening so "repeat question" etc. work before the answer
+            listenForCommand(handleVoiceTranscript);
+          }
           setStudyState(StudyState.WAITING_FOR_ANSWER);
           questionDelayTimerId = setTimeout(() => {
             if (!isPaused) {
