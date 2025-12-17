@@ -1960,19 +1960,14 @@ let speakGeneration = 0;
 
 // Reads the full settings object (rate, volume, + new delay)
 function getTtsSettingsObj() {
-  if (typeof obj.answerDelayAfterSpeechSec !== "number") obj.answerDelayAfterSpeechSec = 0;
   const raw = localStorage.getItem(TTS_SETTINGS_KEY);
   let s = {};
   try { s = raw ? JSON.parse(raw) : {}; } catch { s = {}; }
 
-  // existing
   if (typeof s.rate !== "number") s.rate = 1.0;
   if (typeof s.volume !== "number") s.volume = 1.0;
-
-  // NEW: default instant
   if (typeof s.answerDelayAfterSpeechSec !== "number") s.answerDelayAfterSpeechSec = 0;
 
-  // clamp
   s.rate = clamp(s.rate, 0.5, 2.0);
   s.volume = clamp(s.volume, 0.0, 1.0);
   s.answerDelayAfterSpeechSec = clamp(Math.round(s.answerDelayAfterSpeechSec), 0, 30);
@@ -1997,18 +1992,16 @@ function saveTtsSettingsObj(s) {
     // Load TTS settings from storage
     (function loadTtsSettings() {
   const s = getTtsSettingsObj();
-
   ttsRate = s.rate;
   ttsVolume = s.volume;
 
   if (ttsRateInput) ttsRateInput.value = String(ttsRate);
   if (ttsVolumeInput) ttsVolumeInput.value = String(ttsVolume);
-  if (answerDelayAfterSpeechSecInput) {
-  answerDelayAfterSpeechSecInput.value = String(s.answerDelayAfterSpeechSec ?? 0);
-}
-  
-  // NOTE: we’ll wire the UI control for answerDelayAfterSpeechSec next
+
+  const delayInput = document.getElementById("answerDelayAfterSpeechSecInput");
+  if (delayInput) delayInput.value = String(s.answerDelayAfterSpeechSec ?? 0);
 })();
+
 
     function saveTtsSettings() {
   const current = getTtsSettingsObj();
@@ -2357,8 +2350,6 @@ function saveTtsSettingsObj(s) {
     const answerModeDelayRadio = document.getElementById("answerModeDelay");
     const answerModeVoiceRadio = document.getElementById("answerModeVoice");
     const answerDelaySecondsInput = document.getElementById("answerDelaySeconds");
-    const answerDelayAfterSpeechSecInput =
-  document.getElementById("answerDelayAfterSpeechSecInput");
     const studyAheadGapSecondsInput = document.getElementById("studyAheadGapSeconds");
 const autoEnterStudyAheadCheckbox = document.getElementById("autoEnterStudyAhead");
 const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
@@ -2461,21 +2452,23 @@ function clearAnswerAfterSpeechDelay() {
 }
 function startOrResetAnswerAfterSpeechDelay() {
   const s = getTtsSettingsObj();
-  const sec = Math.max(0, Math.min(10, Number(s.answerDelayAfterSpeechSec || 0)));
+  const sec = clamp(Number(s.answerDelayAfterSpeechSec || 0), 0, 30);
+
   if (sec === 0) {
-    // instant
     clearAnswerAfterSpeechDelay();
     speakAnswerThenAskDifficulty();
     return;
   }
 
-  // reset timer
   clearAnswerAfterSpeechDelay();
   inAnswerAfterSpeechDelay = true;
   answerAfterSpeechDueMs = Date.now() + sec * 1000;
 
-  // IMPORTANT: keep listening during this window so we can reset on new input
-  // (your existing listenForCommand will do that)
+  // ✅ keep the mic open during this window so any speech resets the timer
+  if (currentMode === "voice" && !isPaused) {
+    listenForCommand(handleVoiceTranscript);
+  }
+
   answerAfterSpeechTimerId = setTimeout(() => {
     inAnswerAfterSpeechDelay = false;
     answerAfterSpeechTimerId = null;
@@ -2545,7 +2538,7 @@ function updateMicMuteCountdownUI() {
 }
 
 function startMicMute(seconds) {
-  const sec = Math.max(10, Math.min(60, seconds));
+  const sec = Math.max(0, Math.min(30, Number(s.answerDelayAfterSpeechSec || 0)));
   isMicMuted = true;
   setStatus("Mic temporarily muted...");
   micMutedUntilMs = Date.now() + sec * 1000;
