@@ -1988,7 +1988,22 @@ function saveTtsSettingsObj(s) {
     const audioSettingsPanel = document.getElementById("audioSettingsPanel");
     const ttsRateInput = document.getElementById("ttsRateInput");
     const ttsVolumeInput = document.getElementById("ttsVolumeInput");
+    const answerDelayAfterSpeechSecInput = document.getElementById("answerDelayAfterSpeechSecInput");
+    
+if (answerDelayAfterSpeechSecInput) {
+  answerDelayAfterSpeechSecInput.addEventListener("change", () => {
+    const v = Math.max(
+      0,
+      Math.min(60, parseInt(answerDelayAfterSpeechSecInput.value, 10) || 0)
+    );
 
+    answerDelayAfterSpeechSecInput.value = String(v);
+
+    const s = getTtsSettingsObj();
+    s.answerDelayAfterSpeechSec = v;
+    saveTtsSettingsObj(s);
+  });
+}
     // Load TTS settings from storage
     (function loadTtsSettings() {
   const s = getTtsSettingsObj();
@@ -2538,7 +2553,7 @@ function updateMicMuteCountdownUI() {
 }
 
 function startMicMute(seconds) {
-  const sec = Math.max(0, Math.min(30, Number(s.answerDelayAfterSpeechSec || 0)));
+  const sec = Math.max(0, Math.min(60, Number(seconds || 0)));
   isMicMuted = true;
   setStatus("Mic temporarily muted...");
   micMutedUntilMs = Date.now() + sec * 1000;
