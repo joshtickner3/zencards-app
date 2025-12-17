@@ -620,10 +620,15 @@
           <button id="startVoiceBtn">Start Hands-Free Study</button>
           <button id="startSilentBtn" class="secondary">Start Silent Study</button>
         </div>
+
+        <button id="openInstructionsBtn" class="secondary small" type="button">
+  Instructions / Voice Commands
+</button>
+
         <p style="font-size:0.85rem;color:#9ca3af;margin-top:0.5rem;">
-          Voice commands (hands-free): "again", "hard", "good", "easy", "next",
+          Voice commands (hands-free): "again", "hard", "good", "easy", "go to the next card",
           "repeat question", "repeat answer", "pause study session",
-          "resume study session", "go to the main menu".
+          "resume study session", "go to the main menu", "mute microphone".
         </p>
       </div>
     </div>
@@ -641,6 +646,7 @@
           <button id="backToMenuBtn" class="secondary small">Main Menu</button>
           <button id="pauseBtn" class="secondary small">Pause</button>
           <button id="resumeBtn" class="secondary small" disabled>Resume</button>
+          <button id="studyInstructionsBtn" class="secondary small">Instructions</button>
         </div>
       </div>
       <div id="status"></div>
@@ -773,6 +779,75 @@
   </div>
 </div>
 
+<!-- ===== Instructions Modal ===== -->
+<div id="instructionsModal" class="modal hidden" aria-hidden="true">
+  <div class="modalBackdrop"></div>
+
+  <div class="modalCard" role="dialog" aria-modal="true" aria-labelledby="instructionsModalTitle">
+    <div class="row" style="justify-content:space-between;align-items:center;">
+      <h3 id="instructionsModalTitle" style="margin:0;">How ZenCards Works</h3>
+      <button id="instructionsCloseBtn" class="secondary small" type="button">Close</button>
+    </div>
+
+    <div style="margin-top:0.75rem;max-height:70vh;overflow:auto;">
+
+      <h3>📊 Ratings (Again / Hard / Good / Easy)</h3>
+      <p style="color:#9ca3af;margin-top:0.25rem;">
+        Ratings decide when you’ll see the card again. “Again” brings it back soonest, “Easy” pushes it out the farthest.
+      </p>
+      <ul style="margin-top:0.5rem;">
+        <li><strong>Again</strong> — you didn’t remember it (restarts the learning ladder).</li>
+        <li><strong>Hard</strong> — you remembered, but it was tough (slower progress).</li>
+        <li><strong>Good</strong> — you remembered normally (standard progress).</li>
+        <li><strong>Easy</strong> — you remembered instantly (faster progress).</li>
+      </ul>
+
+      <hr style="border:0;border-top:1px solid #111827;margin:1rem 0;" />
+
+      <h3>🎤 When to say voice commands</h3>
+      <ul>
+        <li><strong>After the question</strong>: you can say <em>repeat question</em> or <em>go to next card</em>.</li>
+        <li><strong>After the answer</strong>: say your rating (<em>again / hard / good / easy</em>).</li>
+        <li><strong>Any time</strong>: <em>pause study session</em>, <em>resume study session</em>, <em>go to the main menu</em>.</li>
+      </ul>
+
+      <hr style="border:0;border-top:1px solid #111827;margin:1rem 0;" />
+
+      <h3>➡️ Next Card</h3>
+      <p style="color:#9ca3af;margin-top:0.25rem;">
+        Say <strong>“go to next card”</strong> to skip the current card and immediately move forward.
+      </p>
+
+      <hr style="border:0;border-top:1px solid #111827;margin:1rem 0;" />
+
+      <h3>🔇 Mute Microphone (Hands-Free mode)</h3>
+      <p style="color:#9ca3af;margin-top:0.25rem;">
+        If you need time to think or you’re in a noisy place, you can temporarily stop listening.
+      </p>
+      <ul>
+        <li>Say <strong>“mute microphone”</strong></li>
+        <li>Then say a duration: <strong>10 / 20 / 30 / 40 / 50 / 60</strong> seconds</li>
+        <li>While muted, ZenCards will not process commands until the timer ends.</li>
+      </ul>
+
+      <hr style="border:0;border-top:1px solid #111827;margin:1rem 0;" />
+
+      <h3>🗣️ Full voice command list</h3>
+      <ul>
+        <li><strong>again</strong>, <strong>hard</strong>, <strong>good</strong>, <strong>easy</strong> — rate the card</li>
+        <li><strong>go to next card</strong> — skip ahead</li>
+        <li><strong>repeat question</strong></li>
+        <li><strong>repeat answer</strong></li>
+        <li><strong>pause study session</strong></li>
+        <li><strong>resume study session</strong></li>
+        <li><strong>go to the main menu</strong></li>
+        <li><strong>mute microphone</strong> (then say: 10/20/30/40/50/60)</li>
+      </ul>
+
+    </div>
+  </div>
+</div>
+
   <script>
     // ===================== SUPABASE CONFIG =====================
 const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
@@ -805,6 +880,11 @@ const addCardModalSaveBtn = document.getElementById("addCardModalSaveBtn");
 const addCardModalQuestion = document.getElementById("addCardModalQuestion");
 const addCardModalAnswer = document.getElementById("addCardModalAnswer");
 const addCardModalStatus = document.getElementById("addCardModalStatus");
+// ===== Instructions modal refs =====
+const openInstructionsBtn = document.getElementById("openInstructionsBtn");
+const instructionsModal = document.getElementById("instructionsModal");
+const instructionsCloseBtn = document.getElementById("instructionsCloseBtn");
+
 
 // ===== AUTH FUNCTIONS (SIGN UP / SIGN IN / SIGN OUT / RESET PASSWORD) =====
 async function signUpWithEmail() {
@@ -2358,6 +2438,7 @@ if (answerDelayAfterSpeechSecInput) {
     const backToMenuBtn = document.getElementById("backToMenuBtn");
     const pauseBtn = document.getElementById("pauseBtn");
     const resumeBtn = document.getElementById("resumeBtn");
+    const studyInstructionsBtn = document.getElementById("studyInstructionsBtn");
 
     const skipInstructionsAfterFirstCheckbox = document.getElementById("skipInstructionsAfterFirst");
     const autoGoodToggle = document.getElementById("autoGoodToggle");
@@ -2664,6 +2745,52 @@ function closeAddCardModal() {
   if (currentMode === "voice" && !isPaused) runVoiceLoop();
   if (currentMode === "silent" && !isPaused) runSilentLoop();
 }
+function openInstructionsModal() {
+  // pause audio/listening so the modal isn’t chaotic in hands-free mode
+  stopAllAudio();
+  clearStudyAheadGapTimer();
+  clearQuestionDelayTimer();
+  clearAnswerAfterSpeechDelay();
+
+  if (!instructionsModal) return;
+  instructionsModal.classList.remove("hidden");
+  instructionsModal.setAttribute("aria-hidden", "false");
+}
+
+function closeInstructionsModal() {
+  if (!instructionsModal) return;
+  instructionsModal.classList.add("hidden");
+  instructionsModal.setAttribute("aria-hidden", "true");
+
+  // If you were studying, resume the correct loop
+  if (currentMode === "voice" && !isPaused) runVoiceLoop();
+  if (currentMode === "silent" && !isPaused) runSilentLoop();
+}
+
+if (openInstructionsBtn) {
+  openInstructionsBtn.addEventListener("click", openInstructionsModal);
+}
+
+if (instructionsCloseBtn) {
+  instructionsCloseBtn.addEventListener("click", closeInstructionsModal);
+}
+
+// click backdrop to close
+if (instructionsModal) {
+  instructionsModal.addEventListener("click", (e) => {
+    if (e.target && e.target.classList && e.target.classList.contains("modalBackdrop")) {
+      closeInstructionsModal();
+    }
+  });
+}
+
+// ESC to close
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && instructionsModal && !instructionsModal.classList.contains("hidden")) {
+    closeInstructionsModal();
+  }
+});
+
 
     function showStudySection(mode) {
       currentMode = mode;
@@ -4148,6 +4275,12 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
       });
     });
     // <<< END MODIFIED HANDLER <<<
+
+    if (studyInstructionsBtn) {
+  studyInstructionsBtn.addEventListener("click", () => {
+    openInstructionsModal();
+  });
+}
 
     (async function init() {
   // 1) Start with whatever is in localStorage (or sample deck)
