@@ -578,6 +578,25 @@
               value="1.0"
             />
           </div>
+
+          <div style="margin-top:0.5rem;">
+  <label for="answerDelayAfterSpeechSecInput">
+    Answer delay after I stop speaking (seconds)
+    <br />
+    <small style="opacity:0.7;">
+      0 = instant (default). Any speech resets the timer.
+    </small>
+  </label>
+  <input
+    type="number"
+    id="answerDelayAfterSpeechSecInput"
+    min="0"
+    max="30"
+    step="1"
+    value="0"
+  />
+</div>
+
           <div style="margin-top:0.5rem;">
             <label for="ttsVolumeInput">
               TTS volume (0 = mute, 1 = max)
@@ -1941,6 +1960,7 @@ let speakGeneration = 0;
 
 // Reads the full settings object (rate, volume, + new delay)
 function getTtsSettingsObj() {
+  if (typeof obj.answerDelayAfterSpeechSec !== "number") obj.answerDelayAfterSpeechSec = 0;
   const raw = localStorage.getItem(TTS_SETTINGS_KEY);
   let s = {};
   try { s = raw ? JSON.parse(raw) : {}; } catch { s = {}; }
@@ -1983,7 +2003,10 @@ function saveTtsSettingsObj(s) {
 
   if (ttsRateInput) ttsRateInput.value = String(ttsRate);
   if (ttsVolumeInput) ttsVolumeInput.value = String(ttsVolume);
-
+  if (answerDelayAfterSpeechSecInput) {
+  answerDelayAfterSpeechSecInput.value = String(s.answerDelayAfterSpeechSec ?? 0);
+}
+  
   // NOTE: we’ll wire the UI control for answerDelayAfterSpeechSec next
 })();
 
@@ -2030,10 +2053,25 @@ function saveTtsSettingsObj(s) {
         saveTtsSettings();
       });
     }
+    if (answerDelayAfterSpeechSecInput) {
+  answerDelayAfterSpeechSecInput.addEventListener("change", () => {
+    const v = Math.max(
+      0,
+      Math.min(30, parseInt(answerDelayAfterSpeechSecInput.value, 10) || 0)
+    );
+
+    answerDelayAfterSpeechSecInput.value = String(v);
+
+    const s = getTtsSettingsObj();
+    s.answerDelayAfterSpeechSec = v;
+    saveTtsSettingsObj(s);
+  });
+}
 
     // Helper: stop all audio + listening
     function stopAllAudio() {
        speakGeneration++;
+       clearAnswerAfterSpeechDelay();
       if (window.speechSynthesis) {
         window.speechSynthesis.cancel();
       }
@@ -2319,6 +2357,8 @@ function saveTtsSettingsObj(s) {
     const answerModeDelayRadio = document.getElementById("answerModeDelay");
     const answerModeVoiceRadio = document.getElementById("answerModeVoice");
     const answerDelaySecondsInput = document.getElementById("answerDelaySeconds");
+    const answerDelayAfterSpeechSecInput =
+  document.getElementById("answerDelayAfterSpeechSecInput");
     const studyAheadGapSecondsInput = document.getElementById("studyAheadGapSeconds");
 const autoEnterStudyAheadCheckbox = document.getElementById("autoEnterStudyAhead");
 const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
@@ -2407,6 +2447,42 @@ let loopStudyAhead = false;       // from Study Options
 
     let studyAheadGapMs = 4000;
     let inStudyAheadAnswerGap = false;
+    let answerAfterSpeechTimerId = null;
+let answerAfterSpeechDueMs = 0;
+let inAnswerAfterSpeechDelay = false;
+
+function clearAnswerAfterSpeechDelay() {
+  if (answerAfterSpeechTimerId !== null) {
+    clearTimeout(answerAfterSpeechTimerId);
+    answerAfterSpeechTimerId = null;
+  }
+  inAnswerAfterSpeechDelay = false;
+  answerAfterSpeechDueMs = 0;
+}
+function startOrResetAnswerAfterSpeechDelay() {
+  const s = getTtsSettingsObj();
+  const sec = Math.max(0, Math.min(10, Number(s.answerDelayAfterSpeechSec || 0)));
+  if (sec === 0) {
+    // instant
+    clearAnswerAfterSpeechDelay();
+    speakAnswerThenAskDifficulty();
+    return;
+  }
+
+  // reset timer
+  clearAnswerAfterSpeechDelay();
+  inAnswerAfterSpeechDelay = true;
+  answerAfterSpeechDueMs = Date.now() + sec * 1000;
+
+  // IMPORTANT: keep listening during this window so we can reset on new input
+  // (your existing listenForCommand will do that)
+  answerAfterSpeechTimerId = setTimeout(() => {
+    inAnswerAfterSpeechDelay = false;
+    answerAfterSpeechTimerId = null;
+    speakAnswerThenAskDifficulty();
+  }, sec * 1000);
+}
+
     let studyAheadGapTimerId = null;
 
     let isPaused = false;
@@ -2698,6 +2774,7 @@ document.addEventListener("keydown", (e) => {
     function endStudySession() {
   clearStudyAheadGapTimer();
   clearQuestionDelayTimer();
+  clearAnswerAfterSpeechDelay();
   if (voiceRatingButtons) {
     voiceRatingButtons.classList.add("hidden");
   }
@@ -2817,6 +2894,7 @@ function speakAndGoToMainMenu() {
       // Reset timers and state for this card
       clearStudyAheadGapTimer();
       clearQuestionDelayTimer();
+      clearAnswerAfterSpeechDelay();
       awaitingDifficulty = false;
       awaitingAnswerSignal = false;
       awaitingPostCompletionChoice = false;
@@ -2990,51 +3068,6 @@ function speakAndGoToMainMenu() {
   });
 }
 
-// NEW helper: fully restart current card flow in hands-free mode
-function restartCurrentCardVoiceFlow() {
-  if (!currentCard) return;
-
-  clearStudyAheadGapTimer();
-  clearQuestionDelayTimer();
-  awaitingDifficulty = false;
-  awaitingAnswerSignal = false;
-  awaitingPostCompletionChoice = false;
-  inStudyAheadAnswerGap = false;
-
-  if (voiceAnswer) {
-    voiceAnswer.classList.add("hidden");
-  }
-  hasSpokenCurrentAnswer = false;
-  hasSpokenCurrentQuestion = false;
-
-  setStatus("Repeating card...");
-  setStudyState(StudyState.SHOWING_QUESTION);
-
-  hasSpokenCurrentQuestion = true;
-  speak(getPlainTextFromCard(currentCard.question), () => {
-    if (isPaused) return;
-
-    if (answerMode === "delay") {
-      const delay = Math.max(
-        1,
-        Math.min(60, Math.floor(answerDelayMs / 1000))
-      );
-
-      setStudyState(StudyState.WAITING_FOR_ANSWER);
-      questionDelayTimerId = setTimeout(() => {
-        if (!isPaused) {
-          speakAnswerThenAskDifficulty();
-        }
-      }, delay * 1000);
-    } else {
-      awaitingAnswerSignal = true;
-      setStudyState(StudyState.WAITING_FOR_ANSWER);
-      setStatus("Listening for your answer...");
-      listenForCommand(handleVoiceTranscript);
-    }
-  });
-}
-
 function handleGlobalVoiceCommands(text) {
   const t = text.toLowerCase();
 
@@ -3103,6 +3136,7 @@ if (
     stopAllAudio();
     clearStudyAheadGapTimer();
     clearQuestionDelayTimer();
+    clearAnswerAfterSpeechDelay();
 
     pauseBtn.disabled = true;
     resumeBtn.disabled = false;
@@ -3159,6 +3193,14 @@ if (
 }
 
     function handleVoiceTranscript(text) {
+      // If we are waiting to play the answer after speech ended, ANY transcript resets the countdown
+if (inAnswerAfterSpeechDelay) {
+  // Optional: ignore empty
+  if (normalizeCmdText(text).length > 0) {
+    startOrResetAnswerAfterSpeechDelay();
+    return;
+  }
+}
   // First, let global commands capture things like pause, resume, main menu, repeats
   if (handleGlobalVoiceCommands(text)) return;
   // ===== Mic mute command: ONLY during voice-answer gap (after question, before answer) =====
@@ -3237,10 +3279,10 @@ if (awaitingAnswerSignal && currentMode === "voice") {
 
   // If we're waiting for the user to say "I'm ready" in voice-answer mode
   if (awaitingAnswerSignal) {
-    awaitingAnswerSignal = false;
-    speakAnswerThenAskDifficulty();
-    return;
-  }
+  awaitingAnswerSignal = false;
+  startOrResetAnswerAfterSpeechDelay();
+  return;
+}
 
   // Difficulty / rating flow (normal, schedule-changing mode only)
   if (awaitingDifficulty) {
@@ -3484,6 +3526,7 @@ if (!noScheduleChanges && !autoGoodMode && voiceRatingButtons) {
       }
       clearStudyAheadGapTimer();
       clearQuestionDelayTimer();
+      clearAnswerAfterSpeechDelay();
       const deck = getDeckById(currentDeckId);
       if (!deck || deck.cards.length === 0) {
         if (voiceQuestionText) voiceQuestionText.textContent = "";
