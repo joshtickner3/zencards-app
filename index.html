@@ -1994,7 +1994,7 @@ if (answerDelayAfterSpeechSecInput) {
   answerDelayAfterSpeechSecInput.addEventListener("change", () => {
     const v = Math.max(
       0,
-      Math.min(60, parseInt(answerDelayAfterSpeechSecInput.value, 10) || 0)
+      Math.min(30, parseInt(answerDelayAfterSpeechSecInput.value, 10) || 0)
     );
 
     answerDelayAfterSpeechSecInput.value = String(v);
@@ -2945,6 +2945,39 @@ function speakAndGoToMainMenu() {
   });
     }
 
+    function handleNextCardSkip() {
+  if (!currentCard || !currentDeckId) return;
+
+  // 1) Hard stop anything that could still fire the answer later
+  stopAllAudio();                 // cancels TTS + mic
+  clearQuestionDelayTimer();      // kills delay-mode timer
+  clearStudyAheadGapTimer();      // kills study-ahead gap window
+  clearAnswerAfterSpeechDelay();  // kills “answer after I stop speaking” timer
+  clearMicMuteTimer();            // optional safety
+
+  // 2) Reset flow flags so nothing thinks we’re mid-step
+  awaitingAnswerSignal = false;
+  awaitingDifficulty = false;
+  inAnswerAfterSpeechDelay = false;
+
+  // 3) Hide answer UI (we’re skipping it)
+  if (voiceAnswer) voiceAnswer.classList.add("hidden");
+  if (voiceRatingButtons) voiceRatingButtons.classList.add("hidden");
+
+  // 4) Apply EASY only when schedule changes are enabled
+  if (!noScheduleChanges) {
+    const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, "easy");
+    if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
+      queueCardForAgain(currentDeckId, currentCard);
+    }
+  }
+
+  // 5) Advance
+  setStudyState(StudyState.IDLE);
+  runVoiceLoop();
+}
+
+
     function normalizeCmdText(x) {
   return String(x || "")
     .toLowerCase()
@@ -2953,6 +2986,15 @@ function speakAndGoToMainMenu() {
     .replace(/\s+/g, " ")
     .trim();
 }
+function isNextCardCommand(text) {
+  const t = normalizeCmdText(text);
+  return (
+    t === "go to next card" ||
+    t === "go next card" ||       // optional: forgiving variation
+    t === "go to the next card"   // optional: forgiving variation
+  );
+}
+
 
 // tiny Levenshtein distance (fast enough for 1–2 word commands)
 function levenshtein(a, b) {
@@ -3022,7 +3064,6 @@ function parseRatingFromText(text) {
   if (t.includes("again")) return "again";
   if (t.includes("hard")) return "hard";
   if (t.includes("easy")) return "easy";
-  if (t.includes("next")) return "good";
 
   // “Good” synonyms / common mishears
   // (Web Speech often returns could/hood/gud/go when you say "good")
@@ -3203,6 +3244,9 @@ if (
     function handleVoiceTranscript(text) {
       // If we are waiting to play the answer after speech ended, ANY transcript resets the countdown
 if (inAnswerAfterSpeechDelay) {
+
+  if (isNextCardCommand(text)) { handleNextCardSkip(); return; }
+
   // Optional: ignore empty
   if (normalizeCmdText(text).length > 0) {
     startOrResetAnswerAfterSpeechDelay();
@@ -3211,6 +3255,11 @@ if (inAnswerAfterSpeechDelay) {
 }
   // First, let global commands capture things like pause, resume, main menu, repeats
   if (handleGlobalVoiceCommands(text)) return;
+  // ✅ Next card = skip answer + auto-easy (or just advance in study-ahead)
+if (isNextCardCommand(text) && currentMode === "voice") {
+  handleNextCardSkip();
+  return;
+}
   // ===== Mic mute command: ONLY during voice-answer gap (after question, before answer) =====
 if (awaitingAnswerSignal && currentMode === "voice") {
   const t = normalizeCmdText(text);
@@ -3295,6 +3344,7 @@ if (awaitingAnswerSignal && currentMode === "voice") {
   // Difficulty / rating flow (normal, schedule-changing mode only)
   if (awaitingDifficulty) {
     const t = text.toLowerCase();
+      if (isNextCardCommand(text)) { handleNextCardSkip(); return; }
 
     // Main menu commands are already handled globally, but just in case:
     if (isMainMenuCommand(t)) {
