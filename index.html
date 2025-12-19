@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ZenCards — Hands-Free Flashcards (7-Day Free Trial)</title>
   <style>
@@ -256,7 +257,7 @@
 
       <div class="row" style="margin-top:0.85rem;">
         <!-- Start free trial goes into your app UI (index.html). You can detect ?trial=1 later. -->
-        <a class="btn" href="index.html?trial=1">Start free trial</a>
+       <button class="btn" id="startTrialBtn" type="button">Start free trial</button>
         <a class="btn secondary" href="index.html">Log in</a>
 
         <!-- Cancel/manage is a link you wire up later (Stripe customer portal). -->
@@ -265,7 +266,7 @@
       </div>
 
       <div class="fineprint">
-        <strong>Billing:</strong> Your 7-day free trial starts when you create an account.
+        <strong>Billing:</strong> Your 5-day free trial starts when you create an account.
         You will be <strong>charged $9.99/month automatically</strong> at the end of the trial unless you cancel beforehand.
         Cancel anytime from the “Manage / Cancel subscription” option.
       </div>
@@ -466,5 +467,65 @@
   <script>
     document.getElementById("year").textContent = String(new Date().getFullYear());
   </script>
+  <script>
+document.getElementById("year").textContent = String(new Date().getFullYear());
+
+
+  // ===== Supabase client (same anon key as app.html) =====
+  const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
+  const { createClient } = window.supabase;
+  const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  async function startFreeTrial() {
+    // 1) Must be logged in first
+    const { data: authData } = await supabaseClient.auth.getUser();
+    const user = authData?.user;
+
+    if (!user) {
+      alert("Please create an account or log in first, then click Start Free Trial again.");
+      return;
+    }
+
+    // 2) Get JWT for the Edge Function
+    const sessionRes = await supabaseClient.auth.getSession();
+    const token = sessionRes?.data?.session?.access_token;
+
+    if (!token) {
+      alert("Session missing. Please log in again.");
+      return;
+    }
+
+    // 3) Call your Edge Function to create a Stripe Checkout session
+    const res = await fetch(
+      "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/create-checkout-session",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          // EDIT THESE TWO URLS (these are the ones you were asking about)
+          success_url: "https://zencardstudy.com/app.html",
+          cancel_url: "https://zencardstudy.com/?canceled=1",
+        }),
+      }
+    );
+
+    const json = await res.json();
+    if (!res.ok) {
+      console.error("Checkout error:", json);
+      alert("Checkout failed. Check console.");
+      return;
+    }
+
+    // 4) Redirect to Stripe Checkout
+    window.location.href = json.url;
+  }
+
+  document.getElementById("startTrialBtn").addEventListener("click", startFreeTrial);
+</script>
+
 </body>
 </html>

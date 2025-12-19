@@ -387,6 +387,7 @@
           Signed in as <strong id="userEmailLabel"></strong>
         </p>
         <button id="logOutBtn" class="secondary small">Log Out</button>
+        <button id="manageBillingBtn">Manage Billing</button>
       </div>
     </div>
 
@@ -872,7 +873,19 @@ const authPasswordInput = document.getElementById("authPassword");
 
 const signUpBtn = document.getElementById("signUpBtn");
 const signInBtn = document.getElementById("logInBtn");           // correct ID
-const signOutBtn = document.getElementById("logOutBtn");         // correct ID
+const signOutBtn = document.getElementById("logOutBtn"); 
+const manageBillingBtn = document.getElementById("manageBillingBtn");
+manageBillingBtn?.addEventListener("click", async () => {
+  if (!currentUser) {
+    alert("You must be logged in.");
+    return;
+  }
+
+  // Stripe Customer Portal link (you generate this once in Stripe)
+  window.location.href = "https://billing.stripe.com/p/login/4gMfZh7E9aX72wK0jI1VK00";
+});
+
+        // correct ID
 const resetPwBtn = document.getElementById("resetPasswordBtn");  // correct ID
 
 const authStatusSpan = document.getElementById("authStatus");

@@ -1083,6 +1083,49 @@ function updateAuthButtons() {
   }
 }
 
+async function getMySubscriptionStatus() {
+  // Reads the latest subscription for the logged-in user
+  const { data, error } = await supabase
+    .from("subscriptions")
+    .select("status, current_period_end, trial_end, cancel_at_period_end")
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (error) {
+    console.error("Subscription lookup error:", error);
+    return "unknown";
+  }
+
+  const sub = data?.[0];
+  return sub?.status || "none"; // status examples: active, trialing, canceled, incomplete, etc.
+}
+
+async function enforceAccessGate() {
+  // 1) Must be logged in
+  const { data: authData } = await supabase.auth.getUser();
+  const user = authData?.user;
+
+  if (!user) {
+    // Not logged in -> go to landing page
+    window.location.href = "/"; // index.html
+    return;
+  }
+
+  // 2) Must be active or trialing
+  const status = await getMySubscriptionStatus();
+  console.log("Subscription status:", status);
+
+  if (status !== "active" && status !== "trialing") {
+    // Not subscribed -> send them to checkout
+    // Option A: send them back to landing page where "Start trial" button is
+    window.location.href = "/?subscribe=1";
+    return;
+  }
+
+  // 3) Allowed in
+  console.log("Access granted.");
+}
+
 supabaseClient.auth.onAuthStateChange((event, session) => {
   // Ignore auth events triggered during manual sign-out
   if (isSigningOut) return;
@@ -4318,14 +4361,10 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
   });
 }
 
-    (async function init() {
-  // 1) Start with whatever is in localStorage (or sample deck)
+   (async function init() {
+  await enforceAccessGate();   // <-- important
   loadFromStorage();
-
-  // 2) Then try to overwrite with Supabase state if it exists
   await loadStateFromSupabase();
-
-  // 3) Finally, draw the UI
   refreshDeckSelect();
   refreshCardsList();
 })();
