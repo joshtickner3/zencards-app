@@ -863,6 +863,58 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // Use the UMD global from the CDN
 const { createClient } = window.supabase;
 const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+supabaseClient.auth.onAuthStateChange(() => {
+  startTrialIfRequested();
+});
+
+function shouldStartTrialFromUrl() {
+  return new URLSearchParams(window.location.search).get("startTrial") === "1";
+}
+
+async function startTrialIfRequested() {
+  if (!shouldStartTrialFromUrl()) return;
+
+  const { data: sessionData } = await supabaseClient.auth.getSession();
+  const token = sessionData?.session?.access_token;
+
+  if (!token) {
+    // Not logged in yet — do nothing; after login, onAuthStateChange will run and we’ll retry
+    return;
+  }
+
+  const res = await fetch(
+    "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/create-checkout-session",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        success_url: "https://zencardstudy.com/app.html",
+        cancel_url: "https://zencardstudy.com/?canceled=1",
+      }),
+    }
+  );
+
+  const json = await res.json();
+  if (!res.ok) {
+    console.error("Checkout error:", json);
+    alert("Checkout failed. Check console.");
+    return;
+  }
+
+  window.location.href = json.url;
+}
+
+// Run once on page load
+startTrialIfRequested();
+
+// Also run after login happens
+supabaseClient.auth.onAuthStateChange((event, session) => {
+  if (session?.user) startTrialIfRequested();
+});
+
 
 let currentUser = null;
 let isSigningOut = false;
@@ -4365,6 +4417,9 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
   await enforceAccessGate();   // <-- important
   loadFromStorage();
   await loadStateFromSupabase();
+
+  await startTrialIfRequested();
+
   refreshDeckSelect();
   refreshCardsList();
 })();
