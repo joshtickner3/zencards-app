@@ -1230,7 +1230,7 @@ async function enforceAccessGate() {
   const ok = (status === "active" || status === "trialing");
 
   if (!ok) {
-    lockUI("Your account isn’t active yet. Start your free trial to unlock the app.");
+    lockUI("Your account isn’t active yet. Create your account and verify your email, then you will be directed to stripe to begin your free trial. Happy studying!");
     return false;
   }
 
