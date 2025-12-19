@@ -354,6 +354,23 @@
   </style>
 </head>
 <body>
+  <div id="paywall" class="hidden" style="
+  position:fixed; inset:0; z-index:99999;
+  background:rgba(0,0,0,0.75);
+  display:flex; align-items:center; justify-content:center;
+  padding:20px;
+">
+  <div style="max-width:520px;width:100%;background:#020617;border:1px solid #1f2937;border-radius:16px;padding:18px;">
+    <h2 style="margin:0 0 8px 0;">ZenCards Premium</h2>
+    <p style="color:#9ca3af;margin:0 0 12px 0;">
+      Your account isn’t active yet. Start your free trial to unlock the app.
+    </p>
+    <button id="paywallStartTrialBtn">Start free trial</button>
+    <button id="paywallLogoutBtn" class="secondary" style="margin-left:8px;">Log out</button>
+    <p id="paywallMsg" style="color:#9ca3af;margin-top:10px;"></p>
+  </div>
+</div>
+
   <div class="container">
         <!-- ========== AUTH / ACCOUNT ========== -->
     <div id="authSection" class="card">
@@ -474,7 +491,7 @@
         <!-- Move card to another deck -->
 <div class="row" style="margin-top:0.5rem;">
   <div>
-    <label for="moveDeckSelect">Move selected card to deck (edit a card to select one):</label>
+    <label for="moveDeckSelect">Move selected card to deck (edit a card to select it):</label>
     <select id="moveDeckSelect"></select>
   </div>
   <div style="flex:0 0 auto;">
@@ -863,12 +880,23 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // Use the UMD global from the CDN
 const { createClient } = window.supabase;
 const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-supabaseClient.auth.onAuthStateChange(() => {
-  startTrialIfRequested();
-});
 
 function shouldStartTrialFromUrl() {
   return new URLSearchParams(window.location.search).get("startTrial") === "1";
+}
+let checkoutStarted = false;
+
+async function startTrialIfRequested() {
+  if (checkoutStarted) return;
+  if (!shouldStartTrialFromUrl()) return;
+
+  const { data: sessionData } = await supabaseClient.auth.getSession();
+  const token = sessionData?.session?.access_token;
+  if (!token) return;
+
+  checkoutStarted = true;
+
+  // ...fetch checkout session + redirect...
 }
 
 async function startTrialIfRequested() {
@@ -910,18 +938,27 @@ async function startTrialIfRequested() {
 // Run once on page load
 startTrialIfRequested();
 
-// Also run after login happens
-supabaseClient.auth.onAuthStateChange((event, session) => {
-  if (session?.user) startTrialIfRequested();
-});
-
-
 let currentUser = null;
 let isSigningOut = false;
 
 // ===== AUTH DOM REFERENCES =====
 const authEmailInput = document.getElementById("authEmail");
 const authPasswordInput = document.getElementById("authPassword");
+const paywallStartTrialBtn = document.getElementById("paywallStartTrialBtn");
+const paywallLogoutBtn = document.getElementById("paywallLogoutBtn");
+
+paywallStartTrialBtn?.addEventListener("click", async () => {
+  // send them through your verified-email -> stripe flow
+  // easiest: add startTrial=1 to URL and call the same function
+  const url = new URL(window.location.href);
+  url.searchParams.set("startTrial", "1");
+  window.location.href = url.toString();
+});
+
+paywallLogoutBtn?.addEventListener("click", async () => {
+  await signOutFromApp();
+  lockUI("Signed out. Please log in to start your free trial.");
+});
 
 const signUpBtn = document.getElementById("signUpBtn");
 const signInBtn = document.getElementById("logInBtn");           // correct ID
@@ -968,9 +1005,13 @@ async function signUpWithEmail() {
   }
 
   const { data, error } = await supabaseClient.auth.signUp({
-    email,
-    password,
-  });
+  email,
+  password,
+  options: {
+    emailRedirectTo: "https://zencardstudy.com/confirm.html"
+  }
+});
+
 
   if (error) {
     console.error("Sign-up error:", error);
@@ -1025,7 +1066,7 @@ async function signOutFromApp() {
     if (!sessionData || !sessionData.session) {
       console.log("No auth session in this browser; treating as signed out.");
       currentUser = null;
-      setAuthStatus("Not signed in.");
+      setAuthStatus("Not signed in. (New users- welcome! Create an account and verify your email, then you will be directed to stripe to begin your free trial. Happy studying!)");
       updateAuthButtons();
       isSigningOut = false;
       return;
@@ -1136,10 +1177,17 @@ function updateAuthButtons() {
 }
 
 async function getMySubscriptionStatus() {
-  // Reads the latest subscription for the logged-in user
-  const { data, error } = await supabase
+  // Must have a user
+  const { data: authData, error: authErr } = await supabaseClient.auth.getUser();
+  const user = authData?.user;
+  if (authErr) console.error("auth.getUser error:", authErr);
+  if (!user) return "none";
+
+  // IMPORTANT: filter by user_id and use supabaseClient (not supabase)
+  const { data, error } = await supabaseClient
     .from("subscriptions")
-    .select("status, current_period_end, trial_end, cancel_at_period_end")
+    .select("status, current_period_end, trial_end, cancel_at_period_end, created_at")
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(1);
 
@@ -1149,46 +1197,69 @@ async function getMySubscriptionStatus() {
   }
 
   const sub = data?.[0];
-  return sub?.status || "none"; // status examples: active, trialing, canceled, incomplete, etc.
+  return sub?.status || "none";
+}
+
+function lockUI(message = "") {
+  const paywall = document.getElementById("paywall");
+  const msg = document.getElementById("paywallMsg");
+  if (msg) msg.textContent = message;
+  paywall?.classList.remove("hidden");
+}
+
+function unlockUI() {
+  const paywall = document.getElementById("paywall");
+  paywall?.classList.add("hidden");
 }
 
 async function enforceAccessGate() {
   // 1) Must be logged in
-  const { data: authData } = await supabase.auth.getUser();
+  const { data: authData } = await supabaseClient.auth.getUser();
   const user = authData?.user;
 
   if (!user) {
-    // Not logged in -> go to landing page
-    window.location.href = "/"; // index.html
-    return;
+    // Not logged in -> lock UI and keep them on this page
+    lockUI("Please log in or create an account to start your free trial.");
+    return false;
   }
 
   // 2) Must be active or trialing
   const status = await getMySubscriptionStatus();
   console.log("Subscription status:", status);
 
-  if (status !== "active" && status !== "trialing") {
-    // Not subscribed -> send them to checkout
-    // Option A: send them back to landing page where "Start trial" button is
-    window.location.href = "/?subscribe=1";
-    return;
+  const ok = (status === "active" || status === "trialing");
+
+  if (!ok) {
+    lockUI("Your account isn’t active yet. Start your free trial to unlock the app.");
+    return false;
   }
 
   // 3) Allowed in
-  console.log("Access granted.");
+  unlockUI();
+  return true;
 }
 
-supabaseClient.auth.onAuthStateChange((event, session) => {
-  // Ignore auth events triggered during manual sign-out
+supabaseClient.auth.onAuthStateChange(async (event, session) => {
   if (isSigningOut) return;
 
   currentUser = session?.user || null;
   updateAuthButtons();
 
+  // lock/unlock the app based on subscription
+  await enforceAccessGate();
+
+  // load user data if logged in
   if (currentUser) {
-    loadStateFromSupabase();
+    await loadStateFromSupabase();
+    refreshDeckSelect();
+    refreshCardsList();
   }
+
+  // if they came here with ?startTrial=1, try to send to Stripe
+  // (this only works if they are logged in AND have a session token)
+  await startTrialIfRequested();
 });
+
 
     // ===================== DATA & STORAGE =====================
     let decks = [];
@@ -4414,14 +4485,14 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
 }
 
    (async function init() {
-  await enforceAccessGate();   // <-- important
+  const allowed = await enforceAccessGate();
   loadFromStorage();
-  await loadStateFromSupabase();
 
-  await startTrialIfRequested();
-
-  refreshDeckSelect();
-  refreshCardsList();
+  if (allowed) {
+    await loadStateFromSupabase();
+    refreshDeckSelect();
+    refreshCardsList();
+  }
 })();
 
   </script>

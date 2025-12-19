@@ -1,0 +1,73 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ZenCards — Confirming…</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body style="font-family:system-ui;background:#0b1220;color:#e5e7eb;padding:24px;">
+  <h2>Confirming your email…</h2>
+  <p id="msg">One moment.</p>
+
+  <script>
+    const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
+    const SUPABASE_ANON_KEY = "YOUR_ANON_KEY_HERE"; // same as app.html
+    const { createClient } = window.supabase;
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    async function go() {
+      const msg = document.getElementById("msg");
+
+      // If Supabase uses ?code=... flow, exchange it for a session
+      const code = new URLSearchParams(window.location.search).get("code");
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          msg.textContent = "Could not create session. Please try logging in.";
+          console.error(error);
+          return;
+        }
+      }
+
+      // Now we should have a session
+      const { data } = await supabase.auth.getSession();
+      const token = data?.session?.access_token;
+
+      if (!token) {
+        msg.textContent = "You're verified — now please log in again.";
+        return;
+      }
+
+      msg.textContent = "Email verified. Sending you to checkout…";
+
+      // Create Stripe Checkout session
+      const res = await fetch(
+        "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/create-checkout-session",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            success_url: "https://zencardstudy.com/app.html",
+            cancel_url: "https://zencardstudy.com/?canceled=1",
+          }),
+        }
+      );
+
+      const json = await res.json();
+      if (!res.ok) {
+        msg.textContent = "Checkout failed. Open console for details.";
+        console.error("Checkout error:", json);
+        return;
+      }
+
+      window.location.href = json.url;
+    }
+
+    go();
+  </script>
+</body>
+</html>
