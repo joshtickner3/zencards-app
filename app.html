@@ -376,7 +376,7 @@
     <div id="authSection" class="card">
       <h2>Account</h2>
       <p id="authStatus" style="font-size:0.85rem;color:#9ca3af;margin-bottom:0.5rem;">
-        Not signed in.
+        Not signed in. (New users- welcome! Create an account and verify your email, then you will be directed to begin your free trial. Happy studying)!
       </p>
 
       <!-- Shown when logged OUT -->
@@ -1066,7 +1066,7 @@ async function signOutFromApp() {
     if (!sessionData || !sessionData.session) {
       console.log("No auth session in this browser; treating as signed out.");
       currentUser = null;
-      setAuthStatus("Not signed in. (New users- welcome! Create an account and verify your email, then you will be directed to stripe to begin your free trial. Happy studying!)");
+      setAuthStatus("Not signed in.");
       updateAuthButtons();
       isSigningOut = false;
       return;
