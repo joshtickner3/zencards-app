@@ -362,12 +362,32 @@
 ">
   <div style="max-width:520px;width:100%;background:#020617;border:1px solid #1f2937;border-radius:16px;padding:18px;">
     <h2 style="margin:0 0 8px 0;">ZenCards Premium</h2>
-    <p style="color:#9ca3af;margin:0 0 12px 0;">
-      Your account isn’t active yet. Start your free trial to unlock the app.
+
+    <p style="color:#9ca3af;margin:0 0 12px 0;line-height:1.4;">
+      Create an account to start your free trial.
+      After you sign up, you’ll receive an email verification link.
+      Once you verify your email, you’ll be redirected to Stripe to start your free trial.
+      <br><br>
+      <strong style="color:#e5e7eb;">Happy studying!</strong>
     </p>
-    <button id="paywallStartTrialBtn">Start free trial</button>
-    <button id="paywallLogoutBtn" class="secondary" style="margin-left:8px;">Log out</button>
-    <p id="paywallMsg" style="color:#9ca3af;margin-top:10px;"></p>
+
+    <div class="row" style="margin-top:0.25rem;">
+      <div>
+        <label for="paywallEmail">Email</label>
+        <input id="paywallEmail" type="text" placeholder="you@example.com" />
+      </div>
+      <div>
+        <label for="paywallPassword">Password</label>
+        <input id="paywallPassword" type="password" placeholder="••••••••" />
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:0.75rem;">
+      <button id="paywallSignUpBtn">Sign up</button>
+      <button id="paywallLogoutBtn" class="secondary" style="margin-left:8px;">Log out</button>
+    </div>
+
+    <p id="paywallMsg" style="color:#9ca3af;margin-top:10px;min-height:1.2em;"></p>
   </div>
 </div>
 
@@ -887,19 +907,7 @@ function shouldStartTrialFromUrl() {
 let checkoutStarted = false;
 
 async function startTrialIfRequested() {
-  if (checkoutStarted) return;
-  if (!shouldStartTrialFromUrl()) return;
-
-  const { data: sessionData } = await supabaseClient.auth.getSession();
-  const token = sessionData?.session?.access_token;
-  if (!token) return;
-
-  checkoutStarted = true;
-
-  // ...fetch checkout session + redirect...
-}
-
-async function startTrialIfRequested() {
+   if (checkoutStarted) return;
   if (!shouldStartTrialFromUrl()) return;
 
   const { data: sessionData } = await supabaseClient.auth.getSession();
@@ -910,6 +918,7 @@ async function startTrialIfRequested() {
     return;
   }
 
+checkoutStarted = true;
   const res = await fetch(
     "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/create-checkout-session",
     {
@@ -944,20 +953,40 @@ let isSigningOut = false;
 // ===== AUTH DOM REFERENCES =====
 const authEmailInput = document.getElementById("authEmail");
 const authPasswordInput = document.getElementById("authPassword");
-const paywallStartTrialBtn = document.getElementById("paywallStartTrialBtn");
+const paywallEmailInput = document.getElementById("paywallEmail");
+const paywallPasswordInput = document.getElementById("paywallPassword");
+const paywallSignUpBtn = document.getElementById("paywallSignUpBtn");
 const paywallLogoutBtn = document.getElementById("paywallLogoutBtn");
 
-paywallStartTrialBtn?.addEventListener("click", async () => {
-  // send them through your verified-email -> stripe flow
-  // easiest: add startTrial=1 to URL and call the same function
-  const url = new URL(window.location.href);
-  url.searchParams.set("startTrial", "1");
-  window.location.href = url.toString();
+paywallSignUpBtn?.addEventListener("click", async () => {
+  const email = (paywallEmailInput?.value || "").trim();
+  const password = (paywallPasswordInput?.value || "").trim();
+
+  if (!email || !password) {
+    lockUI("Please enter an email and password.");
+    return;
+  }
+
+  const { data, error } = await supabaseClient.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: "https://zencardstudy.com/confirm.html?startTrial=1"
+    }
+  });
+
+  if (error) {
+    console.error("Paywall sign-up error:", error);
+    lockUI("Sign-up error: " + error.message);
+    return;
+  }
+
+  lockUI("Check your email to verify. After verification, you’ll be redirected to Stripe to start your free trial. Happy studying!");
 });
 
 paywallLogoutBtn?.addEventListener("click", async () => {
   await signOutFromApp();
-  lockUI("Signed out. Please log in to start your free trial.");
+  lockUI("Signed out. Please create an account to start your free trial. Happy studying!");
 });
 
 const signUpBtn = document.getElementById("signUpBtn");
@@ -1008,7 +1037,7 @@ async function signUpWithEmail() {
   email,
   password,
   options: {
-    emailRedirectTo: "https://zencardstudy.com/confirm.html"
+    emailRedirectTo: "https://zencardstudy.com/confirm.html?startTrial=1"
   }
 });
 
@@ -1219,7 +1248,7 @@ async function enforceAccessGate() {
 
   if (!user) {
     // Not logged in -> lock UI and keep them on this page
-    lockUI("Please log in or create an account to start your free trial.");
+    lockUI("Create an account to start your free trial. You’ll verify your email, then you’ll be redirected to Stripe. Happy studying!");
     return false;
   }
 
@@ -1240,26 +1269,27 @@ async function enforceAccessGate() {
 }
 
 supabaseClient.auth.onAuthStateChange(async (event, session) => {
+  // Prevent weird UI flashes during an intentional sign-out
   if (isSigningOut) return;
 
-  currentUser = session?.user || null;
+  // Keep currentUser in sync
+  currentUser = session?.user ?? null;
+
   updateAuthButtons();
 
-  // lock/unlock the app based on subscription
-  await enforceAccessGate();
-
-  // load user data if logged in
+  // Optional: if you already do these, keep them
   if (currentUser) {
     await loadStateFromSupabase();
     refreshDeckSelect();
     refreshCardsList();
+
+    // ✅ THE IMPORTANT LINE:
+    // If the URL has ?startTrial=1, this will now run RIGHT AFTER LOGIN too.
+    await startTrialIfRequested();
+  } else {
+    // logged out state — you can keep whatever you currently do here
   }
-
-  // if they came here with ?startTrial=1, try to send to Stripe
-  // (this only works if they are logged in AND have a session token)
-  await startTrialIfRequested();
 });
-
 
     // ===================== DATA & STORAGE =====================
     let decks = [];

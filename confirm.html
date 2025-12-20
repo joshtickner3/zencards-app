@@ -11,63 +11,58 @@
   <p id="msg">One moment.</p>
 
   <script>
-    const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
-    const SUPABASE_ANON_KEY = "YOUR_ANON_KEY_HERE"; // same as app.html
-    const { createClient } = window.supabase;
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
+  const { createClient } = window.supabase;
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    async function go() {
-      const msg = document.getElementById("msg");
+  async function go() {
+    const msg = document.getElementById("msg");
 
-      // If Supabase uses ?code=... flow, exchange it for a session
+    try {
+      // Supabase email confirmation typically returns ?code=...
       const code = new URLSearchParams(window.location.search).get("code");
+
       if (code) {
+        msg.textContent = "Confirming…";
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (error) {
-          msg.textContent = "Could not create session. Please try logging in.";
-          console.error(error);
+          console.error("exchangeCodeForSession error:", error);
+          msg.textContent = "Could not confirm session. Please try logging in.";
           return;
         }
       }
 
-      // Now we should have a session
-      const { data } = await supabase.auth.getSession();
-      const token = data?.session?.access_token;
-
-      if (!token) {
-        msg.textContent = "You're verified — now please log in again.";
-        return;
+      // If we successfully exchanged, we should now have a session in this browser
+      const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+      if (sessionErr) {
+        console.error("getSession error:", sessionErr);
       }
 
-      msg.textContent = "Email verified. Sending you to checkout…";
+      const hasSession = !!sessionData?.session;
 
-      // Create Stripe Checkout session
-      const res = await fetch(
-        "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/create-checkout-session",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            success_url: "https://zencardstudy.com/app.html",
-            cancel_url: "https://zencardstudy.com/?canceled=1",
-          }),
-        }
-      );
+      // Always send them to app.html with startTrial=1.
+      // If session exists, app.html can immediately start checkout.
+      // If not, app.html will show login and then on login can start checkout.
+      msg.textContent = "Email verified. Sending you to ZenCards…";
 
-      const json = await res.json();
-      if (!res.ok) {
-        msg.textContent = "Checkout failed. Open console for details.";
-        console.error("Checkout error:", json);
-        return;
-      }
+      const url = new URL("https://zencardstudy.com/app.html");
+      url.searchParams.set("startTrial", "1");
 
-      window.location.href = json.url;
+      // If you want to be extra safe, you can add a tiny delay so the session write finishes.
+      setTimeout(() => {
+        window.location.href = url.toString();
+      }, hasSession ? 250 : 50);
+
+    } catch (err) {
+      console.error("confirm.html fatal error:", err);
+      document.getElementById("msg").textContent =
+        "Something went wrong. Please go back and log in.";
     }
+  }
 
-    go();
-  </script>
+  go();
+</script>
+
 </body>
 </html>
