@@ -4,8 +4,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>ZenCards — Confirming…</title>
-
-  <!-- IMPORTANT: UMD build so window.supabase always exists -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
 
@@ -14,87 +12,24 @@
   <p id="msg">One moment.</p>
 
   <script>
+    const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ"
     const msgEl = document.getElementById("msg");
     const setMsg = (t) => { msgEl.textContent = t; console.log("[confirm]", t); };
 
-    // Show any JS error directly on the page
-    window.addEventListener("error", (e) => {
-      console.error("Window error:", e.error || e.message);
-      setMsg("JS error: " + (e.error?.message || e.message));
-    });
-
-    window.addEventListener("unhandledrejection", (e) => {
-      console.error("Unhandled rejection:", e.reason);
-      setMsg("Promise error: " + (e.reason?.message || String(e.reason)));
-    });
-
-    const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     function scrubUrl() {
       history.replaceState({}, document.title, window.location.pathname + window.location.search);
     }
 
-    async function createCheckoutAndRedirect(accessToken) {
-      setMsg("Email confirmed ✅ Creating checkout session…");
-
-      let res, raw;
-      try {
-        res = await fetch(`${SUPABASE_URL}/functions/v1/create-checkout-session`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({
-            success_url: "https://zencardstudy.com/app.html",
-            cancel_url: "https://zencardstudy.com/app.html?canceled=1",
-          }),
-        });
-        raw = await res.text();
-      } catch (e) {
-        console.error("Checkout fetch failed:", e);
-        setMsg("Checkout request failed (network/CORS). Check console.");
-        return;
-      }
-
-      let json = null;
-      try { json = JSON.parse(raw); } catch {}
-
-      if (!res.ok) {
-        console.error("Checkout HTTP error:", res.status, raw);
-        setMsg(`Checkout failed (${res.status}). ${raw.slice(0, 200)}`);
-        return;
-      }
-
-      if (!json?.url) {
-        console.error("Checkout missing url:", raw);
-        setMsg(`Checkout returned no url. ${raw.slice(0, 200)}`);
-        return;
-      }
-
-      setMsg("Redirecting to Stripe…");
-      window.location.href = json.url;
-    }
-
     async function go() {
-      setMsg("Starting confirm script…");
-
-      // Make sure supabase loaded
-      if (!window.supabase || !window.supabase.createClient) {
-        setMsg("Supabase SDK did not load (window.supabase missing).");
-        return;
-      }
-
-      const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
       setMsg("Finalizing confirmation…");
 
       const url = new URL(window.location.href);
-      const queryParams = url.searchParams;
       const hashParams = new URLSearchParams(url.hash.replace(/^#/, ""));
 
-      // Surface errors from Supabase redirect
+      // show error if supabase returned one
       const err = hashParams.get("error");
       if (err) {
         const errDesc = hashParams.get("error_description") || "";
@@ -103,41 +38,63 @@
         return;
       }
 
-      // Flow: #access_token & #refresh_token
       const access_token = hashParams.get("access_token");
       const refresh_token = hashParams.get("refresh_token");
-      if (access_token && refresh_token) {
-        setMsg("Saving session…");
-        const { error } = await sb.auth.setSession({ access_token, refresh_token });
-        if (error) throw error;
-        scrubUrl();
-        await new Promise(r => setTimeout(r, 200));
-      }
 
-      // Flow: ?code=...
-      const code = queryParams.get("code");
-      if (code) {
-        setMsg("Finishing sign-in…");
-        const { error } = await sb.auth.exchangeCodeForSession(code);
-        if (error) throw error;
-        scrubUrl();
-        await new Promise(r => setTimeout(r, 200));
-      }
-
-      setMsg("Checking session…");
-      const { data: sessionData, error: sessErr } = await sb.auth.getSession();
-      if (sessErr) throw sessErr;
-
-      const token = sessionData?.session?.access_token;
-      if (!token) {
-        setMsg("Email verified, but no session was created. Please go back and log in.");
+      if (!access_token || !refresh_token) {
+        setMsg("Missing tokens in confirmation link. Please request a new link.");
         return;
       }
 
-      await createCheckoutAndRedirect(token);
+      setMsg("Saving session…");
+      const { error: setErr } = await sb.auth.setSession({ access_token, refresh_token });
+      if (setErr) {
+        console.error(setErr);
+        setMsg("Could not save session from link. Please request a new link.");
+        return;
+      }
+
+      scrubUrl();
+      await new Promise(r => setTimeout(r, 200));
+
+      setMsg("Email confirmed ✅ Creating checkout session…");
+      const { data: sessionData } = await sb.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
+      if (!token) {
+        setMsg("Email verified but no session token found. Please log in again.");
+        return;
+      }
+
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/create-checkout-session`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          success_url: "https://zencardstudy.com/app.html",
+          cancel_url: "https://zencardstudy.com/app.html?canceled=1",
+        }),
+      });
+
+      const raw = await res.text();
+      let json; try { json = JSON.parse(raw); } catch { json = null; }
+
+      if (!res.ok || !json?.url) {
+        console.error("Checkout error:", res.status, raw);
+        setMsg(`Checkout failed (${res.status}). ${raw.slice(0, 200)}`);
+        return;
+      }
+
+      setMsg("Redirecting to Stripe…");
+      window.location.href = json.url;
     }
 
-    go();
+    go().catch((e) => {
+      console.error(e);
+      setMsg("Something went wrong: " + (e?.message || String(e)));
+    });
   </script>
 </body>
 </html>
