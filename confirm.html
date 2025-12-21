@@ -13,20 +13,73 @@
 
   <script>
     const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ"
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
+
     const msgEl = document.getElementById("msg");
     const setMsg = (t) => { msgEl.textContent = t; console.log("[confirm]", t); };
 
-    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: false, // we handle parsing ourselves
+      },
+    });
 
     function scrubUrl() {
       history.replaceState({}, document.title, window.location.pathname + window.location.search);
+    }
+
+    function withTimeout(promise, ms, label) {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+        ),
+      ]);
+    }
+
+    async function createCheckoutAndRedirect(accessToken) {
+      setMsg("Email confirmed ✅ Creating checkout session…");
+
+      let res, raw;
+      try {
+        res = await fetch(`${SUPABASE_URL}/functions/v1/create-checkout-session`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            success_url: "https://zencardstudy.com/app.html",
+            cancel_url: "https://zencardstudy.com/app.html?canceled=1",
+          }),
+        });
+        raw = await res.text();
+      } catch (e) {
+        console.error("Fetch failed:", e);
+        setMsg("Checkout request failed (network/CORS). Open console.");
+        return;
+      }
+
+      let json = null;
+      try { json = JSON.parse(raw); } catch {}
+
+      if (!res.ok || !json?.url) {
+        console.error("Checkout error:", res.status, raw);
+        setMsg(`Checkout failed (${res.status}). ${raw.slice(0, 250)}`);
+        return;
+      }
+
+      setMsg("Redirecting to Stripe…");
+      window.location.href = json.url;
     }
 
     async function go() {
       setMsg("Finalizing confirmation…");
 
       const url = new URL(window.location.href);
+      const queryParams = url.searchParams;
       const hashParams = new URLSearchParams(url.hash.replace(/^#/, ""));
 
       // show error if supabase returned one
@@ -38,57 +91,83 @@
         return;
       }
 
+      // Try FLOW 1: implicit hash session (#access_token / #refresh_token)
       const access_token = hashParams.get("access_token");
       const refresh_token = hashParams.get("refresh_token");
 
-      if (!access_token || !refresh_token) {
-        setMsg("Missing tokens in confirmation link. Please request a new link.");
+      if (access_token && refresh_token) {
+        setMsg("Saving session…");
+
+        try {
+          const result = await withTimeout(
+            sb.auth.setSession({ access_token, refresh_token }),
+            10000,
+            "setSession"
+          );
+
+          if (result?.error) {
+            console.error("setSession error:", result.error);
+            setMsg("setSession error: " + (result.error.message || JSON.stringify(result.error)));
+            return;
+          }
+
+          scrubUrl();
+          await new Promise(r => setTimeout(r, 250));
+        } catch (e) {
+          console.error("setSession threw/hung:", e);
+          setMsg("setSession failed: " + (e?.message || String(e)));
+          return;
+        }
+      } else {
+        // Try FLOW 2: PKCE code (?code=...)
+        const code = queryParams.get("code");
+        if (code) {
+          setMsg("Finishing sign-in…");
+          const { error } = await sb.auth.exchangeCodeForSession(code);
+          if (error) {
+            console.error("exchangeCodeForSession error:", error);
+            setMsg("exchangeCodeForSession error: " + (error.message || JSON.stringify(error)));
+            return;
+          }
+          scrubUrl();
+          await new Promise(r => setTimeout(r, 250));
+        } else {
+          // Try FLOW 3: token_hash + type
+          const token_hash = queryParams.get("token_hash") || hashParams.get("token_hash");
+          const type = queryParams.get("type") || hashParams.get("type");
+          if (token_hash && type) {
+            setMsg("Verifying…");
+            const { error } = await sb.auth.verifyOtp({ token_hash, type });
+            if (error) {
+              console.error("verifyOtp error:", error);
+              setMsg("verifyOtp error: " + (error.message || JSON.stringify(error)));
+              return;
+            }
+            scrubUrl();
+            await new Promise(r => setTimeout(r, 250));
+          } else {
+            setMsg("Missing tokens/code in confirmation link. Please request a new link.");
+            return;
+          }
+        }
+      }
+
+      // Now retrieve session
+      setMsg("Checking session…");
+      const { data: sessionData, error: sessErr } = await sb.auth.getSession();
+      if (sessErr) {
+        console.error("getSession error:", sessErr);
+        setMsg("getSession error: " + (sessErr.message || JSON.stringify(sessErr)));
         return;
       }
 
-      setMsg("Saving session…");
-      const { error: setErr } = await sb.auth.setSession({ access_token, refresh_token });
-      if (setErr) {
-        console.error(setErr);
-        setMsg("Could not save session from link. Please request a new link.");
-        return;
-      }
-
-      scrubUrl();
-      await new Promise(r => setTimeout(r, 200));
-
-      setMsg("Email confirmed ✅ Creating checkout session…");
-      const { data: sessionData } = await sb.auth.getSession();
       const token = sessionData?.session?.access_token;
-
       if (!token) {
         setMsg("Email verified but no session token found. Please log in again.");
         return;
       }
 
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/create-checkout-session`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          success_url: "https://zencardstudy.com/app.html",
-          cancel_url: "https://zencardstudy.com/app.html?canceled=1",
-        }),
-      });
-
-      const raw = await res.text();
-      let json; try { json = JSON.parse(raw); } catch { json = null; }
-
-      if (!res.ok || !json?.url) {
-        console.error("Checkout error:", res.status, raw);
-        setMsg(`Checkout failed (${res.status}). ${raw.slice(0, 200)}`);
-        return;
-      }
-
-      setMsg("Redirecting to Stripe…");
-      window.location.href = json.url;
+      await createCheckoutAndRedirect(token);
     }
 
     go().catch((e) => {
