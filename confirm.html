@@ -6,114 +6,105 @@
   <title>ZenCards — Confirming…</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
+
 <body style="font-family:system-ui;background:#0b1220;color:#e5e7eb;padding:24px;">
   <h2>Confirming your email…</h2>
   <p id="msg">One moment.</p>
 
- <script>
-  const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ"; // same as app.html
-  const { createClient } = window.supabase;
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  <script>
+    const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ"; // must match app.html
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  async function go() {
-    const msg = document.getElementById("msg");
+    const msgEl = document.getElementById("msg");
+    const setMsg = (t) => { msgEl.textContent = t; console.log("[confirm]", t); };
 
-    try {
+    function scrubUrl() {
+      // Removes hash tokens from the URL so access_token isn't left in the address bar
+      history.replaceState({}, document.title, window.location.pathname + window.location.search);
+    }
+
+    async function createCheckoutAndRedirect(accessToken) {
+      setMsg("Email confirmed ✅ Creating checkout session…");
+
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/create-checkout-session`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          success_url: "https://zencardstudy.com/app.html",
+          cancel_url: "https://zencardstudy.com/app.html?canceled=1",
+        }),
+      });
+
+      const raw = await res.text();
+      let json;
+      try { json = JSON.parse(raw); } catch { json = { raw }; }
+
+      if (!res.ok || !json?.url) {
+        console.error("Checkout error:", { status: res.status, json });
+        throw new Error(`Checkout failed (${res.status}). ${json?.error || json?.raw || "No url returned."}`);
+      }
+
+      setMsg("Redirecting to Stripe…");
+      window.location.href = json.url;
+    }
+
+    async function go() {
+      setMsg("Finalizing confirmation…");
+
       const url = new URL(window.location.href);
-
-      // Supabase sometimes returns params in the URL hash (#...), not the query (?...)
       const hashParams = new URLSearchParams(url.hash.replace(/^#/, ""));
-      const queryParams = url.searchParams;
 
       // If Supabase returned an error in the hash, show it clearly
       const err = hashParams.get("error");
-      const errDesc = hashParams.get("error_description");
-      const errCode = hashParams.get("error_code");
       if (err) {
-        msg.textContent = `Confirmation error: ${err}${errCode ? " (" + errCode + ")" : ""}${errDesc ? " — " + errDesc : ""}`;
+        const errDesc = hashParams.get("error_description") || "";
+        const errCode = hashParams.get("error_code") || "";
+        setMsg(`Confirmation error: ${err}${errCode ? " (" + errCode + ")" : ""}${errDesc ? " — " + errDesc : ""}`);
         console.error("Confirm error:", { err, errCode, errDesc, hash: url.hash });
         return;
       }
 
-      // ---- FLOW A: PKCE code exchange (?code=...) ----
-      const code = queryParams.get("code");
-      if (code) {
-        msg.textContent = "Finishing sign-in…";
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) {
-          msg.textContent = "Could not create session from code. Please log in again.";
-          console.error("exchangeCodeForSession error:", error);
-          return;
-        }
+      // ✅ This handles BOTH:
+      // - PKCE: ?code=...
+      // - Implicit hash: #access_token=...&refresh_token=...
+      // - Other supported auth redirects
+      setMsg("Reading session from confirmation link…");
+      const { error: fromUrlErr } = await supabase.auth.getSessionFromUrl({ storeSession: true });
+      if (fromUrlErr) {
+        console.error("getSessionFromUrl error:", fromUrlErr);
+        setMsg("Could not read session from confirmation link. Please request a new link.");
+        return;
       }
 
-      // ---- FLOW B: token_hash + type (often in hash or query) ----
-      const token_hash =
-        queryParams.get("token_hash") || hashParams.get("token_hash");
-      const type =
-        queryParams.get("type") || hashParams.get("type"); // usually "signup" or "recovery"
+      // Clean tokens from URL (good security hygiene)
+      scrubUrl();
 
-      if (token_hash && type) {
-        msg.textContent = "Verifying your email…";
-        const { data, error } = await supabase.auth.verifyOtp({
-          token_hash,
-          type,
-        });
-
-        if (error) {
-          msg.textContent =
-            "That confirmation link is invalid or expired. Please sign up again (or request a new link).";
-          console.error("verifyOtp error:", error);
-          return;
-        }
+      // Now retrieve session
+      const { data: sessionData, error: sessErr } = await supabase.auth.getSession();
+      if (sessErr) {
+        console.error("getSession error:", sessErr);
+        setMsg("Could not load session. Please log in again.");
+        return;
       }
 
-      // Now we should have a session (if verification succeeded)
-      const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
-
       if (!token) {
-        msg.textContent =
-          "Email verified, but no session was created. Please go back and log in.";
+        setMsg("Email verified, but no session was created. Please go back and log in.");
         return;
       }
 
-      msg.textContent = "Email confirmed ✅ Redirecting to checkout…";
-
-      // Create Stripe Checkout session
-      const res = await fetch(
-        "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/create-checkout-session",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            success_url: "https://zencardstudy.com/app.html",
-            cancel_url: "https://zencardstudy.com/app.html?canceled=1",
-          }),
-        }
-      );
-
-      const json = await res.json();
-
-      if (!res.ok || !json?.url) {
-        msg.textContent = "Checkout failed. Open console for details.";
-        console.error("Checkout error:", json);
-        return;
-      }
-
-      window.location.href = json.url;
-    } catch (e) {
-      msg.textContent = "Something went wrong. Open console for details.";
-      console.error(e);
+      // Create Stripe checkout and redirect
+      await createCheckoutAndRedirect(token);
     }
-  }
 
-  go();
-</script>
-
+    go().catch((e) => {
+      console.error(e);
+      setMsg("Something went wrong: " + (e?.message || String(e)));
+    });
+  </script>
 </body>
 </html>
