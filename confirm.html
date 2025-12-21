@@ -13,14 +13,15 @@
 
   <script>
     const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ"; // must match app.html
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
+
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const msgEl = document.getElementById("msg");
     const setMsg = (t) => { msgEl.textContent = t; console.log("[confirm]", t); };
 
     function scrubUrl() {
-      // Removes hash tokens from the URL so access_token isn't left in the address bar
+      // Remove hash tokens from the address bar
       history.replaceState({}, document.title, window.location.pathname + window.location.search);
     }
 
@@ -56,6 +57,7 @@
       setMsg("Finalizing confirmation…");
 
       const url = new URL(window.location.href);
+      const queryParams = url.searchParams;
       const hashParams = new URLSearchParams(url.hash.replace(/^#/, ""));
 
       // If Supabase returned an error in the hash, show it clearly
@@ -68,28 +70,44 @@
         return;
       }
 
-      // ✅ This handles BOTH:
-      // - PKCE: ?code=...
-      // - Implicit hash: #access_token=...&refresh_token=...
-      // - Other supported auth redirects
-      setMsg("Reading session from confirmation link…");
-      const { error: fromUrlErr } = await sb.auth.getSessionFromUrl({ storeSession: true });
-      if (fromUrlErr) {
-        console.error("getSessionFromUrl error:", fromUrlErr);
-        setMsg("Could not read session from confirmation link. Please request a new link.");
-        return;
+      // ---- FLOW 1: implicit hash session (#access_token=...&refresh_token=...) ----
+      const access_token = hashParams.get("access_token");
+      const refresh_token = hashParams.get("refresh_token");
+
+      if (access_token && refresh_token) {
+        setMsg("Saving session…");
+        const { error } = await sb.auth.setSession({ access_token, refresh_token });
+        if (error) throw error;
+
+        // Clean tokens out of URL
+        scrubUrl();
       }
 
-      // Clean tokens from URL (good security hygiene)
-      scrubUrl();
+      // ---- FLOW 2: PKCE code (?code=...) ----
+      const code = queryParams.get("code");
+      if (code) {
+        setMsg("Finishing sign-in…");
+        const { error } = await sb.auth.exchangeCodeForSession(code);
+        if (error) throw error;
+
+        scrubUrl();
+      }
+
+      // ---- FLOW 3: token_hash + type (some templates use this) ----
+      const token_hash = queryParams.get("token_hash") || hashParams.get("token_hash");
+      const type = queryParams.get("type") || hashParams.get("type"); // "signup" or "recovery"
+      if (token_hash && type) {
+        setMsg("Verifying…");
+        const { error } = await sb.auth.verifyOtp({ token_hash, type });
+        if (error) throw error;
+
+        scrubUrl();
+      }
 
       // Now retrieve session
+      setMsg("Checking session…");
       const { data: sessionData, error: sessErr } = await sb.auth.getSession();
-      if (sessErr) {
-        console.error("getSession error:", sessErr);
-        setMsg("Could not load session. Please log in again.");
-        return;
-      }
+      if (sessErr) throw sessErr;
 
       const token = sessionData?.session?.access_token;
       if (!token) {
@@ -97,7 +115,6 @@
         return;
       }
 
-      // Create Stripe checkout and redirect
       await createCheckoutAndRedirect(token);
     }
 
