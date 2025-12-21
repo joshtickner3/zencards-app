@@ -15,7 +15,7 @@
     const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
 
-    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const msgEl = document.getElementById("msg");
     const setMsg = (t) => { msgEl.textContent = t; console.log("[confirm]", t); };
@@ -76,7 +76,7 @@
 
       if (access_token && refresh_token) {
         setMsg("Saving session…");
-        const { error } = await sb.auth.setSession({ access_token, refresh_token });
+        const { error } = await supabase.auth.setSession({ access_token, refresh_token });
         if (error) throw error;
 
         // Clean tokens out of URL
@@ -87,7 +87,7 @@
       const code = queryParams.get("code");
       if (code) {
         setMsg("Finishing sign-in…");
-        const { error } = await sb.auth.exchangeCodeForSession(code);
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (error) throw error;
 
         scrubUrl();
@@ -98,7 +98,7 @@
       const type = queryParams.get("type") || hashParams.get("type"); // "signup" or "recovery"
       if (token_hash && type) {
         setMsg("Verifying…");
-        const { error } = await sb.auth.verifyOtp({ token_hash, type });
+        const { error } = await supabase.auth.verifyOtp({ token_hash, type });
         if (error) throw error;
 
         scrubUrl();
