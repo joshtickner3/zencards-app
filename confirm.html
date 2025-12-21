@@ -4,7 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>ZenCards — Confirming…</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- IMPORTANT: UMD build so window.supabase always exists -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
 
 <body style="font-family:system-ui;background:#0b1220;color:#e5e7eb;padding:24px;">
@@ -12,41 +14,63 @@
   <p id="msg">One moment.</p>
 
   <script>
-    const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
-
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
     const msgEl = document.getElementById("msg");
     const setMsg = (t) => { msgEl.textContent = t; console.log("[confirm]", t); };
 
+    // Show any JS error directly on the page
+    window.addEventListener("error", (e) => {
+      console.error("Window error:", e.error || e.message);
+      setMsg("JS error: " + (e.error?.message || e.message));
+    });
+
+    window.addEventListener("unhandledrejection", (e) => {
+      console.error("Unhandled rejection:", e.reason);
+      setMsg("Promise error: " + (e.reason?.message || String(e.reason)));
+    });
+
+    const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
+
     function scrubUrl() {
-      // Remove hash tokens from the address bar
       history.replaceState({}, document.title, window.location.pathname + window.location.search);
     }
 
     async function createCheckoutAndRedirect(accessToken) {
       setMsg("Email confirmed ✅ Creating checkout session…");
 
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/create-checkout-session`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          success_url: "https://zencardstudy.com/app.html",
-          cancel_url: "https://zencardstudy.com/app.html?canceled=1",
-        }),
-      });
+      let res, raw;
+      try {
+        res = await fetch(`${SUPABASE_URL}/functions/v1/create-checkout-session`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            success_url: "https://zencardstudy.com/app.html",
+            cancel_url: "https://zencardstudy.com/app.html?canceled=1",
+          }),
+        });
+        raw = await res.text();
+      } catch (e) {
+        console.error("Checkout fetch failed:", e);
+        setMsg("Checkout request failed (network/CORS). Check console.");
+        return;
+      }
 
-      const raw = await res.text();
-      let json;
-      try { json = JSON.parse(raw); } catch { json = { raw }; }
+      let json = null;
+      try { json = JSON.parse(raw); } catch {}
 
-      if (!res.ok || !json?.url) {
-        console.error("Checkout error:", { status: res.status, json });
-        throw new Error(`Checkout failed (${res.status}). ${json?.error || json?.raw || "No url returned."}`);
+      if (!res.ok) {
+        console.error("Checkout HTTP error:", res.status, raw);
+        setMsg(`Checkout failed (${res.status}). ${raw.slice(0, 200)}`);
+        return;
+      }
+
+      if (!json?.url) {
+        console.error("Checkout missing url:", raw);
+        setMsg(`Checkout returned no url. ${raw.slice(0, 200)}`);
+        return;
       }
 
       setMsg("Redirecting to Stripe…");
@@ -54,57 +78,52 @@
     }
 
     async function go() {
+      setMsg("Starting confirm script…");
+
+      // Make sure supabase loaded
+      if (!window.supabase || !window.supabase.createClient) {
+        setMsg("Supabase SDK did not load (window.supabase missing).");
+        return;
+      }
+
+      const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
       setMsg("Finalizing confirmation…");
 
       const url = new URL(window.location.href);
       const queryParams = url.searchParams;
       const hashParams = new URLSearchParams(url.hash.replace(/^#/, ""));
 
-      // If Supabase returned an error in the hash, show it clearly
+      // Surface errors from Supabase redirect
       const err = hashParams.get("error");
       if (err) {
         const errDesc = hashParams.get("error_description") || "";
         const errCode = hashParams.get("error_code") || "";
         setMsg(`Confirmation error: ${err}${errCode ? " (" + errCode + ")" : ""}${errDesc ? " — " + errDesc : ""}`);
-        console.error("Confirm error:", { err, errCode, errDesc, hash: url.hash });
         return;
       }
 
-      // ---- FLOW 1: implicit hash session (#access_token=...&refresh_token=...) ----
+      // Flow: #access_token & #refresh_token
       const access_token = hashParams.get("access_token");
       const refresh_token = hashParams.get("refresh_token");
-
       if (access_token && refresh_token) {
         setMsg("Saving session…");
-        const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+        const { error } = await sb.auth.setSession({ access_token, refresh_token });
         if (error) throw error;
-
-        // Clean tokens out of URL
         scrubUrl();
+        await new Promise(r => setTimeout(r, 200));
       }
 
-      // ---- FLOW 2: PKCE code (?code=...) ----
+      // Flow: ?code=...
       const code = queryParams.get("code");
       if (code) {
         setMsg("Finishing sign-in…");
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        const { error } = await sb.auth.exchangeCodeForSession(code);
         if (error) throw error;
-
         scrubUrl();
+        await new Promise(r => setTimeout(r, 200));
       }
 
-      // ---- FLOW 3: token_hash + type (some templates use this) ----
-      const token_hash = queryParams.get("token_hash") || hashParams.get("token_hash");
-      const type = queryParams.get("type") || hashParams.get("type"); // "signup" or "recovery"
-      if (token_hash && type) {
-        setMsg("Verifying…");
-        const { error } = await supabase.auth.verifyOtp({ token_hash, type });
-        if (error) throw error;
-
-        scrubUrl();
-      }
-
-      // Now retrieve session
       setMsg("Checking session…");
       const { data: sessionData, error: sessErr } = await sb.auth.getSession();
       if (sessErr) throw sessErr;
@@ -118,10 +137,7 @@
       await createCheckoutAndRedirect(token);
     }
 
-    go().catch((e) => {
-      console.error(e);
-      setMsg("Something went wrong: " + (e?.message || String(e)));
-    });
+    go();
   </script>
 </body>
 </html>
