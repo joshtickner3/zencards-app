@@ -14,7 +14,7 @@
   <script>
     const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ"; // must match app.html
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const msgEl = document.getElementById("msg");
     const setMsg = (t) => { msgEl.textContent = t; console.log("[confirm]", t); };
@@ -73,7 +73,7 @@
       // - Implicit hash: #access_token=...&refresh_token=...
       // - Other supported auth redirects
       setMsg("Reading session from confirmation link…");
-      const { error: fromUrlErr } = await supabase.auth.getSessionFromUrl({ storeSession: true });
+      const { error: fromUrlErr } = await sb.auth.getSessionFromUrl({ storeSession: true });
       if (fromUrlErr) {
         console.error("getSessionFromUrl error:", fromUrlErr);
         setMsg("Could not read session from confirmation link. Please request a new link.");
@@ -84,7 +84,7 @@
       scrubUrl();
 
       // Now retrieve session
-      const { data: sessionData, error: sessErr } = await supabase.auth.getSession();
+      const { data: sessionData, error: sessErr } = await sb.auth.getSession();
       if (sessErr) {
         console.error("getSession error:", sessErr);
         setMsg("Could not load session. Please log in again.");
