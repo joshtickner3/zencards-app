@@ -770,38 +770,69 @@ setTimeout(() => openBillingModal(), 50);
     });
     
     async function startCheckoutFromLanding() {
-      await supabaseClient.auth.refreshSession();
-  const { data: { session }, error: sessErr } = await supabaseClient.auth.getSession();
-  if (sessErr) throw sessErr;
+  billingMsg.textContent = "";
+  billingMsg.className = "modalMsg";
 
-  const token = session?.access_token;
-  if (!token) throw new Error("No session token. Please log in again.");
+  // Safety timeout so you never get stuck on "Redirecting..."
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
 
-  const res = await fetch(
-  "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/create-checkout-session",
-  {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`,
-      "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ",          // ✅ ADD THIS
-    },
-    body: JSON.stringify({
-      success_url: "https://zencardstudy.com/app.html",
-      cancel_url: "https://zencardstudy.com/?canceled=1",
-    }),
-  }
-);
+  try {
+    await supabaseClient.auth.refreshSession();
 
-      const json = await res.json();
-      if (!res.ok) {
-        console.error("Checkout error:", json);
-        alert("Checkout failed. Check console.");
-        return;
+    const { data: { session }, error: sessErr } = await supabaseClient.auth.getSession();
+    if (sessErr) throw sessErr;
+
+    const token = session?.access_token;
+    if (!token) throw new Error("No session token. Please log in again.");
+
+    const res = await fetch(
+      "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/create-checkout-session",
+      {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+          "apikey": SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          success_url: "https://zencardstudy.com/app.html",
+          cancel_url: "https://zencardstudy.com/?canceled=1",
+        }),
       }
+    );
 
-      window.location.href = json.url;
+    const text = await res.text(); // read raw text first
+    let json;
+    try { json = JSON.parse(text); } catch { json = null; }
+
+    if (!res.ok) {
+      console.error("Checkout HTTP error:", res.status, text);
+      throw new Error(json?.error || `Checkout failed (HTTP ${res.status}). See console.`);
     }
+
+    if (!json?.url) {
+      console.error("Checkout missing url:", json);
+      throw new Error("Checkout session created but no URL returned.");
+    }
+
+    window.location.href = json.url;
+  } catch (e) {
+    console.error(e);
+    billingMsg.textContent =
+      e.name === "AbortError"
+        ? "Request timed out (15s). This usually means the Edge Function did not respond. Check Supabase Function logs."
+        : (e.message || "Could not start billing. Check console.");
+    billingMsg.className = "modalMsg error";
+
+    // unfreeze button
+    continueToBillingBtn.disabled = false;
+    continueToBillingBtn.textContent = "Continue to billing";
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
   document.getElementById("startTrialBtn")
   .addEventListener("click", () => window.startFreeTrial());
