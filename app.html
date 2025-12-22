@@ -371,21 +371,36 @@
       <strong style="color:#e5e7eb;">Happy studying!</strong>
     </p>
 
-    <div class="row" style="margin-top:0.25rem;">
-      <div>
-        <label for="paywallEmail">Email</label>
-        <input id="paywallEmail" type="text" placeholder="you@example.com" />
-      </div>
-      <div>
-        <label for="paywallPassword">Password</label>
-        <input id="paywallPassword" type="password" placeholder="••••••••" />
-      </div>
-    </div>
+    <!-- Wrap the signup fields so we can hide them when user is already logged in -->
+<div id="paywallAuthFields">
 
-    <div class="row" style="margin-top:0.75rem;">
-      <button id="paywallSignUpBtn">Sign up</button>
-      <button id="paywallLogoutBtn" class="secondary" style="margin-left:8px;">Log out</button>
+  <div class="row" style="margin-top:0.25rem;">
+    <div>
+      <label for="paywallEmail">Email</label>
+      <input id="paywallEmail" type="text" placeholder="you@example.com" />
     </div>
+    <div>
+      <label for="paywallPassword">Password</label>
+      <input id="paywallPassword" type="password" placeholder="••••••••" />
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:0.75rem;">
+    <button id="paywallSignUpBtn">Sign up</button>
+  </div>
+
+</div>
+
+<!-- Shown ONLY when user is logged in but not subscribed -->
+<div id="paywallLoggedInActions" class="hidden" style="margin-top:0.75rem;">
+  <p style="color:#9ca3af;margin-bottom:0.5rem;">
+    Your account isn’t active yet.
+  </p>
+  <button id="resumeCheckoutBtn">Continue to billing</button>
+  <button id="paywallLogoutBtn" class="secondary" style="margin-left:8px;">
+    Log out
+  </button>
+</div>
 
     <p id="paywallMsg" style="color:#9ca3af;margin-top:10px;min-height:1.2em;"></p>
   </div>
@@ -957,6 +972,11 @@ const paywallEmailInput = document.getElementById("paywallEmail");
 const paywallPasswordInput = document.getElementById("paywallPassword");
 const paywallSignUpBtn = document.getElementById("paywallSignUpBtn");
 const paywallLogoutBtn = document.getElementById("paywallLogoutBtn");
+const paywallAuthFields = document.getElementById("paywallAuthFields");
+const paywallInactiveActions = document.getElementById("paywallInactiveActions");
+const paywallSubscribeBtn = document.getElementById("paywallSubscribeBtn");
+const paywallCancelBtn = document.getElementById("paywallCancelBtn");
+
 
 paywallSignUpBtn?.addEventListener("click", async () => {
   const email = (paywallEmailInput?.value || "").trim();
@@ -987,6 +1007,51 @@ paywallSignUpBtn?.addEventListener("click", async () => {
 paywallLogoutBtn?.addEventListener("click", async () => {
   await signOutFromApp();
   lockUI("Signed out. Please create an account to start your free trial. Happy studying!");
+});
+paywallCancelBtn?.addEventListener("click", () => {
+  // Send them back to landing page
+  window.location.href = "index.html";
+});
+
+paywallSubscribeBtn?.addEventListener("click", async () => {
+  try {
+    lockUI("Opening Stripe checkout…", { mode: "inactive" });
+
+    const { data: sessionData } = await supabaseClient.auth.getSession();
+    const token = sessionData?.session?.access_token;
+
+    if (!token) {
+      lockUI("Session missing. Please log in again.", { mode: "logged_out" });
+      return;
+    }
+
+    const res = await fetch(
+      "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/create-checkout-session",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          success_url: "https://zencardstudy.com/app.html",
+          cancel_url: "https://zencardstudy.com/app.html?canceled=1",
+        }),
+      }
+    );
+
+    const json = await res.json();
+    if (!res.ok || !json?.url) {
+      console.error("Checkout error:", json);
+      lockUI("Checkout failed. Please try again.", { mode: "inactive" });
+      return;
+    }
+
+    window.location.href = json.url;
+  } catch (e) {
+    console.error(e);
+    lockUI("Something went wrong opening Stripe.", { mode: "inactive" });
+  }
 });
 
 const signUpBtn = document.getElementById("signUpBtn");
@@ -1227,12 +1292,25 @@ async function getMySubscriptionStatus() {
 
   const sub = data?.[0];
   return sub?.status || "none";
-}
 
-function lockUI(message = "") {
+}
+function lockUI(message = "", opts = { mode: "logged_out" }) {
   const paywall = document.getElementById("paywall");
   const msg = document.getElementById("paywallMsg");
   if (msg) msg.textContent = message;
+
+  // modes:
+  // - "logged_out" => show signup fields
+  // - "inactive"   => hide signup fields, show subscribe/cancel
+  const mode = opts?.mode || "logged_out";
+
+  if (paywallAuthFields) {
+    paywallAuthFields.style.display = (mode === "inactive") ? "none" : "block";
+  }
+  if (paywallInactiveActions) {
+    paywallInactiveActions.style.display = (mode === "inactive") ? "block" : "none";
+  }
+
   paywall?.classList.remove("hidden");
 }
 
@@ -1247,10 +1325,12 @@ async function enforceAccessGate() {
   const user = authData?.user;
 
   if (!user) {
-    // Not logged in -> lock UI and keep them on this page
-    lockUI("Create an account to start your free trial. You’ll verify your email, then you’ll be redirected to Stripe. Happy studying!");
-    return false;
-  }
+  lockUI(
+    "Create an account to start your free trial. You’ll verify your email, then you’ll be redirected to Stripe. Happy studying!",
+    { mode: "logged_out" }
+  );
+  return false;
+}
 
   // 2) Must be active or trialing
   const status = await getMySubscriptionStatus();
@@ -1259,9 +1339,12 @@ async function enforceAccessGate() {
   const ok = (status === "active" || status === "trialing");
 
   if (!ok) {
-    lockUI("Your account isn’t active yet. Create your account and verify your email, then you will be directed to stripe to begin your free trial. Happy studying!");
-    return false;
-  }
+  lockUI(
+    "Your account isn’t active yet. Subscribe to start your free trial, or cancel to go back.",
+    { mode: "inactive" }
+  );
+  return false;
+}
 
   // 3) Allowed in
   unlockUI();
