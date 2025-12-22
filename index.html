@@ -604,7 +604,14 @@
     const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
     const { createClient } = window.supabase;
-    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: window.localStorage,
+  },
+});
     
     // Expose it on window so it's not "undefined" in console
 window.startFreeTrial = async function startFreeTrial() {
@@ -778,22 +785,34 @@ setTimeout(() => openBillingModal(), 50);
         loginMsg.className = "modalMsg error";
       }
     });
-    
-   async function startCheckoutFromLanding() {
+    function withTimeout(promise, ms, label = "operation") {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
+async function startCheckoutFromLanding() {
   console.log("3) inside startCheckoutFromLanding");
 
-  const { data, error } = await supabaseClient.auth.getSession();
+  const { data, error } = await withTimeout(
+    supabaseClient.auth.getSession(),
+    2500,
+    "getSession()"
+  );
 
   if (error) {
     console.error("getSession error:", error);
     throw error;
   }
 
-  const session = data.session;
+  const session = data?.session;
   console.log("4) session:", session);
 
   if (!session?.access_token) {
-    throw new Error("No session token");
+    throw new Error("No session token (session not persisted).");
   }
 
   console.log("5) calling create-checkout-session");
@@ -805,21 +824,22 @@ setTimeout(() => openBillingModal(), 50);
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${session.access_token}`,
-        "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ",
+        "apikey": SUPABASE_ANON_KEY, // use the constant, not a pasted string
       },
       body: JSON.stringify({
-        success_url: "https://zencardstudy.com/app.html",
+        success_url: "https://zencardstudy.com/app.html?checkout=success",
         cancel_url: "https://zencardstudy.com/?canceled=1",
       }),
     }
   );
 
-  const json = await res.json();
-  console.log("6) checkout response:", json);
+  const text = await res.text();
+  console.log("6) checkout raw response:", res.status, text);
 
-  if (!res.ok) {
-    throw new Error(json.error || "Checkout failed");
-  }
+  if (!res.ok) throw new Error(text);
+
+  const json = JSON.parse(text);
+  if (!json?.url) throw new Error("No url returned from create-checkout-session");
 
   window.location.href = json.url;
 }
