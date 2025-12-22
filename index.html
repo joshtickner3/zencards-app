@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ZenCards — Hands-Free Flashcards (7-Day Free Trial)</title>
   <style>
+    #billingModal { z-index: 10000; }
     :root{
       --bg1:#1f2937;
       --bg2:#020617;
@@ -548,27 +549,6 @@
         </div>
         <button class="modalClose" id="loginCloseBtn" type="button">✕</button>
       </div>
-        <!-- ===== Billing Modal (shown after login if no subscription yet) ===== -->
-  <div class="modalOverlay" id="billingModal">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="billingTitle">
-      <div class="modalHeader">
-        <div>
-          <h3 id="billingTitle">ZenCards Premium</h3>
-          <div class="muted" style="font-size:0.9rem;">
-            Your account is ready. Continue to Stripe to start your free trial.
-          </div>
-        </div>
-        <button class="modalClose" id="billingCloseBtn" type="button">✕</button>
-      </div>
-
-      <div class="modalActions" style="margin-top:1rem;">
-        <button class="btn" id="continueToBillingBtn" type="button">Continue to billing</button>
-        <button class="btn secondary" id="billingCancelBtn" type="button">Cancel</button>
-      </div>
-
-      <div class="modalMsg" id="billingMsg"></div>
-    </div>
-  </div>
 
       <div class="field">
         <label class="muted" for="loginEmail">Email</label>
@@ -592,6 +572,29 @@
       </div>
     </div>
   </div>
+
+  <!-- ===== Billing Modal (shown after login if no subscription yet) ===== -->
+<div class="modalOverlay" id="billingModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="billingTitle">
+    <div class="modalHeader">
+      <div>
+        <h3 id="billingTitle">ZenCards Premium</h3>
+        <div class="muted" style="font-size:0.9rem;">
+          Your account is ready. Continue to Stripe to start your free trial.
+        </div>
+      </div>
+      <button class="modalClose" id="billingCloseBtn" type="button">✕</button>
+    </div>
+
+    <div class="modalActions" style="margin-top:1rem;">
+      <button class="btn" id="continueToBillingBtn" type="button">Continue to billing</button>
+      <button class="btn secondary" id="billingCancelBtn" type="button">Cancel</button>
+    </div>
+
+    <div class="modalMsg" id="billingMsg"></div>
+  </div>
+</div>
+
 
   <script>
     // Year (keep only one)
@@ -714,7 +717,7 @@
 
         // Close login modal and show billing choices instead of going to app.html
         closeLoginModal();
-        openBillingModal();
+setTimeout(() => openBillingModal(), 50);
 
       } catch (e) {
         console.error(e);
