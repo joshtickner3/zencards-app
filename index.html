@@ -615,7 +615,9 @@
     
     // Expose it on window so it's not "undefined" in console
 window.startFreeTrial = async function startFreeTrial() {
-  const { data: { session } } = await supabaseClient.auth.getSession();
+  const authKey = Object.keys(localStorage).find(k => k.endsWith("-auth-token"));
+  const raw = authKey ? localStorage.getItem(authKey) : null;
+  const session = raw ? JSON.parse(raw) : null;
 
   // If already logged in, start Stripe checkout immediately
   if (session?.access_token) {
@@ -785,25 +787,24 @@ setTimeout(() => openBillingModal(), 50);
         loginMsg.className = "modalMsg error";
       }
     });
-    function withTimeout(promise, ms, label = "operation") {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
-    ),
-  ]);
-}
+    
 async function startCheckoutFromLanding() {
-  // 1) Pull session from localStorage (reliable even if getSession hangs)
-  const key = Object.keys(localStorage).find(k => k.endsWith("-auth-token"));
-  const stored = key ? localStorage.getItem(key) : null;
-  const session = stored ? JSON.parse(stored) : null;
+  console.log("3) inside startCheckoutFromLanding");
+
+  // Pull the auth token directly from localStorage (most reliable on static sites)
+  const authKey = Object.keys(localStorage).find(k => k.endsWith("-auth-token"));
+  const raw = authKey ? localStorage.getItem(authKey) : null;
+  const session = raw ? JSON.parse(raw) : null;
+
+  console.log("4) authKey:", authKey);
+  console.log("5) has access_token:", !!session?.access_token);
 
   if (!session?.access_token) {
     throw new Error("No session token found. Please log in again.");
   }
 
-  // 2) Call your edge function
+  console.log("6) calling create-checkout-session");
+
   const res = await fetch(
     "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/create-checkout-session",
     {
@@ -821,20 +822,20 @@ async function startCheckoutFromLanding() {
   );
 
   const text = await res.text();
+  console.log("7) status:", res.status);
+  console.log("8) response text:", text);
+
   let json;
-  try { json = JSON.parse(text); } catch { json = { raw: text }; }
+  try { json = JSON.parse(text); } catch { json = {}; }
 
   if (!res.ok) {
-    console.error("Checkout error:", res.status, json);
-    throw new Error(json?.error || json?.message || `Checkout failed (${res.status})`);
+    throw new Error(json.error || json.message || "Checkout failed");
   }
 
-  if (!json?.url) {
-    console.error("No url returned:", json);
-    throw new Error("No Stripe URL returned from server.");
+  if (!json.url) {
+    throw new Error("No checkout URL returned from Edge Function");
   }
 
-  // 3) Redirect
   window.location.href = json.url;
 }
 
