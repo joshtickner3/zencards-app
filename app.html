@@ -973,9 +973,10 @@ const paywallPasswordInput = document.getElementById("paywallPassword");
 const paywallSignUpBtn = document.getElementById("paywallSignUpBtn");
 const paywallLogoutBtn = document.getElementById("paywallLogoutBtn");
 const paywallAuthFields = document.getElementById("paywallAuthFields");
-const paywallInactiveActions = document.getElementById("paywallInactiveActions");
-const paywallSubscribeBtn = document.getElementById("paywallSubscribeBtn");
+const paywallLoggedInActions = document.getElementById("paywallLoggedInActions");
+const resumeCheckoutBtn = document.getElementById("resumeCheckoutBtn");
 const paywallCancelBtn = document.getElementById("paywallCancelBtn");
+
 
 
 paywallSignUpBtn?.addEventListener("click", async () => {
@@ -1013,7 +1014,7 @@ paywallCancelBtn?.addEventListener("click", () => {
   window.location.href = "index.html";
 });
 
-paywallSubscribeBtn?.addEventListener("click", async () => {
+resumeCheckoutBtn?.addEventListener("click", async () => {
   try {
     lockUI("Opening Stripe checkout…", { mode: "inactive" });
 
@@ -1294,21 +1295,22 @@ async function getMySubscriptionStatus() {
   return sub?.status || "none";
 
 }
+
 function lockUI(message = "", opts = { mode: "logged_out" }) {
   const paywall = document.getElementById("paywall");
   const msg = document.getElementById("paywallMsg");
   if (msg) msg.textContent = message;
 
-  // modes:
-  // - "logged_out" => show signup fields
-  // - "inactive"   => hide signup fields, show subscribe/cancel
   const mode = opts?.mode || "logged_out";
 
+  // logged_out => show email/password signup fields
   if (paywallAuthFields) {
-    paywallAuthFields.style.display = (mode === "inactive") ? "none" : "block";
+    paywallAuthFields.classList.toggle("hidden", mode === "inactive");
   }
-  if (paywallInactiveActions) {
-    paywallInactiveActions.style.display = (mode === "inactive") ? "block" : "none";
+
+  // inactive => show "Continue to billing" + "Log out"
+  if (paywallLoggedInActions) {
+    paywallLoggedInActions.classList.toggle("hidden", mode !== "inactive");
   }
 
   paywall?.classList.remove("hidden");
@@ -1317,6 +1319,25 @@ function lockUI(message = "", opts = { mode: "logged_out" }) {
 function unlockUI() {
   const paywall = document.getElementById("paywall");
   paywall?.classList.add("hidden");
+}
+async function waitForSubscriptionToBecomeActiveish({
+  maxMs = 15000,
+  intervalMs = 1500,
+} = {}) {
+  const start = Date.now();
+
+  while (Date.now() - start < maxMs) {
+    await supabaseClient.auth.refreshSession();
+
+    const status = await getMySubscriptionStatus();
+    console.log("Recheck subscription status:", status);
+
+    if (status === "active" || status === "trialing") return true;
+
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+
+  return false;
 }
 
 async function enforceAccessGate() {
@@ -1333,18 +1354,35 @@ async function enforceAccessGate() {
 }
 
   // 2) Must be active or trialing
-  const status = await getMySubscriptionStatus();
-  console.log("Subscription status:", status);
+await supabaseClient.auth.refreshSession();
+let status = await getMySubscriptionStatus();
+console.log("Subscription status:", status);
 
-  const ok = (status === "active" || status === "trialing");
+let ok = (status === "active" || status === "trialing");
 
-  if (!ok) {
+if (!ok) {
+  // If Stripe just returned us, give webhooks a moment to update DB
+  const params = new URLSearchParams(window.location.search);
+  const cameFromStripe =
+    params.has("session_id") || params.has("success") || params.has("trialStarted");
+
+  if (cameFromStripe) {
+    lockUI("Finishing setup… one moment.", { mode: "inactive" });
+
+    const becameOk = await waitForSubscriptionToBecomeActiveish();
+    if (becameOk) {
+      unlockUI();
+      return true;
+    }
+  }
+
   lockUI(
     "Your account isn’t active yet. Subscribe to start your free trial, or cancel to go back.",
     { mode: "inactive" }
   );
   return false;
 }
+
 
   // 3) Allowed in
   unlockUI();
