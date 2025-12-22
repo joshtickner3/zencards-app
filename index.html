@@ -780,18 +780,23 @@ setTimeout(() => openBillingModal(), 50);
     });
     
    async function startCheckoutFromLanding() {
-  console.log("1) startCheckoutFromLanding() called");
+  console.log("3) inside startCheckoutFromLanding");
 
-  console.log("2) about to getSession()");
-  const { data: { session }, error: sessErr } = await supabaseClient.auth.getSession();
-  console.log("3) getSession() returned", { sessErr, hasToken: !!session?.access_token });
+  const { data, error } = await supabaseClient.auth.getSession();
 
-  if (sessErr) throw sessErr;
+  if (error) {
+    console.error("getSession error:", error);
+    throw error;
+  }
 
-  const token = session?.access_token;
-  if (!token) throw new Error("No session token. Please log in again.");
+  const session = data.session;
+  console.log("4) session:", session);
 
-  console.log("4) about to fetch edge function");
+  if (!session?.access_token) {
+    throw new Error("No session token");
+  }
+
+  console.log("5) calling create-checkout-session");
 
   const res = await fetch(
     "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/create-checkout-session",
@@ -799,8 +804,8 @@ setTimeout(() => openBillingModal(), 50);
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
-        "apikey": SUPABASE_ANON_KEY,
+        "Authorization": `Bearer ${session.access_token}`,
+        "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ",
       },
       body: JSON.stringify({
         success_url: "https://zencardstudy.com/app.html",
@@ -809,12 +814,12 @@ setTimeout(() => openBillingModal(), 50);
     }
   );
 
-  console.log("5) fetch returned", res.status);
-
   const json = await res.json();
-  console.log("6) response json", json);
+  console.log("6) checkout response:", json);
 
-  if (!res.ok) throw new Error(json?.error || "Checkout failed");
+  if (!res.ok) {
+    throw new Error(json.error || "Checkout failed");
+  }
 
   window.location.href = json.url;
 }
