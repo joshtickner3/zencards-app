@@ -975,9 +975,6 @@ const paywallLogoutBtn = document.getElementById("paywallLogoutBtn");
 const paywallAuthFields = document.getElementById("paywallAuthFields");
 const paywallLoggedInActions = document.getElementById("paywallLoggedInActions");
 const resumeCheckoutBtn = document.getElementById("resumeCheckoutBtn");
-const paywallCancelBtn = document.getElementById("paywallCancelBtn");
-
-
 
 paywallSignUpBtn?.addEventListener("click", async () => {
   const email = (paywallEmailInput?.value || "").trim();
@@ -1016,15 +1013,21 @@ paywallCancelBtn?.addEventListener("click", () => {
 
 resumeCheckoutBtn?.addEventListener("click", async () => {
   try {
-    lockUI("Opening Stripe checkout…", { mode: "inactive" });
+    lockUI("Redirecting…", { mode: "inactive" });
 
+    // Make sure session/token is fresh
+    await supabaseClient.auth.refreshSession();
     const { data: sessionData } = await supabaseClient.auth.getSession();
     const token = sessionData?.session?.access_token;
 
     if (!token) {
-      lockUI("Session missing. Please log in again.", { mode: "logged_out" });
+      lockUI("Session missing. Please log out and log back in.", { mode: "inactive" });
       return;
     }
+
+    // Fetch with a timeout so you never hang forever
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 15000);
 
     const res = await fetch(
       "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/create-checkout-session",
@@ -1032,26 +1035,41 @@ resumeCheckoutBtn?.addEventListener("click", async () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          success_url: "https://zencardstudy.com/app.html",
+          success_url: "https://zencardstudy.com/app.html?success=1&session_id={CHECKOUT_SESSION_ID}",
           cancel_url: "https://zencardstudy.com/app.html?canceled=1",
         }),
+        signal: controller.signal,
       }
     );
 
-    const json = await res.json();
-    if (!res.ok || !json?.url) {
-      console.error("Checkout error:", json);
-      lockUI("Checkout failed. Please try again.", { mode: "inactive" });
+    clearTimeout(t);
+
+    const json = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      console.error("create-checkout-session failed:", res.status, json);
+      lockUI(`Stripe checkout failed: ${json?.error || res.status}`, { mode: "inactive" });
       return;
     }
 
-    window.location.href = json.url;
+    if (!json?.url) {
+      console.error("Missing checkout url:", json);
+      lockUI("Stripe checkout failed: missing redirect URL.", { mode: "inactive" });
+      return;
+    }
+
+    window.location.assign(json.url);
   } catch (e) {
-    console.error(e);
-    lockUI("Something went wrong opening Stripe.", { mode: "inactive" });
+    console.error("Resume checkout error:", e);
+    lockUI(
+      e?.name === "AbortError"
+        ? "Checkout timed out. Try again."
+        : "Checkout error. Open console for details.",
+      { mode: "inactive" }
+    );
   }
 });
 
@@ -1303,12 +1321,11 @@ function lockUI(message = "", opts = { mode: "logged_out" }) {
 
   const mode = opts?.mode || "logged_out";
 
-  // logged_out => show email/password signup fields
+  // logged_out => show email/pass signup fields
+  // inactive   => user is logged in but not subscribed => show "Continue to billing"
   if (paywallAuthFields) {
-    paywallAuthFields.classList.toggle("hidden", mode === "inactive");
+    paywallAuthFields.style.display = (mode === "inactive") ? "none" : "block";
   }
-
-  // inactive => show "Continue to billing" + "Log out"
   if (paywallLoggedInActions) {
     paywallLoggedInActions.classList.toggle("hidden", mode !== "inactive");
   }
