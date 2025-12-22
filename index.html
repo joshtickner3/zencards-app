@@ -793,30 +793,17 @@ setTimeout(() => openBillingModal(), 50);
     ),
   ]);
 }
-
 async function startCheckoutFromLanding() {
-  console.log("3) inside startCheckoutFromLanding");
-
-  const { data, error } = await withTimeout(
-    supabaseClient.auth.getSession(),
-    2500,
-    "getSession()"
-  );
-
-  if (error) {
-    console.error("getSession error:", error);
-    throw error;
-  }
-
-  const session = data?.session;
-  console.log("4) session:", session);
+  // 1) Pull session from localStorage (reliable even if getSession hangs)
+  const key = Object.keys(localStorage).find(k => k.endsWith("-auth-token"));
+  const stored = key ? localStorage.getItem(key) : null;
+  const session = stored ? JSON.parse(stored) : null;
 
   if (!session?.access_token) {
-    throw new Error("No session token (session not persisted).");
+    throw new Error("No session token found. Please log in again.");
   }
 
-  console.log("5) calling create-checkout-session");
-
+  // 2) Call your edge function
   const res = await fetch(
     "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/create-checkout-session",
     {
@@ -824,23 +811,30 @@ async function startCheckoutFromLanding() {
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${session.access_token}`,
-        "apikey": SUPABASE_ANON_KEY, // use the constant, not a pasted string
+        "apikey": SUPABASE_ANON_KEY,
       },
       body: JSON.stringify({
-        success_url: "https://zencardstudy.com/app.html?checkout=success",
+        success_url: "https://zencardstudy.com/app.html",
         cancel_url: "https://zencardstudy.com/?canceled=1",
       }),
     }
   );
 
   const text = await res.text();
-  console.log("6) checkout raw response:", res.status, text);
+  let json;
+  try { json = JSON.parse(text); } catch { json = { raw: text }; }
 
-  if (!res.ok) throw new Error(text);
+  if (!res.ok) {
+    console.error("Checkout error:", res.status, json);
+    throw new Error(json?.error || json?.message || `Checkout failed (${res.status})`);
+  }
 
-  const json = JSON.parse(text);
-  if (!json?.url) throw new Error("No url returned from create-checkout-session");
+  if (!json?.url) {
+    console.error("No url returned:", json);
+    throw new Error("No Stripe URL returned from server.");
+  }
 
+  // 3) Redirect
   window.location.href = json.url;
 }
 
