@@ -660,7 +660,17 @@ window.startFreeTrial = async function startFreeTrial() {
       if (e.target === billingModal) closeBillingModal();
     });
 
+window.addEventListener("unhandledrejection", (e) => {
+  console.error("[unhandledrejection]", e.reason);
+});
+window.addEventListener("error", (e) => {
+  console.error("[window error]", e.message, e.error);
+});
+
     continueToBillingBtn.addEventListener("click", async () => {
+      console.log("[Billing] click fired");
+console.log("[Billing] about to call startCheckoutFromLanding");
+setTimeout(() => console.log("[Billing] still running after 5s"), 5000);
       continueToBillingBtn.disabled = true;
       continueToBillingBtn.textContent = "Redirecting…";
       billingMsg.textContent = "";
