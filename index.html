@@ -652,7 +652,7 @@
       billingMsg.textContent = "";
 
       try {
-        await startFreeTrial(); // uses your existing function -> creates Stripe checkout + redirects
+        await startCheckoutFromLanding();
       } catch (e) {
         console.error(e);
         billingMsg.textContent = "Could not start billing. Check console.";
@@ -754,6 +754,64 @@ setTimeout(() => openBillingModal(), 50);
         loginMsg.className = "modalMsg error";
       }
     });
+    
+    async function startCheckoutFromLanding() {
+      console.log("[checkout] token ok:", !!token);
+  // 1) Make sure auth session is fresh
+  try { await supabaseClient.auth.refreshSession(); } catch (_) {}
+
+  const sessionRes = await supabaseClient.auth.getSession();
+  const token = sessionRes?.data?.session?.access_token;
+
+  if (!token) {
+    throw new Error("Session missing. Please log in again.");
+  }
+
+  // 2) Time out if the request never returns (prevents infinite "Redirecting...")
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+  let res;
+  try {
+    res = await fetch(
+      "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/create-checkout-session",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          // IMPORTANT: keep these landing-page URLs
+          success_url: "https://zencardstudy.com/app.html?success=1&session_id={CHECKOUT_SESSION_ID}",
+          cancel_url: "https://zencardstudy.com/?canceled=1",
+        }),
+        signal: controller.signal,
+      }
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  // 3) Read response safely (some failures are not JSON)
+  const rawText = await res.text();
+  let json = {};
+  try { json = JSON.parse(rawText); } catch (_) {}
+
+  if (!res.ok) {
+    console.error("Checkout error:", res.status, rawText);
+    throw new Error(json?.error || `Checkout failed (${res.status}).`);
+  }
+
+  if (!json?.url) {
+    console.error("Missing Stripe URL:", rawText);
+    throw new Error("Checkout failed: missing Stripe URL.");
+  }
+
+  // 4) Redirect
+  console.log("[checkout] redirecting to:", json.url);
+  window.location.assign(json.url);
+}
 
     async function startFreeTrial() {
       const { data: authData } = await supabaseClient.auth.getUser();
