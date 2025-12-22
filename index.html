@@ -756,95 +756,26 @@ setTimeout(() => openBillingModal(), 50);
     });
     
     async function startCheckoutFromLanding() {
-      console.log("[checkout] token ok:", !!token);
-  // 1) Make sure auth session is fresh
-  try { await supabaseClient.auth.refreshSession(); } catch (_) {}
+  const { data: { session }, error: sessErr } = await supabaseClient.auth.getSession();
+  if (sessErr) throw sessErr;
 
-  const sessionRes = await supabaseClient.auth.getSession();
-  const token = sessionRes?.data?.session?.access_token;
+  const token = session?.access_token;
+  if (!token) throw new Error("No session token. Please log in again.");
 
-  if (!token) {
-    throw new Error("Session missing. Please log in again.");
-  }
-
-  // 2) Time out if the request never returns (prevents infinite "Redirecting...")
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-  let res;
-  try {
-    res = await fetch(
-      "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/create-checkout-session",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          // IMPORTANT: keep these landing-page URLs
-          success_url: "https://zencardstudy.com/app.html?success=1&session_id={CHECKOUT_SESSION_ID}",
-          cancel_url: "https://zencardstudy.com/?canceled=1",
-        }),
-        signal: controller.signal,
-      }
-    );
-  } finally {
-    clearTimeout(timeoutId);
-  }
-
-  // 3) Read response safely (some failures are not JSON)
-  const rawText = await res.text();
-  let json = {};
-  try { json = JSON.parse(rawText); } catch (_) {}
-
-  if (!res.ok) {
-    console.error("Checkout error:", res.status, rawText);
-    throw new Error(json?.error || `Checkout failed (${res.status}).`);
-  }
-
-  if (!json?.url) {
-    console.error("Missing Stripe URL:", rawText);
-    throw new Error("Checkout failed: missing Stripe URL.");
-  }
-
-  // 4) Redirect
-  console.log("[checkout] redirecting to:", json.url);
-  window.location.assign(json.url);
-}
-
-    async function startFreeTrial() {
-      const { data: authData } = await supabaseClient.auth.getUser();
-      const user = authData?.user;
-
-      if (!user) {
-        alert("Please create an account or log in first, then click Start Free Trial again.");
-        openLoginModal();
-        return;
-      }
-
-      const sessionRes = await supabaseClient.auth.getSession();
-      const token = sessionRes?.data?.session?.access_token;
-
-      if (!token) {
-        alert("Session missing. Please log in again.");
-        return;
-      }
-
-      const res = await fetch(
-        "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/create-checkout-session",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            success_url: "https://zencardstudy.com/app.html",
-            cancel_url: "https://zencardstudy.com/?canceled=1",
-          }),
-        }
-      );
+  const res = await fetch(
+    "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/create-checkout-session",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        success_url: "https://zencardstudy.com/app.html",
+        cancel_url: "https://zencardstudy.com/?canceled=1",
+      }),
+    }
+  );
 
       const json = await res.json();
       if (!res.ok) {
