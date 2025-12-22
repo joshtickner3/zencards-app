@@ -597,9 +597,6 @@
 
 
   <script>
-    window.startFreeTrial = async function startFreeTrial() {
-  // whatever your checkout logic is
-};
     // Year (keep only one)
     document.getElementById("year").textContent = String(new Date().getFullYear());
 
@@ -608,6 +605,18 @@
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
     const { createClient } = window.supabase;
     const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    async function startFreeTrial() {
+  // If they are already logged in, start checkout immediately
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (session?.access_token) {
+    await startCheckoutFromLanding();
+    return;
+  }
+
+  // Otherwise ask them to log in first, then they'll hit Continue to billing
+  openLoginModal();
+  // Optional: auto-open billing modal after successful login is already in your login flow
+}
 
     // ===== Login modal logic =====
     const loginModal = document.getElementById("loginModal");
@@ -759,6 +768,7 @@ setTimeout(() => openBillingModal(), 50);
     });
     
     async function startCheckoutFromLanding() {
+      await supabaseClient.auth.refreshSession();
   const { data: { session }, error: sessErr } = await supabaseClient.auth.getSession();
   if (sessErr) throw sessErr;
 
@@ -790,7 +800,7 @@ setTimeout(() => openBillingModal(), 50);
       window.location.href = json.url;
     }
 
-    document.getElementById("startTrialBtn").addEventListener("click", startFreeTrial);
+  document.getElementById("startTrialBtn").addEventListener("click", () => startFreeTrial());
   </script>
 
 </body>
