@@ -628,24 +628,28 @@ async function checkUserAccess(userIdFromLogin) {
 
   // IMPORTANT: order by a column that exists.
   // Most tables have "id". If yours doesn't, see Step 2 below.
-  const { data, error, status } = await supabaseClient
+ const { data, error, status } = await supabaseClient
   .from("subscriptions")
-  .select("status")
-  .eq("user_id", uid)
-  .limit(1);
+  .select("status,user_id,stripe_subscription_id")
+  .eq("user_id", uid);
 
-  console.log("[checkUserAccess] subscriptions query:", { statusCode: status, error, data });
+const safe = {
+  uid,
+  statusCode: status,
+  error: error ? { message: error.message, code: error.code, details: error.details, hint: error.hint } : null,
+  rows: Array.isArray(data) ? data : null,
+};
+console.log("[checkUserAccess] subscriptions raw:", safe);
 
-  if (error) {
-    return { hasAccess: false, reason: "subs_query_failed", error: error.message, statusCode: status };
-  }
+if (error) {
+  return { hasAccess: false, reason: "subs_read_failed", error: error.message };
+}
 
-  const subStatus = (data?.[0]?.status || "").toLowerCase();
+const hasAccess =
+  Array.isArray(data) &&
+  data.some(r => ["active", "trialing"].includes(String(r?.status || "").toLowerCase()));
 
-  // Allow common trial spelling variants
-  const hasAccess = ["active", "trialing", "trial"].includes(subStatus);
-
-  return { hasAccess, reason: hasAccess ? "ok" : `status_${subStatus || "none"}` };
+return { hasAccess, reason: hasAccess ? "ok" : "no_active_or_trialing_row", rows: data || [] };
 }
     
     // Expose it on window so it's not "undefined" in console
