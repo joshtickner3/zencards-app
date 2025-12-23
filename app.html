@@ -1214,7 +1214,7 @@ async function sendPasswordReset() {
   }
  
   const { data, error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-  redirectTo: "https://joshtickner3.github.io/zencards-app/reset.html"
+  redirectTo: "https://zencardstudy.com/reset.html"
 });
 
   if (error) {
