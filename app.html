@@ -1353,6 +1353,8 @@ const status = await getMySubscriptionStatus(uid);
 }
 
 async function enforceAccessGate() {
+  // 1) Must be logged in
+  async function enforceAccessGate() {
   // 1) Must be logged in (use session, not getUser)
   const { data: sessionData } = await supabaseClient.auth.getSession();
   const session = sessionData?.session;
@@ -1426,10 +1428,11 @@ if (!ok) {
   return false;
 }
 
+
   // 3) Allowed in
   unlockUI();
   return true;
-
+}
 // ✅ Run gate on first load
 window.addEventListener("DOMContentLoaded", async () => {
   const ok = await enforceAccessGate();
