@@ -613,28 +613,36 @@
   },
 });
 
-async function checkUserAccess() {
-  // Must be logged in
-  const { data: { user }, error: userErr } = await supabaseClient.auth.getUser();
-  if (userErr || !user) return { hasAccess: false, reason: "not_logged_in" };
+async function checkUserAccess(userIdFromLogin) {
+  // Prefer the user id we already got from signIn (avoids race conditions)
+  let uid = userIdFromLogin;
 
-  // Read subscriptions table (this is your source of truth)
-  const { data, error } = await supabaseClient
+  if (!uid) {
+    const { data: userData, error: userErr } = await supabaseClient.auth.getUser();
+    console.log("[checkUserAccess] getUser:", { userErr, user: userData?.user });
+    uid = userData?.user?.id;
+  }
+
+  if (!uid) return { hasAccess: false, reason: "not_logged_in" };
+
+  const { data, error, status } = await supabaseClient
     .from("subscriptions")
-    .select("status")
-    .eq("user_id", user.id)
+    .select("status, created_at")
+    .eq("user_id", uid)
     .order("created_at", { ascending: false })
     .limit(1);
 
+  console.log("[checkUserAccess] subscriptions query:", { statusCode: status, error, data });
+
   if (error) {
-    console.warn("[checkUserAccess] subscriptions read failed:", error.message);
-    return { hasAccess: false, reason: "subs_read_failed" };
+    // This is the telltale sign of RLS blocking you
+    return { hasAccess: false, reason: "subs_read_failed", error: error.message };
   }
 
-  const status = (data?.[0]?.status || "").toLowerCase();
-  const hasAccess = status === "active" || status === "trialing";
+  const subStatus = (data?.[0]?.status || "").toLowerCase();
+  const hasAccess = subStatus === "active" || subStatus === "trialing";
 
-  return { hasAccess, reason: hasAccess ? "ok" : `status_${status || "none"}` };
+  return { hasAccess, reason: hasAccess ? "ok" : `status_${subStatus || "none"}` };
 }
     
     // Expose it on window so it's not "undefined" in console
@@ -773,23 +781,21 @@ console.log("[LOGIN RESULT]", res);
 if (res.error) {
   loginMsg.textContent = res.error.message;
   loginMsg.className = "modalMsg error";
-  throw res.error;
+  return; // stop here
 }
 
-
-               // ✅ LOGIN SUCCESS UI
+ // ✅ LOGIN SUCCESS UI
 loginMsg.textContent = "Logged in ✅";
 loginMsg.className = "modalMsg ok";
 
 // ✅ Close modal
 closeLoginModal();
 
-// ✅ Confirm session exists (debug)
-const { data: sessData, error: sessErr } = await supabaseClient.auth.getSession();
-console.log("[POST-LOGIN] session?", !!sessData?.session, sessErr || "");
+// ✅ Use the user id from the login response (avoids timing issues)
+const uid = res?.data?.user?.id;
 
-// ✅ Check access (debug)
-const access = await checkUserAccess();
+// ✅ Check access using UID
+const access = await checkUserAccess(uid);
 console.log("[POST-LOGIN] access:", access);
 
 // ✅ If user has access → app
@@ -798,9 +804,8 @@ if (access.hasAccess) {
   return;
 }
 
-// ✅ If no access → go straight to Stripe checkout
+// ❌ No access → send to Stripe checkout
 await startCheckoutFromLanding();
-
 
       } catch (e) {
         console.error(e);
