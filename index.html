@@ -828,16 +828,13 @@ setTimeout(() => openBillingModal(), 50);
 async function startCheckoutFromLanding() {
   console.log("[startCheckoutFromLanding] starting…");
 
-  // ✅ Get the token the official way
   const { data: sessionData, error: sessionErr } = await supabaseClient.auth.getSession();
   if (sessionErr) console.warn("[getSession error]", sessionErr);
 
   const token = sessionData?.session?.access_token;
   console.log("[startCheckoutFromLanding] has token:", !!token);
 
-  if (!token) {
-    throw new Error("No session token found. Please log in again.");
-  }
+  if (!token) throw new Error("No session token found. Please log in again.");
 
   const res = await fetch(
     "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/create-checkout-session",
@@ -845,7 +842,7 @@ async function startCheckoutFromLanding() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        "Authorization": `Bearer ${token}`,
         "apikey": SUPABASE_ANON_KEY,
       },
       body: JSON.stringify({
@@ -858,15 +855,10 @@ async function startCheckoutFromLanding() {
   const json = await res.json().catch(() => ({}));
   console.log("[startCheckoutFromLanding] status:", res.status, json);
 
-  if (!res.ok) {
-    throw new Error(json.error || json.message || "Checkout failed");
-  }
+  if (!res.ok) throw new Error(json.error || json.message || "Checkout failed");
+  if (!json.url) throw new Error("No checkout URL returned from Edge Function");
 
-  if (!json.url) {
-    throw new Error("No checkout URL returned from Edge Function");
-  }
-
- window.location.href = json.url;
+  window.location.href = json.url; // ✅ redirect to Stripe
 }
 
 (async () => {
