@@ -1353,8 +1353,6 @@ const status = await getMySubscriptionStatus(uid);
 }
 
 async function enforceAccessGate() {
-  // 1) Must be logged in
-  async function enforceAccessGate() {
   // 1) Must be logged in (use session, not getUser)
   const { data: sessionData } = await supabaseClient.auth.getSession();
   const session = sessionData?.session;
@@ -1371,10 +1369,12 @@ async function enforceAccessGate() {
   }
 
   // 2) Must be active or trialing
-  await supabaseClient.auth.refreshSession();
+ // 2) Must be active or trialing
+const { data: refreshed } = await supabaseClient.auth.refreshSession();
+const uid2 = refreshed?.session?.user?.id || uid;
 
-  let subStatus = await getMySubscriptionStatus(uid);
-  console.log("[GATE] normalized subscription status:", subStatus);
+let subStatus = await getMySubscriptionStatus(uid2);
+console.log("[GATE] normalized subscription status:", subStatus);
 
   let ok = (subStatus === "active" || subStatus === "trialing");
 
@@ -1405,34 +1405,10 @@ async function enforceAccessGate() {
   return true;
 }
 
-if (!ok) {
-  // If Stripe just returned us, give webhooks a moment to update DB
-  const params = new URLSearchParams(window.location.search);
-  const cameFromStripe =
-    params.has("session_id") || params.has("success") || params.has("trialStarted");
-
-  if (cameFromStripe) {
-    lockUI("Finishing setup… one moment.", { mode: "inactive" });
-
-    const becameOk = await waitForSubscriptionToBecomeActiveish();
-    if (becameOk) {
-      unlockUI();
-      return true;
-    }
-  }
-
-  lockUI(
-    "Your account isn’t active yet. Subscribe to start your free trial, or cancel to go back.",
-    { mode: "inactive" }
-  );
-  return false;
-}
-
-
   // 3) Allowed in
   unlockUI();
   return true;
-}
+
 // ✅ Run gate on first load
 window.addEventListener("DOMContentLoaded", async () => {
   const ok = await enforceAccessGate();
