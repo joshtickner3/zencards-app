@@ -6,6 +6,42 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ZenCards — Hands-Free Flashcards (7-Day Free Trial)</title>
   <style>
+    /* ===== Logged-in status bar ===== */
+#authStatusBar{
+  position: sticky;
+  top: 0;
+  z-index: 10002; /* above modals */
+  background: #020617;
+  border-bottom: 1px solid #1f2937;
+  display: none; /* hidden until logged in */
+}
+#authStatusInner{
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 0.6rem 1rem;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 0.75rem;
+  color:#cbd5e1;
+  font-size:0.9rem;
+}
+#authEmail{
+  font-weight:700;
+}
+#logoutBtn{
+  background: transparent;
+  border: 1px solid #374151;
+  color: #e5e7eb;
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+#logoutBtn:hover{
+  background:#1f2937;
+}
+
     #billingModal { z-index: 10000; }
     :root{
       --bg1:#1f2937;
@@ -301,6 +337,14 @@
 </head>
 
 <body>
+  <!-- ===== Logged-in status bar ===== -->
+<div id="authStatusBar">
+  <div id="authStatusInner">
+    <span id="authEmail"></span>
+    <button id="logoutBtn" type="button">Log out</button>
+  </div>
+</div>
+
   <div class="container">
 
     <div class="appHeader">
@@ -605,12 +649,57 @@
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
     const { createClient } = window.supabase;
     const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
     storage: window.localStorage,
   },
+});
+// ===== Auth status bar (logged-in email) =====
+function getStoredSession() {
+  const authKey = Object.keys(localStorage).find(k => k.endsWith("-auth-token"));
+  const raw = authKey ? localStorage.getItem(authKey) : null;
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
+function renderAuthStatusBar() {
+  const loggedIn = email && hasToken;
+document.getElementById("loginBtn")?.style && (document.getElementById("loginBtn").style.display = loggedIn ? "none" : "");
+document.getElementById("loginBtn2")?.style && (document.getElementById("loginBtn2").style.display = loggedIn ? "none" : "");
+  const s = getStoredSession();
+  const bar = document.getElementById("authStatusBar");
+  const emailEl = document.getElementById("authEmail");
+
+  const email = s?.user?.email;
+  const hasToken = !!s?.access_token;
+
+  if (email && hasToken) {
+    emailEl.textContent = `Logged in as ${email}`;
+    bar.style.display = "block";
+  } else {
+    bar.style.display = "none";
+  }
+}
+
+// Keep it updated on load + whenever auth changes
+renderAuthStatusBar();
+
+supabaseClient.auth.onAuthStateChange((_event, _session) => {
+  // session can be null; we re-check localStorage for consistency on static sites
+  renderAuthStatusBar();
+});
+
+// Logout button
+document.getElementById("logoutBtn").addEventListener("click", async () => {
+  try { await supabaseClient.auth.signOut(); } catch (e) {}
+  // Your app stores other stuff in localStorage (srsDecks, srsSchedule).
+  // Remove ONLY the Supabase auth key so you don't wipe user study data.
+  const authKey = Object.keys(localStorage).find(k => k.endsWith("-auth-token"));
+  if (authKey) localStorage.removeItem(authKey);
+  location.reload();
 });
     
     // Expose it on window so it's not "undefined" in console
