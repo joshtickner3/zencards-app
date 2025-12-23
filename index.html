@@ -777,20 +777,30 @@ if (res.error) {
 }
 
 
-                loginMsg.textContent = "Logged in ✅";
-        loginMsg.className = "modalMsg ok";
+               // ✅ LOGIN SUCCESS UI
+loginMsg.textContent = "Logged in ✅";
+loginMsg.className = "modalMsg ok";
 
-        // Close login modal and show billing choices instead of going to app.html
-        closeLoginModal();
+// ✅ Close modal
+closeLoginModal();
 
+// ✅ Confirm session exists (debug)
+const { data: sessData, error: sessErr } = await supabaseClient.auth.getSession();
+console.log("[POST-LOGIN] session?", !!sessData?.session, sessErr || "");
+
+// ✅ Check access (debug)
 const access = await checkUserAccess();
+console.log("[POST-LOGIN] access:", access);
+
+// ✅ If user has access → app
 if (access.hasAccess) {
   window.location.href = "https://zencardstudy.com/app.html";
   return;
 }
 
-// No access → send to billing
-setTimeout(() => openBillingModal(), 50);
+// ✅ If no access → go straight to Stripe checkout
+await startCheckoutFromLanding();
+
 
       } catch (e) {
         console.error(e);
