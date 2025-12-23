@@ -614,9 +614,10 @@
 });
 
 async function checkUserAccess(userIdFromLogin) {
-  // Prefer the user id we already got from signIn (avoids race conditions)
+  // Prefer uid from login response
   let uid = userIdFromLogin;
 
+  // Fallback to current session user
   if (!uid) {
     const { data: userData, error: userErr } = await supabaseClient.auth.getUser();
     console.log("[checkUserAccess] getUser:", { userErr, user: userData?.user });
@@ -625,22 +626,25 @@ async function checkUserAccess(userIdFromLogin) {
 
   if (!uid) return { hasAccess: false, reason: "not_logged_in" };
 
+  // IMPORTANT: order by a column that exists.
+  // Most tables have "id". If yours doesn't, see Step 2 below.
   const { data, error, status } = await supabaseClient
     .from("subscriptions")
-    .select("status, created_at")
+    .select("status")
     .eq("user_id", uid)
-    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(1);
 
   console.log("[checkUserAccess] subscriptions query:", { statusCode: status, error, data });
 
   if (error) {
-    // This is the telltale sign of RLS blocking you
-    return { hasAccess: false, reason: "subs_read_failed", error: error.message };
+    return { hasAccess: false, reason: "subs_query_failed", error: error.message, statusCode: status };
   }
 
   const subStatus = (data?.[0]?.status || "").toLowerCase();
-  const hasAccess = subStatus === "active" || subStatus === "trialing";
+
+  // Allow common trial spelling variants
+  const hasAccess = ["active", "trialing", "trial"].includes(subStatus);
 
   return { hasAccess, reason: hasAccess ? "ok" : `status_${subStatus || "none"}` };
 }
