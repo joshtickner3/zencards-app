@@ -459,7 +459,7 @@
           </ul>
 
           <div class="row" style="margin-top:0.85rem;">
-            <a class="btn" href="app.html?startTrial=1">Start free trial</a>
+            <a class="btn" href="https://zencardstudy.com/app.html?startTrial=1">Start free trial</a>
             <button class="btn secondary" id="loginBtn2" type="button">Log in</button>
           </div>
 
@@ -865,7 +865,7 @@ async function startCheckoutFromLanding() {
     throw new Error("No checkout URL returned from Edge Function");
   }
 
- window.location.href = "https://zencardstudy.com/app.html";
+ window.location.href = json.url;
 }
 
 (async () => {
