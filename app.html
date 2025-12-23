@@ -1355,16 +1355,33 @@ async function waitForSubscriptionToBecomeActiveish({
 
 async function enforceAccessGate() {
   // 1) Must be logged in
-  const { data: authData } = await supabaseClient.auth.getUser();
-  const user = authData?.user;
+  // Try to get the current user. In some redirect/login timing cases the
+  // auth session may not be immediately available, so retry briefly before
+  // deciding the user is unauthenticated.
+  let user = null;
+  try {
+    // quick best-effort refresh of session tokens
+    try { await supabaseClient.auth.refreshSession(); } catch (e) { /* ignore */ }
+
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const { data: authData } = await supabaseClient.auth.getUser();
+      user = authData?.user ?? null;
+      if (user) break;
+      // small backoff — allow time for client to hydrate session
+      await new Promise((r) => setTimeout(r, 250));
+    }
+  } catch (e) {
+    console.warn('enforceAccessGate: getUser/refresh error', e);
+    user = null;
+  }
 
   if (!user) {
-  lockUI(
-    "Create an account to start your free trial. You’ll verify your email, then you’ll be redirected to Stripe. Happy studying!",
-    { mode: "logged_out" }
-  );
-  return false;
-}
+    lockUI(
+      "Create an account to start your free trial. You’ll verify your email, then you’ll be redirected to Stripe. Happy studying!",
+      { mode: "logged_out" }
+    );
+    return false;
+  }
 
   // 2) Must be active or trialing
 await supabaseClient.auth.refreshSession();
