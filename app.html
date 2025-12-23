@@ -1403,12 +1403,28 @@ if (!ok) {
 }
 // ✅ Run gate on first load
 window.addEventListener("DOMContentLoaded", async () => {
-  const ok = await enforceAccessGate();
-  if (ok) {
-    // optional: load state once unlocked
+  // Try to restore/refresh an existing session first so enforceAccessGate
+  // can correctly detect logged-in / trialing users who were redirected here.
+  try {
+    // refreshSession will rehydrate tokens in the client if present
+    await supabaseClient.auth.refreshSession();
+  } catch (e) {
+    // ignore refresh errors — we'll still try to read any existing session
+    console.warn('refreshSession error on load:', e);
+  }
+
+  // Populate currentUser from any existing session before running the gate
+  try {
     const { data } = await supabaseClient.auth.getSession();
     currentUser = data?.session?.user ?? null;
+  } catch (e) {
+    console.warn('getSession error on load:', e);
+    currentUser = null;
+  }
 
+  const ok = await enforceAccessGate();
+  if (ok) {
+    // load state once unlocked
     if (currentUser) {
       await loadStateFromSupabase();
       refreshDeckSelect();
