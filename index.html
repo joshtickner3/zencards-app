@@ -629,11 +629,10 @@ async function checkUserAccess(userIdFromLogin) {
   // IMPORTANT: order by a column that exists.
   // Most tables have "id". If yours doesn't, see Step 2 below.
   const { data, error, status } = await supabaseClient
-    .from("subscriptions")
-    .select("status")
-    .eq("user_id", uid)
-    .order("id", { ascending: false })
-    .limit(1);
+  .from("subscriptions")
+  .select("status")
+  .eq("user_id", uid)
+  .limit(1);
 
   console.log("[checkUserAccess] subscriptions query:", { statusCode: status, error, data });
 
