@@ -612,6 +612,34 @@
     storage: window.localStorage,
   },
 });
+async function checkUserAccess() {
+  // Must be logged in
+  const { data: { user }, error: userErr } = await supabaseClient.auth.getUser();
+  if (userErr || !user) return { hasAccess: false, reason: "not_logged_in" };
+
+  // Read your DB "profiles" (or whatever table you use)
+  // Change columns to match YOUR schema
+  const { data, error } = await supabaseClient
+    .from("profiles")
+    .select("subscription_status, has_access, trial_active, trial_ends_at")
+    .eq("id", user.id)
+    .single();
+
+  if (error) {
+    console.warn("[checkUserAccess] profiles read failed:", error.message);
+    return { hasAccess: false, reason: "no_profile_or_rls" };
+  }
+
+  const status = (data?.subscription_status || "").toLowerCase();
+  const hasAccess =
+    data?.has_access === true ||
+    data?.trial_active === true ||
+    status === "active" ||
+    status === "trialing";
+
+  return { hasAccess, reason: hasAccess ? "ok" : "no_access" };
+}
+
     
     // Expose it on window so it's not "undefined" in console
 window.startFreeTrial = async function startFreeTrial() {
@@ -621,9 +649,14 @@ window.startFreeTrial = async function startFreeTrial() {
 
   // If already logged in, start Stripe checkout immediately
   if (session?.access_token) {
-    await startCheckoutFromLanding();
+  const access = await checkUserAccess();
+  if (access.hasAccess) {
+    window.location.href = "app.html";
     return;
   }
+  await startCheckoutFromLanding();
+  return;
+}
 
   // Otherwise open login modal first
   openLoginModal();
@@ -750,6 +783,14 @@ setTimeout(() => console.log("[Billing] still running after 5s"), 5000);
 
         // Close login modal and show billing choices instead of going to app.html
         closeLoginModal();
+
+const access = await checkUserAccess();
+if (access.hasAccess) {
+  window.location.href = "app.html";
+  return;
+}
+
+// No access → send to billing
 setTimeout(() => openBillingModal(), 50);
 
       } catch (e) {
@@ -838,6 +879,18 @@ async function startCheckoutFromLanding() {
 
   window.location.href = json.url;
 }
+
+(async () => {
+  const authKey = Object.keys(localStorage).find(k => k.endsWith("-auth-token"));
+  const raw = authKey ? localStorage.getItem(authKey) : null;
+  const session = raw ? JSON.parse(raw) : null;
+
+  if (session?.access_token) {
+    const access = await checkUserAccess();
+    if (access.hasAccess) window.location.href = "app.html";
+  }
+})();
+
 
   document.getElementById("startTrialBtn")
   .addEventListener("click", () => window.startFreeTrial());
