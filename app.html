@@ -914,7 +914,16 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 // Use the UMD global from the CDN
 const { createClient } = window.supabase;
-const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Ensure auth behavior matches the landing page so stored sessions are
+// detected and tokens auto-refreshed when arriving via redirect.
+const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: window.localStorage,
+  },
+});
 
 function shouldStartTrialFromUrl() {
   return new URLSearchParams(window.location.search).get("startTrial") === "1";
