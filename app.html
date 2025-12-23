@@ -1379,6 +1379,39 @@ async function enforceAccessGate() {
       // small backoff — allow time for client to hydrate session
       await new Promise((r) => setTimeout(r, 250));
     }
+    // If getUser() didn't return a user, also try getSession() which is
+    // sometimes populated earlier when arriving from a redirect/login flow.
+    // This avoids an unnecessary paywall when the browser has a valid
+    // session token but supabase's getUser() hasn't hydrated yet.
+    if (!user) {
+      try {
+        const { data: sessionData } = await supabaseClient.auth.getSession();
+        user = sessionData?.session?.user ?? null;
+      } catch (e) {
+        // ignore — we'll handle missing user below
+        console.warn('enforceAccessGate: getSession fallback failed', e);
+      }
+    }
+
+    // Extra: if there's an auth token in localStorage but no user yet,
+    // wait a little longer in short polling bursts for the session to
+    // become available (helps immediate redirects from the landing page).
+    if (!user) {
+      const authKey = Object.keys(window.localStorage || {}).find(k => k.endsWith('-auth-token'));
+      if (authKey) {
+        const startWait = Date.now();
+        while (!user && Date.now() - startWait < 2000) {
+          try {
+            const { data: sessionData } = await supabaseClient.auth.getSession();
+            user = sessionData?.session?.user ?? null;
+            if (user) break;
+          } catch (e) {
+            // ignore transient errors
+          }
+          await new Promise((r) => setTimeout(r, 200));
+        }
+      }
+    }
   } catch (e) {
     console.warn('enforceAccessGate: getUser/refresh error', e);
     user = null;
