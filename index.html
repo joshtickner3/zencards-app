@@ -11,7 +11,7 @@
       --bg1:#1f2937;
       --bg2:#020617;
       --card:#020617cc;
-      --border:#1f2937;
+      --border:#1f2937; 
       --text:#e5e7eb;
       --muted:#9ca3af;
       --green:#10b981;
@@ -767,12 +767,15 @@ setTimeout(() => console.log("[Billing] still running after 5s"), 5000);
       loginMsg.textContent = "";
 
       try {
-        const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-        if (error) {
-          loginMsg.textContent = error.message || "Login failed.";
-          loginMsg.className = "modalMsg error";
-          return;
-        }
+        const res = await supabaseClient.auth.signInWithPassword({ email, password });
+console.log("[LOGIN RESULT]", res);
+
+if (res.error) {
+  loginMsg.textContent = res.error.message;
+  loginMsg.className = "modalMsg error";
+  throw res.error;
+}
+
 
                 loginMsg.textContent = "Logged in ✅";
         loginMsg.className = "modalMsg ok";
