@@ -943,8 +943,8 @@ checkoutStarted = true;
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
-        success_url: "https://zencardstudy.com/app.html",
-        cancel_url: "https://zencardstudy.com/?canceled=1",
+        success_url: "https://zencardstudy.com/app.html?success=1&session_id={CHECKOUT_SESSION_ID}",
+cancel_url:  "https://zencardstudy.com/app.html?canceled=1",
       }),
     }
   );
@@ -1405,6 +1405,21 @@ if (!ok) {
   unlockUI();
   return true;
 }
+// ✅ Run gate on first load
+window.addEventListener("DOMContentLoaded", async () => {
+  const ok = await enforceAccessGate();
+  if (ok) {
+    // optional: load state once unlocked
+    const { data } = await supabaseClient.auth.getSession();
+    currentUser = data?.session?.user ?? null;
+
+    if (currentUser) {
+      await loadStateFromSupabase();
+      refreshDeckSelect();
+      refreshCardsList();
+    }
+  }
+});
 
 supabaseClient.auth.onAuthStateChange(async (event, session) => {
   // Prevent weird UI flashes during an intentional sign-out
@@ -1414,6 +1429,10 @@ supabaseClient.auth.onAuthStateChange(async (event, session) => {
   currentUser = session?.user ?? null;
 
   updateAuthButtons();
+  // ✅ Always enforce paywall after auth changes
+const ok = await enforceAccessGate();
+if (!ok) return; // keep paywall up, don't proceed loading app
+
 
   // Optional: if you already do these, keep them
   if (currentUser) {
