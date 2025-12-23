@@ -1285,26 +1285,29 @@ function updateAuthButtons() {
   }
 }
 
-async function getMySubscriptionStatus(userId) {
-  if (!userId) return "none";
+async function getMySubscriptionStatus() {
+  // Must have a user
+  const { data: authData, error: authErr } = await supabaseClient.auth.getUser();
+  const user = authData?.user;
+  if (authErr) console.error("auth.getUser error:", authErr);
+  if (!user) return "none";
 
-  const { data, error, status } = await supabaseClient
+  // IMPORTANT: filter by user_id and use supabaseClient (not supabase)
+  const { data, error } = await supabaseClient
     .from("subscriptions")
-    .select("status, created_at")
-    .eq("user_id", userId)
+    .select("status, current_period_end, trial_end, cancel_at_period_end, created_at")
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(1);
 
-  console.log("[SUBS] query:", { statusCode: status, error, data });
-
   if (error) {
-    // If you see this log, it's almost always RLS blocking the read
-    console.error("[SUBS] Subscription lookup error:", error);
+    console.error("Subscription lookup error:", error);
     return "unknown";
   }
 
-  const raw = data?.[0]?.status ?? "none";
-  return String(raw).trim().toLowerCase();
+  const sub = data?.[0];
+  return sub?.status || "none";
+
 }
 
 function lockUI(message = "", opts = { mode: "logged_out" }) {
@@ -1339,9 +1342,7 @@ async function waitForSubscriptionToBecomeActiveish({
   while (Date.now() - start < maxMs) {
     await supabaseClient.auth.refreshSession();
 
-    const { data: sessionData } = await supabaseClient.auth.getSession();
-const uid = sessionData?.session?.user?.id;
-const status = await getMySubscriptionStatus(uid);
+    const status = await getMySubscriptionStatus();
     console.log("Recheck subscription status:", status);
 
     if (status === "active" || status === "trialing") return true;
@@ -1354,56 +1355,23 @@ const status = await getMySubscriptionStatus(uid);
 
 async function enforceAccessGate() {
   // 1) Must be logged in
-  async function enforceAccessGate() {
-  // 1) Must be logged in (use session, not getUser)
-  const { data: sessionData } = await supabaseClient.auth.getSession();
-  const session = sessionData?.session;
-  const uid = session?.user?.id;
+  const { data: authData } = await supabaseClient.auth.getUser();
+  const user = authData?.user;
 
-  console.log("[GATE] session?", !!session, "uid:", uid);
-
-  if (!uid) {
-    lockUI(
-      "Create an account to start your free trial. You’ll verify your email, then you’ll be redirected to Stripe. Happy studying!",
-      { mode: "logged_out" }
-    );
-    return false;
-  }
+  if (!user) {
+  lockUI(
+    "Create an account to start your free trial. You’ll verify your email, then you’ll be redirected to Stripe. Happy studying!",
+    { mode: "logged_out" }
+  );
+  return false;
+}
 
   // 2) Must be active or trialing
-  await supabaseClient.auth.refreshSession();
+await supabaseClient.auth.refreshSession();
+let status = await getMySubscriptionStatus();
+console.log("Subscription status:", status);
 
-  let subStatus = await getMySubscriptionStatus(uid);
-  console.log("[GATE] normalized subscription status:", subStatus);
-
-  let ok = (subStatus === "active" || subStatus === "trialing");
-
-  if (!ok) {
-    const params = new URLSearchParams(window.location.search);
-    const cameFromStripe =
-      params.has("session_id") || params.has("success") || params.has("trialStarted");
-
-    if (cameFromStripe) {
-      lockUI("Finishing setup… one moment.", { mode: "inactive" });
-
-      const becameOk = await waitForSubscriptionToBecomeActiveish();
-      if (becameOk) {
-        unlockUI();
-        return true;
-      }
-    }
-
-    lockUI(
-      "Your account isn’t active yet. Subscribe to start your free trial, or cancel to go back.",
-      { mode: "inactive" }
-    );
-    return false;
-  }
-
-  // 3) Allowed in
-  unlockUI();
-  return true;
-}
+let ok = (status === "active" || status === "trialing");
 
 if (!ok) {
   // If Stripe just returned us, give webhooks a moment to update DB
@@ -1455,7 +1423,6 @@ supabaseClient.auth.onAuthStateChange(async (event, session) => {
 
   // Keep currentUser in sync
   currentUser = session?.user ?? null;
-console.log("[AUTH] currentUser:", currentUser?.id, currentUser?.email);
 
   updateAuthButtons();
   // ✅ Always enforce paywall after auth changes
@@ -4699,42 +4666,10 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
     openInstructionsModal();
   });
 }
-(async function init() {
-  loadFromStorage();
 
-  // 1) If you’re coming back from an email magic link / OAuth / PKCE, exchange the code for a session
-  // (Safe to call; it will just do nothing if no code is present.)
-  try {
-    const url = new URL(window.location.href);
-    if (url.searchParams.get("code")) {
-      await supabase.auth.exchangeCodeForSession(window.location.href);
-      // optional: clean the URL
-      url.searchParams.delete("code");
-      url.searchParams.delete("type");
-      window.history.replaceState({}, "", url.toString());
-    }
-  } catch (e) {
-    console.warn("exchangeCodeForSession skipped/failed:", e);
-  }
-
-  // 2) Ensure the session is actually loaded before gating
-  let { data: { session } } = await supabase.auth.getSession();
-
-  // If session is still null, wait briefly for the initial auth state to hydrate
-  if (!session) {
-    await new Promise((resolve) => {
-      const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
-        sub.subscription.unsubscribe();
-        session = newSession;
-        resolve();
-      });
-      // safety timeout so we never hang forever
-      setTimeout(resolve, 1200);
-    });
-  }
-
-  // 3) Now gate
+   (async function init() {
   const allowed = await enforceAccessGate();
+  loadFromStorage();
 
   if (allowed) {
     await loadStateFromSupabase();
