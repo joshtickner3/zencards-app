@@ -666,17 +666,22 @@ function getStoredSession() {
 }
 
 function renderAuthStatusBar() {
-  const loggedIn = email && hasToken;
-document.getElementById("loginBtn")?.style && (document.getElementById("loginBtn").style.display = loggedIn ? "none" : "");
-document.getElementById("loginBtn2")?.style && (document.getElementById("loginBtn2").style.display = loggedIn ? "none" : "");
   const s = getStoredSession();
+
   const bar = document.getElementById("authStatusBar");
   const emailEl = document.getElementById("authEmail");
 
   const email = s?.user?.email;
   const hasToken = !!s?.access_token;
+  const loggedIn = !!(email && hasToken);
 
-  if (email && hasToken) {
+  // Optional: hide login buttons when logged in
+  const b1 = document.getElementById("loginBtn");
+  const b2 = document.getElementById("loginBtn2");
+  if (b1) b1.style.display = loggedIn ? "none" : "";
+  if (b2) b2.style.display = loggedIn ? "none" : "";
+
+  if (loggedIn) {
     emailEl.textContent = `Logged in as ${email}`;
     bar.style.display = "block";
   } else {
