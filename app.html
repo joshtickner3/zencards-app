@@ -1363,27 +1363,59 @@ async function waitForSubscriptionToBecomeActiveish({
 }
 
 async function enforceAccessGate() {
-  // Always start by hiding any stale paywall while we re-check
-  // (prevents "logged in but still showing the signup gate" flashes)
-  lockUI("Checking access…", { mode: "inactive" });
-
-  // 1) Logged-in check: use session (reliable right after redirects)
-  let session = null;
+  // 1) Must be logged in
+  // Try to get the current user. In some redirect/login timing cases the
+  // auth session may not be immediately available, so retry briefly before
+  // deciding the user is unauthenticated.
+  let user = null;
   try {
-    await supabaseClient.auth.refreshSession();
-  } catch (_) {}
+    // quick best-effort refresh of session tokens
+    try { await supabaseClient.auth.refreshSession(); } catch (e) { /* ignore */ }
 
-  try {
-    const { data } = await supabaseClient.auth.getSession();
-    session = data?.session || null;
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const { data: authData } = await supabaseClient.auth.getUser();
+      user = authData?.user ?? null;
+      if (user) break;
+      // small backoff — allow time for client to hydrate session
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    // If getUser() didn't return a user, also try getSession() which is
+    // sometimes populated earlier when arriving from a redirect/login flow.
+    // This avoids an unnecessary paywall when the browser has a valid
+    // session token but supabase's getUser() hasn't hydrated yet.
+    if (!user) {
+      try {
+        const { data: sessionData } = await supabaseClient.auth.getSession();
+        user = sessionData?.session?.user ?? null;
+      } catch (e) {
+        // ignore — we'll handle missing user below
+        console.warn('enforceAccessGate: getSession fallback failed', e);
+      }
+    }
+
+    // Extra: if there's an auth token in localStorage but no user yet,
+    // wait a little longer in short polling bursts for the session to
+    // become available (helps immediate redirects from the landing page).
+    if (!user) {
+      const authKey = Object.keys(window.localStorage || {}).find(k => k.endsWith('-auth-token'));
+      if (authKey) {
+        const startWait = Date.now();
+        while (!user && Date.now() - startWait < 2000) {
+          try {
+            const { data: sessionData } = await supabaseClient.auth.getSession();
+            user = sessionData?.session?.user ?? null;
+            if (user) break;
+          } catch (e) {
+            // ignore transient errors
+          }
+          await new Promise((r) => setTimeout(r, 200));
+        }
+      }
+    }
   } catch (e) {
-    console.warn("getSession failed:", e);
-    session = null;
+    console.warn('enforceAccessGate: getUser/refresh error', e);
+    user = null;
   }
-
-  const user = session?.user || null;
-  currentUser = user; // keep your global in sync
-  updateAuthButtons();
 
   if (!user) {
     lockUI(
@@ -1393,36 +1425,34 @@ async function enforceAccessGate() {
     return false;
   }
 
-  // 2) Subscription check
-  let status = await getMySubscriptionStatus();
-  console.log("Subscription status:", status);
+  // 2) Must be active or trialing
+await supabaseClient.auth.refreshSession();
+let status = await getMySubscriptionStatus();
+console.log("Subscription status:", status);
 
-  const ok = (status === "active" || status === "trialing");
-  if (ok) {
-    unlockUI();
-    return true;
-  }
+let ok = (status === "active" || status === "trialing");
 
-  // 3) If we just came back from Stripe, poll briefly for webhook DB update
+if (!ok) {
+  // If Stripe just returned us, give webhooks a moment to update DB
   const params = new URLSearchParams(window.location.search);
   const cameFromStripe =
     params.has("session_id") || params.has("success") || params.has("trialStarted");
 
   if (cameFromStripe) {
-    lockUI("Finishing setup… one moment.", { mode: "inactive" });
+  lockUI("Finishing setup… one moment.", { mode: "inactive" });
 
-    const becameOk = await waitForSubscriptionToBecomeActiveish({
-      maxMs: 30000,
-      intervalMs: 1500,
-    });
+  const becameOk = await waitForSubscriptionToBecomeActiveish({
+    maxMs: 60000,
+    intervalMs: 1500,
+    allowPending: true,
+  });
 
-    if (becameOk) {
-      unlockUI();
-      return true;
-    }
+  if (becameOk) {
+    unlockUI();
+    return true;
   }
+}
 
-  // 4) Still not ok → show the "continue billing" state (logged in, not subscribed)
   lockUI(
     "Your account isn’t active yet. Subscribe to start your free trial, or cancel to go back.",
     { mode: "inactive" }
@@ -1430,6 +1460,11 @@ async function enforceAccessGate() {
   return false;
 }
 
+
+  // 3) Allowed in
+  unlockUI();
+  return true;
+}
 // ✅ Run gate on first load
 window.addEventListener("DOMContentLoaded", async () => {
   // Try to restore/refresh an existing session first so enforceAccessGate
