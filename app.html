@@ -1343,22 +1343,22 @@ function unlockUI() {
   paywall?.classList.add("hidden");
 }
 async function waitForSubscriptionToBecomeActiveish({
-  maxMs = 15000,
+  maxMs = 60000,
   intervalMs = 1500,
+  allowPending = false,
 } = {}) {
   const start = Date.now();
 
   while (Date.now() - start < maxMs) {
     await supabaseClient.auth.refreshSession();
-
     const status = await getMySubscriptionStatus();
     console.log("Recheck subscription status:", status);
 
     if (status === "active" || status === "trialing") return true;
+    if (allowPending && status === "pending") return true;
 
     await new Promise((r) => setTimeout(r, intervalMs));
   }
-
   return false;
 }
 
@@ -1439,14 +1439,19 @@ if (!ok) {
     params.has("session_id") || params.has("success") || params.has("trialStarted");
 
   if (cameFromStripe) {
-    lockUI("Finishing setup… one moment.", { mode: "inactive" });
+  lockUI("Finishing setup… one moment.", { mode: "inactive" });
 
-    const becameOk = await waitForSubscriptionToBecomeActiveish();
-    if (becameOk) {
-      unlockUI();
-      return true;
-    }
+  const becameOk = await waitForSubscriptionToBecomeActiveish({
+    maxMs: 60000,
+    intervalMs: 1500,
+    allowPending: true,
+  });
+
+  if (becameOk) {
+    unlockUI();
+    return true;
   }
+}
 
   lockUI(
     "Your account isn’t active yet. Subscribe to start your free trial, or cancel to go back.",
@@ -4743,14 +4748,8 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
 }
 
    (async function init() {
-  const allowed = await enforceAccessGate();
   loadFromStorage();
-
-  if (allowed) {
-    await loadStateFromSupabase();
-    refreshDeckSelect();
-    refreshCardsList();
-  }
+  // Do NOT call enforceAccessGate() here, because DOMContentLoaded already does it.
 })();
 
   </script>
