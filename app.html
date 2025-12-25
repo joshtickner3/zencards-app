@@ -1141,6 +1141,8 @@ async function signUpWithEmail() {
 }
 
 async function signInWithEmail() {
+  console.log("✅ LOGGED IN UUID:", data.user.id);
+console.log("✅ LOGGED IN EMAIL:", data.user.email);
   const email = authEmailInput.value.trim();
   const password = authPasswordInput.value.trim();
   if (!email || !password) {
