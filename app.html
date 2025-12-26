@@ -354,31 +354,6 @@
   </style>
 </head>
 <body>
-  <div id="paywall" class="hidden" style="
-  position:fixed; inset:0; z-index:99999;
-  background:rgba(0,0,0,0.75);
-  display:flex; align-items:center; justify-content:center;
-  padding:20px;
-">
-  <div style="max-width:520px;width:100%;background:#020617;border:1px solid #1f2937;border-radius:16px;padding:18px;">
-    <h2 style="margin:0 0 8px 0;">ZenCards Premium</h2>
-
-    <p style="color:#9ca3af;margin:0 0 12px 0;line-height:1.4;">
-      Create an account to start your free trial.
-      After you sign up, you’ll receive an email verification link.
-      Once you verify your email, you’ll be redirected to Stripe to start your free trial.
-      <br><br>
-      <strong style="color:#e5e7eb;">Happy studying!</strong>
-    </p>
-
-    <!-- Wrap the signup fields so we can hide them when user is already logged in -->
-<div id="paywallAuthFields">
-
-  <div class="row" style="margin-top:0.25rem;">
-    <div>
-      <label for="paywallEmail">Email</label>
-      <input id="paywallEmail" type="text" placeholder="you@example.com" />
-    </div>
     <div>
       <label for="paywallPassword">Password</label>
       <input id="paywallPassword" type="password" placeholder="••••••••" />
@@ -979,44 +954,6 @@ let isSigningOut = false;
 // ===== AUTH DOM REFERENCES =====
 const authEmailInput = document.getElementById("authEmail");
 const authPasswordInput = document.getElementById("authPassword");
-const paywallEmailInput = document.getElementById("paywallEmail");
-const paywallPasswordInput = document.getElementById("paywallPassword");
-const paywallSignUpBtn = document.getElementById("paywallSignUpBtn");
-const paywallLogoutBtn = document.getElementById("paywallLogoutBtn");
-const paywallAuthFields = document.getElementById("paywallAuthFields");
-const paywallLoggedInActions = document.getElementById("paywallLoggedInActions");
-const resumeCheckoutBtn = document.getElementById("resumeCheckoutBtn");
-
-paywallSignUpBtn?.addEventListener("click", async () => {
-  const email = (paywallEmailInput?.value || "").trim();
-  const password = (paywallPasswordInput?.value || "").trim();
-
-  if (!email || !password) {
-    lockUI("Please enter an email and password.");
-    return;
-  }
-
-  const { data, error } = await supabaseClient.auth.signUp({
-    email,
-    password,
-    options: {
-      emailRedirectTo: "https://zencardstudy.com/confirm.html"
-    }
-  });
-
-  if (error) {
-    console.error("Paywall sign-up error:", error);
-    lockUI("Sign-up error: " + error.message);
-    return;
-  }
-
-  lockUI("Check your email to verify. After verification, you’ll be redirected to Stripe to start your free trial. Happy studying!");
-});
-
-paywallLogoutBtn?.addEventListener("click", async () => {
-  await signOutFromApp();
-  lockUI("Signed out. Please create an account to start your free trial. Happy studying!");
-});
 
 resumeCheckoutBtn?.addEventListener("click", async () => {
   try {
@@ -1341,174 +1278,52 @@ async function checkAccessViaEdge() {
   const json = await res.json().catch(() => ({}));
   return json; // expected: { hasAccess: boolean, status: "trialing"|"active"|... }
 }
+async function enforceAccessOrRedirect() {
+  // Refresh session so token is up-to-date
+  try { await supabaseClient.auth.refreshSession(); } catch (_) {}
 
+  const { data } = await supabaseClient.auth.getSession();
+  const user = data?.session?.user || null;
 
-function lockUI(message = "", opts = { mode: "logged_out" }) {
-  const paywall = document.getElementById("paywall");
-  const msg = document.getElementById("paywallMsg");
-  if (msg) msg.textContent = message;
-
-  const mode = opts?.mode || "logged_out";
-
-  // logged_out => show email/pass signup fields
-  // inactive   => user is logged in but not subscribed => show "Continue to billing"
-  if (paywallAuthFields) {
-    paywallAuthFields.style.display = (mode === "inactive") ? "none" : "block";
-  }
-  if (paywallLoggedInActions) {
-    paywallLoggedInActions.classList.toggle("hidden", mode !== "inactive");
-  }
-
-  paywall?.classList.remove("hidden");
-}
-
-function unlockUI() {
-  const paywall = document.getElementById("paywall");
-  paywall?.classList.add("hidden");
-}
-async function waitForSubscriptionToBecomeActiveish({
-  maxMs = 60000,
-  intervalMs = 1500,
-  allowPending = false,
-} = {}) {
-  const start = Date.now();
-
-  while (Date.now() - start < maxMs) {
-    try { await supabaseClient.auth.refreshSession(); } catch (_) {}
-
-    const access = await checkAccessViaEdge();
-    console.log("Recheck access:", access);
-
-    if (access?.hasAccess) return true;
-
-    // Optional: treat "pending" as temporarily ok if you want
-    if (allowPending && access?.status === "pending") return true;
-
-    await new Promise((r) => setTimeout(r, intervalMs));
-  }
-
-  return false;
-}
-
-async function enforceAccessGate() {
-  // Always start by hiding any stale paywall while we re-check
-  // (prevents "logged in but still showing the signup gate" flashes)
-  lockUI("Checking access…", { mode: "inactive" });
-
-  // 1) Logged-in check: use session (reliable right after redirects)
-  let session = null;
-  try {
-    await supabaseClient.auth.refreshSession();
-  } catch (_) {}
-
-  try {
-    const { data } = await supabaseClient.auth.getSession();
-    session = data?.session || null;
-  } catch (e) {
-    console.warn("getSession failed:", e);
-    session = null;
-  }
-
-  const user = session?.user || null;
-  currentUser = user; // keep your global in sync
-  updateAuthButtons();
-
+  // Not logged in -> send to landing
   if (!user) {
-    lockUI(
-      "Create an account to start your free trial. You’ll verify your email, then you’ll be redirected to Stripe. Happy studying!",
-      { mode: "logged_out" }
-    );
+    window.location.replace("https://zencardstudy.com/");
     return false;
   }
 
- // 2) Access check via Edge Function (server-trusted)
-let access = null;
-try {
-  access = await checkAccessViaEdge();
-} catch (e) {
-  console.error("checkAccessViaEdge failed:", e);
-  access = { hasAccess: false, status: "edge_error" };
-}
-
-console.log("Access result:", access);
-
-const ok = !!access?.hasAccess;
-const status = access?.status ?? null;
-
-
-  console.log("[APP GATE]", {
-  hasUser: !!user,
-  status,
-  ok
-});
-
-  if (ok) {
-    unlockUI();
-    return true;
+  // Logged in -> verify access via Edge function
+  let access;
+  try {
+    access = await checkAccessViaEdge();
+  } catch (e) {
+    console.error("checkAccessViaEdge failed:", e);
+    window.location.replace("https://zencardstudy.com/");
+    return false;
   }
 
-  // 3) If we just came back from Stripe, poll briefly for webhook DB update
-  const params = new URLSearchParams(window.location.search);
-  const cameFromStripe =
-  params.has("session_id") ||
-  params.has("success") ||
-  params.has("trialStarted") ||
-  params.has("startTrial") ||
-  params.has("canceled");
-
-  if (cameFromStripe) {
-    lockUI("Finishing setup… one moment.", { mode: "inactive" });
-
-    const becameOk = await waitForSubscriptionToBecomeActiveish({
-      maxMs: 30000,
-      intervalMs: 1500,
-    });
-
-    if (becameOk) {
-      unlockUI();
-      return true;
-    }
+  if (!access?.hasAccess) {
+    // No trial/subscription -> landing page handles Stripe
+    window.location.replace("https://zencardstudy.com/");
+    return false;
   }
 
-  // 4) Still not ok → show the "continue billing" state (logged in, not subscribed)
-  lockUI(
-    "Your account isn’t active yet. Subscribe to start your free trial, or cancel to go back.",
-    { mode: "inactive" }
-  );
-  return false;
+  // Allowed
+  currentUser = user;
+  updateAuthButtons();
+  return true;
 }
 
 // ✅ Run gate on first load
 window.addEventListener("DOMContentLoaded", async () => {
-  // Try to restore/refresh an existing session first so enforceAccessGate
-  // can correctly detect logged-in / trialing users who were redirected here.
-  try {
-    // refreshSession will rehydrate tokens in the client if present
-    await supabaseClient.auth.refreshSession();
-  } catch (e) {
-    // ignore refresh errors — we'll still try to read any existing session
-    console.warn('refreshSession error on load:', e);
-  }
+  const ok = await enforceAccessOrRedirect();
+  if (!ok) return;
 
-  // Populate currentUser from any existing session before running the gate
-  try {
-    const { data } = await supabaseClient.auth.getSession();
-    currentUser = data?.session?.user ?? null;
-  } catch (e) {
-    console.warn('getSession error on load:', e);
-    currentUser = null;
-  }
-
-  const ok = await enforceAccessGate();
-  if (ok) {
-    // load state once unlocked
-    if (currentUser) {
-      await loadStateFromSupabase();
-      refreshDeckSelect();
-      refreshCardsList();
-    }
-  }
+  // load state once unlocked
+  await loadStateFromSupabase();
+  refreshDeckSelect();
+  refreshCardsList();
 });
+
 
 supabaseClient.auth.onAuthStateChange(async (event, session) => {
   // Prevent weird UI flashes during an intentional sign-out
@@ -1519,9 +1334,8 @@ supabaseClient.auth.onAuthStateChange(async (event, session) => {
 
   updateAuthButtons();
   // ✅ Always enforce paywall after auth changes
-const ok = await enforceAccessGate();
-if (!ok) return; // keep paywall up, don't proceed loading app
-
+const ok = await enforceAccessOrRedirect();
+if (!ok) return;
 
   // Optional: if you already do these, keep them
   if (currentUser) {
