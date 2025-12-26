@@ -1141,8 +1141,6 @@ async function signUpWithEmail() {
 }
 
 async function signInWithEmail() {
-  console.log("✅ LOGGED IN UUID:", data.user.id);
-console.log("✅ LOGGED IN EMAIL:", data.user.email);
   const email = authEmailInput.value.trim();
   const password = authPasswordInput.value.trim();
   if (!email || !password) {
@@ -1160,6 +1158,8 @@ console.log("✅ LOGGED IN EMAIL:", data.user.email);
     setAuthStatus("Log-in error: " + error.message);
     return;
   }
+  console.log("✅ LOGGED IN UUID:", data.user.id);
+console.log("✅ LOGGED IN EMAIL:", data.user.email);
 
   currentUser = data.user;
   setAuthStatus("Logged in as: " + currentUser.email);
@@ -1415,7 +1415,11 @@ async function enforceAccessGate() {
   // 3) If we just came back from Stripe, poll briefly for webhook DB update
   const params = new URLSearchParams(window.location.search);
   const cameFromStripe =
-    params.has("session_id") || params.has("success") || params.has("trialStarted");
+  params.has("session_id") ||
+  params.has("success") ||
+  params.has("trialStarted") ||
+  params.has("startTrial") ||
+  params.has("canceled");
 
   if (cameFromStripe) {
     lockUI("Finishing setup… one moment.", { mode: "inactive" });
