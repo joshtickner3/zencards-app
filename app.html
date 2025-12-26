@@ -1400,6 +1400,13 @@ async function enforceAccessGate() {
   console.log("Subscription status:", status);
 
   const ok = (status === "active" || status === "trialing");
+
+  console.log("[APP GATE]", {
+  hasUser: !!user,
+  status,
+  ok
+});
+
   if (ok) {
     unlockUI();
     return true;
