@@ -804,9 +804,13 @@ const uid = res?.data?.user?.id;
 // ✅ Check access using UID
 const access = await checkUserAccess(uid);
 console.log("[POST-LOGIN] access:", access);
+console.log("[POST-LOGIN] typeof hasAccess:", typeof access?.hasAccess, "value:", access?.hasAccess);
+console.log("[POST-LOGIN] about to redirect to app.html");
+
 
 // ✅ If user has access → app
-if (access.hasAccess) {
+if (access?.hasAccess === true || access?.hasAccess === "true") {
+  alert("HAS ACCESS — redirecting now");
   window.location.href = "https://zencardstudy.com/app.html";
   return;
 }
