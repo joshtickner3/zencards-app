@@ -895,7 +895,7 @@ async function startCheckoutFromLanding() {
   const session = raw ? JSON.parse(raw) : null;
 
   if (session?.access_token) {
-    const access = await checkUserAccess(uid);
+    const access = await checkUserAccess();
     if (access.hasAccess) window.location.href = "https://zencardstudy.com/app.html";
   }
 })();
