@@ -1319,6 +1319,26 @@ async function getMySubscriptionStatus() {
   console.log("Subscription row:", data);
   return data?.status ?? null;
 }
+async function checkAccessViaEdge() {
+  const { data: sessionData } = await supabaseClient.auth.getSession();
+  const token = sessionData?.session?.access_token;
+
+  if (!token) return { hasAccess: false, status: "logged_out" };
+
+  const res = await fetch(
+    "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/has-access",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  const json = await res.json().catch(() => ({}));
+  return json; // expected: { hasAccess: boolean, status: "trialing"|"active"|... }
+}
 
 
 function lockUI(message = "", opts = { mode: "logged_out" }) {
@@ -1353,10 +1373,10 @@ async function waitForSubscriptionToBecomeActiveish({
 
   while (Date.now() - start < maxMs) {
     await supabaseClient.auth.refreshSession();
-    const status = await getMySubscriptionStatus();
-    console.log("Recheck subscription status:", status);
+    const access = await checkAccessViaEdge();
+console.log("Recheck access:", access);
 
-    if (status === "active" || status === "trialing") return true;
+if (access?.hasAccess) return true;
     if (allowPending && status === "pending") return true;
 
     await new Promise((r) => setTimeout(r, intervalMs));
@@ -1395,11 +1415,20 @@ async function enforceAccessGate() {
     return false;
   }
 
-  // 2) Subscription check
-  let status = await getMySubscriptionStatus();
-  console.log("Subscription status:", status);
+ // 2) Access check via Edge Function (server-trusted)
+let access = null;
+try {
+  access = await checkAccessViaEdge();
+} catch (e) {
+  console.error("checkAccessViaEdge failed:", e);
+  access = { hasAccess: false, status: "edge_error" };
+}
 
-  const ok = (status === "active" || status === "trialing");
+console.log("Access result:", access);
+
+const ok = !!access?.hasAccess;
+const status = access?.status ?? null;
+
 
   console.log("[APP GATE]", {
   hasUser: !!user,
