@@ -34,8 +34,8 @@
           "Authorization": `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
-           success_url: "https://zencardstudy.com/app.html?success=1&session_id={CHECKOUT_SESSION_ID}",
-          cancel_url: "https://zencardstudy.com/app.html?canceled=1",
+           success_url: "https://zencardstudy.com/?success=1&session_id={CHECKOUT_SESSION_ID}",
+cancel_url: "https://zencardstudy.com/?canceled=1",
         }),
       });
 

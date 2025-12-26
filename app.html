@@ -923,6 +923,7 @@ const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     detectSessionInUrl: true,
     storage: window.localStorage,
   },
+  
 });
 
 function shouldStartTrialFromUrl() {
@@ -952,8 +953,9 @@ checkoutStarted = true;
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
-        success_url: "https://zencardstudy.com/app.html?success=1&session_id={CHECKOUT_SESSION_ID}",
-cancel_url:  "https://zencardstudy.com/app.html?canceled=1",
+        success_url: "https://zencardstudy.com/?success=1&session_id={CHECKOUT_SESSION_ID}",
+cancel_url: "https://zencardstudy.com/?canceled=1",
+
       }),
     }
   );
@@ -1043,8 +1045,8 @@ resumeCheckoutBtn?.addEventListener("click", async () => {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          success_url: "https://zencardstudy.com/app.html?success=1&session_id={CHECKOUT_SESSION_ID}",
-          cancel_url: "https://zencardstudy.com/app.html?canceled=1",
+          success_url: "https://zencardstudy.com/?success=1&session_id={CHECKOUT_SESSION_ID}",
+cancel_url: "https://zencardstudy.com/?canceled=1",
         }),
         signal: controller.signal,
       }
@@ -1372,15 +1374,19 @@ async function waitForSubscriptionToBecomeActiveish({
   const start = Date.now();
 
   while (Date.now() - start < maxMs) {
-    await supabaseClient.auth.refreshSession();
-    const access = await checkAccessViaEdge();
-console.log("Recheck access:", access);
+    try { await supabaseClient.auth.refreshSession(); } catch (_) {}
 
-if (access?.hasAccess) return true;
-    if (allowPending && status === "pending") return true;
+    const access = await checkAccessViaEdge();
+    console.log("Recheck access:", access);
+
+    if (access?.hasAccess) return true;
+
+    // Optional: treat "pending" as temporarily ok if you want
+    if (allowPending && access?.status === "pending") return true;
 
     await new Promise((r) => setTimeout(r, intervalMs));
   }
+
   return false;
 }
 

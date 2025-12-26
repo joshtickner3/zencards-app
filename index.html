@@ -340,6 +340,26 @@
         <button class="btn secondary" id="loginBtn" type="button">Log in</button>
         <a class="btn secondary small" href="mailto:support@YOURDOMAIN.com?subject=ZenCards%20Cancel%20Subscription">Manage / Cancel subscription</a>
       </div>
+      <!-- ===== Account + Gate (Landing Page) ===== -->
+<div class="card" style="margin-top:1rem;background:#0b1220;border:1px solid #111827;">
+  <div class="row" style="align-items:center;">
+    <div style="flex:2;min-width:260px;">
+      <h3 style="margin:0;">Account</h3>
+      <div id="lpWhoami" class="muted" style="margin-top:0.25rem;">Not logged in</div>
+      <div id="lpStatus" class="muted" style="margin-top:0.25rem;"></div>
+    </div>
+
+    <div style="display:flex;gap:0.6rem;justify-content:flex-end;flex:1;min-width:260px;">
+      <button class="btn secondary small" id="lpLogoutBtn" type="button" style="display:none;">Log out</button>
+
+      <button class="btn" id="lpGoBtn" type="button" disabled
+        style="background:#334155;color:#94a3b8;box-shadow:none;cursor:not-allowed;">
+        Go to ZenCards (locked)
+      </button>
+    </div>
+  </div>
+</div>
+
 
       <div class="fineprint">
         <strong>Billing:</strong> Your 7-day free trial starts when you create an account.
@@ -612,6 +632,111 @@
     storage: window.localStorage,
   },
 });
+// ===== Landing Page Gate UI =====
+const lpWhoami = document.getElementById("lpWhoami");
+const lpStatus = document.getElementById("lpStatus");
+const lpGoBtn = document.getElementById("lpGoBtn");
+const lpLogoutBtn = document.getElementById("lpLogoutBtn");
+
+function setLpGoButton(unlocked) {
+  if (unlocked) {
+    lpGoBtn.disabled = false;
+    lpGoBtn.textContent = "Go to ZenCards";
+    lpGoBtn.style.background = "var(--green)";
+    lpGoBtn.style.color = "#020617";
+    lpGoBtn.style.cursor = "pointer";
+    lpGoBtn.style.boxShadow = "0 8px 18px rgba(16,185,129,0.28)";
+  } else {
+    lpGoBtn.disabled = true;
+    lpGoBtn.textContent = "Go to ZenCards (locked)";
+    lpGoBtn.style.background = "#334155";
+    lpGoBtn.style.color = "#94a3b8";
+    lpGoBtn.style.cursor = "not-allowed";
+    lpGoBtn.style.boxShadow = "none";
+  }
+}
+async function waitForAccess({ maxMs = 30000, intervalMs = 1500 } = {}) {
+  const start = Date.now();
+  while (Date.now() - start < maxMs) {
+    try { await supabaseClient.auth.refreshSession(); } catch (_) {}
+
+    const access = await checkUserAccess();
+    if (access?.hasAccess) return true;
+
+    await new Promise(r => setTimeout(r, intervalMs));
+  }
+  return false;
+}
+
+async function refreshLandingGate() {
+  const { data: userData, error: userErr } = await supabaseClient.auth.getUser();
+  const user = userData?.user || null;
+
+  if (userErr) console.warn("[refreshLandingGate] getUser error:", userErr);
+
+  if (!user) {
+    lpWhoami.textContent = "Not logged in";
+    lpStatus.textContent = "";
+    lpLogoutBtn.style.display = "none";
+    setLpGoButton(false);
+    return;
+  }
+
+  lpWhoami.textContent = `Logged in as: ${user.email || user.id}`;
+  lpLogoutBtn.style.display = "inline-flex";
+
+    lpStatus.textContent = "Checking access…";
+  let access = await checkUserAccess(user.id);
+
+  // If they just came back from Stripe, wait a bit for webhook/DB update
+  const params = new URLSearchParams(window.location.search);
+  const cameFromStripe = params.has("success") || params.has("session_id");
+
+  if (!access?.hasAccess && cameFromStripe) {
+    lpStatus.textContent = "Finishing setup… (this can take a few seconds)";
+    const ok = await waitForAccess({ maxMs: 30000, intervalMs: 1500 });
+    if (ok) access = await checkUserAccess(user.id);
+
+    // Optional: clean the URL so refresh doesn't keep polling
+    history.replaceState({}, document.title, window.location.pathname);
+  }
+
+  // Show status info
+  if (access?.rows?.length) {
+    const statuses = access.rows.map(r => String(r.status || "").toLowerCase()).join(", ");
+    lpStatus.textContent = `Subscription status: ${statuses || "(none)"}`;
+  } else {
+    lpStatus.textContent = access?.hasAccess ? "Subscription status: ok" : "No active/trial subscription found.";
+  }
+
+  setLpGoButton(!!access?.hasAccess);
+}
+
+lpGoBtn?.addEventListener("click", async () => {
+  // safety re-check on click
+  const { data } = await supabaseClient.auth.getUser();
+  const user = data?.user;
+  if (!user) return;
+
+  const access = await checkUserAccess(user.id);
+  if (!access?.hasAccess) return;
+
+  window.location.href = "https://zencardstudy.com/app.html";
+});
+
+lpLogoutBtn?.addEventListener("click", async () => {
+  await supabaseClient.auth.signOut();
+  await refreshLandingGate();
+});
+
+// Keep UI in sync when auth changes
+supabaseClient.auth.onAuthStateChange(() => {
+  refreshLandingGate();
+});
+
+// Initial draw
+refreshLandingGate();
+
 
 async function checkUserAccess(userIdFromLogin) {
   // Prefer uid from login response
@@ -810,7 +935,7 @@ console.log("[POST-LOGIN] about to redirect to app.html");
 
 // ✅ If user has access → app
 if (access?.hasAccess === true || access?.hasAccess === "true") {
-  window.location.href = "https://zencardstudy.com/app.html";
+  await refreshLandingGate();   // unlocks button + updates UI
   return;
 }
 
@@ -874,8 +999,8 @@ async function startCheckoutFromLanding() {
         "apikey": SUPABASE_ANON_KEY,
       },
       body: JSON.stringify({
-        success_url: "https://zencardstudy.com/app.html?success=1",
-        cancel_url: "https://zencardstudy.com/?canceled=1",
+       success_url: "https://zencardstudy.com/?success=1&session_id={CHECKOUT_SESSION_ID}",
+cancel_url:  "https://zencardstudy.com/?canceled=1",
       }),
     }
   );
@@ -890,16 +1015,8 @@ async function startCheckoutFromLanding() {
 }
 
 (async () => {
-  const authKey = Object.keys(localStorage).find(k => k.endsWith("-auth-token"));
-  const raw = authKey ? localStorage.getItem(authKey) : null;
-  const session = raw ? JSON.parse(raw) : null;
-
-  if (session?.access_token) {
-    const access = await checkUserAccess();
-    if (access.hasAccess) window.location.href = "https://zencardstudy.com/app.html";
-  }
+  await refreshLandingGate();
 })();
-
 
   document.getElementById("startTrialBtn")
   .addEventListener("click", () => window.startFreeTrial());
