@@ -78,6 +78,18 @@
       margin-top: 0.15rem;
       margin-bottom: 0.75rem;
     }
+    .authStatusBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  opacity: 0.85;
+  margin-bottom: 0.75rem;
+}
+
+.authStatusActions button {
+  margin-left: 0.5rem;
+}
     .container {
       max-width: 900px;
       margin: 0 auto;
@@ -356,6 +368,16 @@
 <body>
 
   <div class="container">
+
+      <!-- Logged-in status bar (required by JS) -->
+  <div id="authStatusBar" class="authStatusBar" style="display:none;">
+    <div id="authStatusText"></div>
+    <div class="authStatusActions">
+      <button id="logoutBtn" type="button">Log out</button>
+      <button id="manageBillingBtn" type="button">Manage billing</button>
+    </div>
+  </div>
+    
         <!-- ========== AUTH / ACCOUNT ========== -->
     <div id="authSection" class="card">
       <h2>Account</h2>
@@ -1298,6 +1320,26 @@ window.addEventListener("DOMContentLoaded", async () => {
   refreshCardsList();
 });
 
+// ===== AUTH UI HELPERS =====
+function updateAuthUI(session) {
+  const bar = document.getElementById("authStatusBar");
+  const text = document.getElementById("authStatusText");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const billingBtn = document.getElementById("manageBillingBtn");
+
+  // ✅ Null-safe guard — prevents UI removal from breaking auth
+  if (!bar || !text || !logoutBtn || !billingBtn) {
+    console.warn("[updateAuthUI] Auth UI elements missing — skipping UI update");
+    return;
+  }
+
+  if (session?.user) {
+    bar.style.display = "flex";
+    text.textContent = `Logged in as ${session.user.email}`;
+  } else {
+    bar.style.display = "none";
+  }
+}
 
 supabaseClient.auth.onAuthStateChange(async (event, session) => {
   // Prevent weird UI flashes during an intentional sign-out
