@@ -357,6 +357,14 @@
 #paywallMsg {
   display: none !important;
 }
+/* Hide stray paywall "Password" label/text */
+label[for="paywallPassword"],
+#paywallPasswordLabel,
+#paywallLabelPassword,
+.paywallLabel {
+  display: none !important;
+}
+
   </style>
 </head>
 <body>
@@ -1160,6 +1168,9 @@ async function signOutFromApp() {
   updateAuthButtons();
 
   isSigningOut = false;
+
+  // ✅ NEW: go back to landing page after logout
+  window.location.replace("https://zencardstudy.com/");
 }
    
 async function sendPasswordReset() {
