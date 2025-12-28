@@ -130,7 +130,7 @@
     return new URLSearchParams(h);
   }
 
-  function waitForInitialSession(supabase, timeoutMs = 5000) {
+  function waitForInitialSession(supabase, timeoutMs = 6000) {
     return new Promise((resolve) => {
       const t = setTimeout(() => {
         try { sub?.subscription?.unsubscribe?.(); } catch (_) {}
@@ -147,20 +147,22 @@
     });
   }
 
-  async function getOrSetSession(supabase) {
-    // 1) Wait for detectSessionInUrl to do its thing
-    const initial = await waitForInitialSession(supabase, 5000);
+  async function getOrSetRecoverySession(supabase) {
+    // 1) Let detectSessionInUrl finish first
+    const initial = await waitForInitialSession(supabase, 6000);
     if (initial) return initial;
 
     // 2) Check persisted session
     const { data: s1 } = await supabase.auth.getSession();
     if (s1?.session) return s1.session;
 
-    // 3) Manual fallback for hash tokens
+    // 3) Manual hash fallback: #access_token=...&refresh_token=...&type=recovery
     const hp = parseHashParams();
     const type = hp.get("type");
     const access_token = hp.get("access_token");
     const refresh_token = hp.get("refresh_token");
+
+    console.log("[reset] hash params:", Object.fromEntries(hp.entries()));
 
     if (type === "recovery" && access_token && refresh_token) {
       const { data, error } = await supabase.auth.setSession({ access_token, refresh_token });
@@ -178,25 +180,26 @@
     }
 
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: { detectSessionInUrl: true, persistSession: true, autoRefreshToken: true },
+      auth: {
+        detectSessionInUrl: true,
+        persistSession: true,
+        autoRefreshToken: true,
+      },
     });
 
     setStatus("Verifying reset link…");
 
     let session = null;
     try {
-      session = await getOrSetSession(supabase);
+      session = await getOrSetRecoverySession(supabase);
     } catch (e) {
-      console.error("Session error:", e);
-      setStatus("Reset link error: " + (e?.message || "invalid/expired"));
+      console.error("[reset] session error:", e);
+      setStatus("This reset link is invalid/expired. Please request a new reset email.");
       return;
     }
 
     if (!session) {
-      // Helpful debug so you can see what you actually received
-      const hp = parseHashParams();
-      console.log("Hash params:", Object.fromEntries(hp.entries()));
-      setStatus("This reset link is invalid/expired OR your Supabase redirect URLs aren’t configured.");
+      setStatus("No recovery session found. Check Supabase redirect URLs and request a new reset email.");
       return;
     }
 
@@ -214,8 +217,9 @@
       setStatus("Updating password…");
 
       const { error } = await supabase.auth.updateUser({ password: newPw });
+
       if (error) {
-        console.error("updateUser error:", error);
+        console.error("[reset] updateUser error:", error);
         setStatus("Error updating password: " + error.message);
         resetBtn.disabled = false;
         return;
