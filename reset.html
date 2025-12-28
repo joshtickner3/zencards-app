@@ -99,11 +99,18 @@
     <p id="status">Checking your reset link…</p>
 
     <div id="formContainer" style="display:none;">
-      <label for="newPassword">New password</label>
-      <input id="newPassword" type="password" placeholder="Enter a new password" />
+  <form id="resetForm">
+    <label for="newPassword">New password</label>
+    <input
+      id="newPassword"
+      type="password"
+      placeholder="Enter a new password"
+      autocomplete="new-password"
+    />
 
-      <button id="resetBtn">Set new password</button>
-    </div>
+    <button id="resetBtn" type="submit">Set new password</button>
+  </form>
+</div>
 
     <p id="doneMessage" style="display:none;margin-top:0.75rem;">
       Password updated. You can now
@@ -116,133 +123,84 @@
   const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
 
-  const statusEl = document.getElementById("status");
+   const statusEl = document.getElementById("status");
   const formContainer = document.getElementById("formContainer");
-  const newPasswordInput = document.getElementById("newPassword");
-  const resetBtn = document.getElementById("resetBtn");
   const doneMessage = document.getElementById("doneMessage");
 
   function setStatus(msg) { statusEl.textContent = msg; }
 
-  function parseHash() {
+  function hashParams() {
     const h = (window.location.hash || "").replace(/^#/, "");
     return new URLSearchParams(h);
   }
 
   async function main() {
-    if (!window.supabase?.createClient) {
-      setStatus("Error: Supabase library failed to load.");
-      return;
-    }
-
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-        // Important: support both kinds of links across environments
-        flowType: "pkce",
-      },
-    });
-
     setStatus("Verifying reset link…");
 
-    // 0) If Supabase redirected you here with an error, show it clearly
-    const hp = parseHash();
-    const hashError = hp.get("error");
-    const hashErrorDesc = hp.get("error_description");
-    const hashErrorCode = hp.get("error_code");
-
-    if (hashError) {
-      console.error("[reset] hash error:", Object.fromEntries(hp.entries()));
-      setStatus(
-        `Reset link error: ${hashError}` +
-        (hashErrorCode ? ` (${hashErrorCode})` : "") +
-        (hashErrorDesc ? ` — ${decodeURIComponent(hashErrorDesc)}` : "")
-      );
+    if (!window.supabase?.createClient) {
+      setStatus("Supabase failed to load.");
       return;
     }
 
-    let session = null;
-
-    try {
-      // 1) PKCE style: ?code=...
-      const url = new URL(window.location.href);
-      const code = url.searchParams.get("code");
-      if (code) {
-        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) throw error;
-        session = data?.session || null;
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: false,        // IMPORTANT: keep reset isolated
+        autoRefreshToken: false,
+        detectSessionInUrl: false,    // IMPORTANT: we do it manually
       }
+    });
 
-      // 2) OTP style: ?token_hash=...&type=recovery
-      if (!session) {
-        const token_hash = url.searchParams.get("token_hash");
-        const type = url.searchParams.get("type");
-        if (token_hash && type) {
-          const { data, error } = await supabase.auth.verifyOtp({ type, token_hash });
-          if (error) throw error;
-          session = data?.session || null;
-        }
-      }
+    // --- Force session from hash ---
+    const hp = hashParams();
+    const type = hp.get("type");
+    const access_token = hp.get("access_token");
+    const refresh_token = hp.get("refresh_token");
 
-      // 3) Implicit hash style: #access_token=...&refresh_token=...
-      if (!session) {
-        const access_token = hp.get("access_token");
-        const refresh_token = hp.get("refresh_token");
-        if (access_token && refresh_token) {
-          const { data, error } = await supabase.auth.setSession({ access_token, refresh_token });
-          if (error) throw error;
-          session = data?.session || null;
-        }
-      }
+    console.log("[reset] type:", type);
+    console.log("[reset] has access_token:", !!access_token);
+    console.log("[reset] has refresh_token:", !!refresh_token);
 
-      // 4) Fallback: maybe session already persisted
-      if (!session) {
-        const { data } = await supabase.auth.getSession();
-        session = data?.session || null;
-      }
-    } catch (e) {
-      console.error("[reset] session setup failed:", e);
-      setStatus(`This reset link is invalid or expired. Please request a new reset email.`);
+    if (type !== "recovery" || !access_token || !refresh_token) {
+      setStatus("Reset link is missing required tokens. Request a new reset email.");
       return;
     }
 
-    if (!session) {
-      console.warn("[reset] No session found. Hash params:", Object.fromEntries(hp.entries()));
-      setStatus("No recovery session found. Request a new reset email.");
+    const { data: sessData, error: sessErr } =
+      await sb.auth.setSession({ access_token, refresh_token });
+
+    console.log("[reset] setSession:", { sessErr, sessData });
+
+    if (sessErr || !sessData?.session) {
+      setStatus("This reset link is invalid or expired. Request a new reset email.");
       return;
     }
 
-    // ✅ Link is good — show form
+    // ✅ Session is valid -> show form
     setStatus("Link verified. Enter a new password below.");
     formContainer.style.display = "block";
 
-    resetBtn.addEventListener("click", async () => {
-      const newPw = (newPasswordInput.value || "").trim();
-      if (newPw.length < 8) {
+    document.getElementById("resetForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const newPw = document.getElementById("newPassword").value.trim();
+      if (!newPw || newPw.length < 8) {
         setStatus("Please enter a new password (8+ characters).");
         return;
       }
 
-      resetBtn.disabled = true;
       setStatus("Updating password…");
 
-      const { error } = await supabase.auth.updateUser({ password: newPw });
+      const { error: upErr } = await sb.auth.updateUser({ password: newPw });
+      console.log("[reset] updateUser:", { upErr });
 
-      if (error) {
-        console.error("[reset] updateUser error:", error);
-        setStatus("Error updating password: " + error.message);
-        resetBtn.disabled = false;
+      if (upErr) {
+        setStatus("Error updating password: " + upErr.message);
         return;
       }
 
       setStatus("");
       formContainer.style.display = "none";
       doneMessage.style.display = "block";
-
-      // Optional: sign out of recovery session
-      try { await supabase.auth.signOut(); } catch (_) {}
     });
   }
 
