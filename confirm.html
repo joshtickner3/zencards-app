@@ -18,7 +18,14 @@
     const msgEl = document.getElementById("msg");
     const setMsg = (t) => { msgEl.textContent = t; console.log("[confirm]", t); };
 
-    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: window.localStorage,
+  },
+});
 
     function scrubUrl() {
       history.replaceState({}, document.title, window.location.pathname + window.location.search);
@@ -30,9 +37,10 @@
       const res = await fetch(`${SUPABASE_URL}/functions/v1/create-checkout-session`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${accessToken}`,
-        },
+  "Content-Type": "application/json",
+  "Authorization": `Bearer ${accessToken}`,
+  "apikey": SUPABASE_ANON_KEY,
+},
         body: JSON.stringify({
            success_url: "https://zencardstudy.com/?success=1&session_id={CHECKOUT_SESSION_ID}",
 cancel_url: "https://zencardstudy.com/?canceled=1",

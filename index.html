@@ -582,9 +582,10 @@
 
       <div class="modalMsg" id="loginMsg"></div>
 
-      <div style="margin-top:0.75rem;">
-        <button class="smallLink" id="forgotPwBtn" type="button">Forgot password?</button>
-      </div>
+      <div style="margin-top:0.75rem; display:flex; justify-content:space-between; gap:12px;">
+  <button class="smallLink" id="forgotPwBtn" type="button">Forgot password?</button>
+  <button class="smallLink" id="toggleAuthModeBtn" type="button">Create account</button>
+</div>
     </div>
   </div>
 
@@ -789,8 +790,8 @@ window.startFreeTrial = async function startFreeTrial() {
   return;
 }
 
-  // Otherwise open login modal first
-  openLoginModal();
+  // Otherwise open SIGNUP modal (create account)
+openLoginModal("signup");
 };
 
     // ===== Login modal logic =====
@@ -803,6 +804,35 @@ window.startFreeTrial = async function startFreeTrial() {
     const loginPassword = document.getElementById("loginPassword");
     const loginMsg = document.getElementById("loginMsg");
     const forgotPwBtn = document.getElementById("forgotPwBtn");
+    const toggleAuthModeBtn = document.getElementById("toggleAuthModeBtn");
+
+let authMode = "login"; // "login" | "signup"
+
+function setAuthMode(mode) {
+  authMode = mode;
+
+  const titleEl = document.getElementById("loginTitle");
+  const subtitleEl = titleEl?.nextElementSibling; // the small muted text under title (in your HTML)
+
+  if (mode === "signup") {
+    titleEl.textContent = "Create account";
+    if (subtitleEl) subtitleEl.textContent = "Enter an email + password. We'll email you a confirmation link.";
+    loginSubmitBtn.textContent = "Create account";
+    forgotPwBtn.style.display = "none";
+    if (toggleAuthModeBtn) toggleAuthModeBtn.textContent = "Already have an account? Log in";
+  } else {
+    titleEl.textContent = "Log in";
+    if (subtitleEl) subtitleEl.textContent = "Enter your ZenCards email + password.";
+    loginSubmitBtn.textContent = "Log in";
+    forgotPwBtn.style.display = "inline-block";
+    if (toggleAuthModeBtn) toggleAuthModeBtn.textContent = "Create account";
+  }
+}
+toggleAuthModeBtn?.addEventListener("click", () => {
+  setAuthMode(authMode === "login" ? "signup" : "login");
+});
+
+
         // ===== Billing modal logic =====
     const billingModal = document.getElementById("billingModal");
     const billingCloseBtn = document.getElementById("billingCloseBtn");
@@ -858,12 +888,13 @@ setTimeout(() => console.log("[Billing] still running after 5s"), 5000);
       }
     });
 
-    function openLoginModal(){
-      loginMsg.textContent = "";
-      loginMsg.className = "modalMsg";
-      loginModal.classList.add("show");
-      setTimeout(() => loginEmail.focus(), 50);
-    }
+    function openLoginModal(mode = "login"){
+  setAuthMode(mode);
+  loginMsg.textContent = "";
+  loginMsg.className = "modalMsg";
+  loginModal.classList.add("show");
+  setTimeout(() => loginEmail.focus(), 50);
+}
     function closeLoginModal(){
       loginModal.classList.remove("show");
     }
@@ -900,49 +931,60 @@ setTimeout(() => console.log("[Billing] still running after 5s"), 5000);
       loginMsg.textContent = "";
 
       try {
-        const res = await supabaseClient.auth.signInWithPassword({ email, password });
-console.log("[LOGIN RESULT]", res);
-
-if (res.error) {
-  loginMsg.textContent = res.error.message;
-  loginMsg.className = "modalMsg error";
-  return; // stop here
-}
-
- // ✅ LOGIN SUCCESS UI
-loginMsg.textContent = "Logged in ✅";
-loginMsg.className = "modalMsg ok";
-
-// ✅ Close modal
-closeLoginModal();
-
-// ✅ Use the user id from the login response (avoids timing issues)
-const uid = res?.data?.user?.id;
-
-// ✅ Check access using UID
-const access = await checkUserAccess(uid);
-console.log("[POST-LOGIN] access:", access);
-console.log("[POST-LOGIN] typeof hasAccess:", typeof access?.hasAccess, "value:", access?.hasAccess);
-console.log("[POST-LOGIN] about to redirect to app.html");
-
-
-// ✅ If user has access → app
-if (access?.hasAccess === true || access?.hasAccess === "true") {
-  await refreshLandingGate();   // unlocks button + updates UI
-  return;
-}
-
-// ❌ No access → send to Stripe checkout
-await startCheckoutFromLanding();
-
-      } catch (e) {
-        console.error(e);
-        loginMsg.textContent = "Something went wrong. Check console.";
-        loginMsg.className = "modalMsg error";
-      } finally {
-        loginSubmitBtn.disabled = false;
-        loginSubmitBtn.textContent = "Log in";
+  if (authMode === "signup") {
+    // Create account + send confirmation email
+    const res = await supabaseClient.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: "https://zencardstudy.com/confirm.html"
       }
+    });
+    console.log("[SIGNUP RESULT]", res);
+
+    if (res.error) {
+      loginMsg.textContent = res.error.message;
+      loginMsg.className = "modalMsg error";
+      return;
+    }
+
+    loginMsg.textContent = "Account created ✅ Check your email to confirm, then you'll be sent to Stripe.";
+    loginMsg.className = "modalMsg ok";
+
+    // Optional safety: close modal so user doesn’t keep clicking
+    // closeLoginModal();
+
+    return; // IMPORTANT: do NOT start Stripe here; wait for confirmation link
+  }
+
+  // ===== LOGIN MODE (your existing behavior) =====
+  const res = await supabaseClient.auth.signInWithPassword({ email, password });
+  console.log("[LOGIN RESULT]", res);
+
+  if (res.error) {
+    loginMsg.textContent = res.error.message;
+    loginMsg.className = "modalMsg error";
+    return;
+  }
+
+  loginMsg.textContent = "Logged in ✅";
+  loginMsg.className = "modalMsg ok";
+  closeLoginModal();
+
+  const uid = res?.data?.user?.id;
+  const access = await checkUserAccess(uid);
+
+  if (access?.hasAccess === true || access?.hasAccess === "true") {
+    await refreshLandingGate();
+    return;
+  }
+
+  await startCheckoutFromLanding();
+} catch (e) {
+  console.error(e);
+  loginMsg.textContent = "Something went wrong. Check console.";
+  loginMsg.className = "modalMsg error";
+}
     });
 
     forgotPwBtn.addEventListener("click", async () => {
