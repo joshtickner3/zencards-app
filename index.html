@@ -170,6 +170,82 @@
       border-top:1px solid #111827;
       padding-top:0.75rem;
     }
+    /* ===== Student pain strip (goes above KPI row) ===== */
+.painStrip{
+  margin-top: 0.9rem;
+  margin-bottom: 0.75rem;
+  padding: 0.85rem;
+  border-radius: 0.95rem;
+  background: linear-gradient(180deg, rgba(2,6,23,0.85), rgba(2,6,23,0.65));
+  border: 1px solid #111827;
+}
+
+.painTitle{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 0.75rem;
+  margin: 0 0 0.65rem 0;
+}
+
+.painTitle h3{
+  margin:0;
+  font-size: 1.05rem;
+}
+
+.painTitle .muted{
+  font-size: 0.9rem;
+}
+
+.painGrid{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+@media (max-width: 860px){
+  .painGrid{ grid-template-columns: 1fr; }
+}
+
+.painItem{
+  background:#020617;
+  border:1px solid #111827;
+  border-radius:0.85rem;
+  padding:0.85rem;
+}
+
+.painItemTop{
+  display:flex;
+  align-items:center;
+  gap:0.55rem;
+  margin-bottom: 0.25rem;
+}
+
+.painIcon{
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid #1f2937;
+  background: rgba(16,185,129,0.10);
+  color: #bbf7d0;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.painItem h4{
+  margin:0;
+  font-size: 0.98rem;
+}
+
+.painItem p{
+  margin:0.2rem 0 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
     .kpiRow{
       display:flex;
       gap:0.75rem;
@@ -319,6 +395,40 @@
         Busy and goal oriented students have little time to spare when balancing studying with work, <strong>until now</strong> . ZenCards lets you study your flashcards completely hands-free <strong>without looking at your phone</strong>.
         Review while doing everyday activities so you can turn unproductive "dead" time into high quality review time, freeing up your schedule for a full time job as a student so you can invest in your future upon graduation. 
       </p>
+      <!-- ===== Student pain strip (NEW) ===== -->
+<div class="painStrip">
+  <div class="painTitle">
+    <h3>The student trap</h3>
+    <div class="muted">Not enough time — for grades, money, or life.</div>
+  </div>
+
+  <div class="painGrid">
+    <div class="painItem">
+      <div class="painItemTop">
+        <div class="painIcon">⏱</div>
+        <h4>Grades slip</h4>
+      </div>
+      <p>There’s never enough time to study, so performance drops and opportunities close.</p>
+    </div>
+
+    <div class="painItem">
+      <div class="painItemTop">
+        <div class="painIcon">💸</div>
+        <h4>Money stays tight</h4>
+      </div>
+      <p>Studying eats your schedule, leaving little time to work, save, and build wealth early.</p>
+    </div>
+
+    <div class="painItem">
+      <div class="painItemTop">
+        <div class="painIcon">😶</div>
+        <h4>No free time</h4>
+      </div>
+      <p>School + work kills your social life, causing loneliness and burnout.</p>
+    </div>
+  </div>
+</div>
+
 
       <div class="kpiRow">
         <div class="kpi">
