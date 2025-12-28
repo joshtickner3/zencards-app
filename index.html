@@ -336,10 +336,10 @@
       </div>
 
       <div class="row" style="margin-top:0.85rem;">
-        <button class="btn" id="startTrialBtn" type="button">Start free trial</button>
-        <button class="btn secondary" id="loginBtn" type="button">Log in</button>
-        <a class="btn secondary small" href="mailto:support@YOURDOMAIN.com?subject=ZenCards%20Cancel%20Subscription">Manage / Cancel subscription</a>
-      </div>
+  <button class="btn secondary" id="loginBtn" type="button">Log in</button>
+  <a class="btn secondary small" href="mailto:support@YOURDOMAIN.com?subject=ZenCards%20Cancel%20Subscription">Manage / Cancel subscription</a>
+</div>
+
       <!-- ===== Account + Gate (Landing Page) ===== -->
 <div class="card" style="margin-top:1rem;background:#0b1220;border:1px solid #111827;">
   <div class="row" style="align-items:center;">
@@ -479,9 +479,8 @@
           </ul>
 
           <div class="row" style="margin-top:0.85rem;">
-            <a class="btn" href="https://zencardstudy.com/app.html?startTrial=1">Start free trial</a>
-            <button class="btn secondary" id="loginBtn2" type="button">Log in</button>
-          </div>
+  <button class="btn" id="startTrialBtn" type="button">Start free trial</button>
+</div>
 
           <div class="fineprint">
             <strong>Auto-billing notice:</strong> After 7 days, you will be charged $9.99/month unless you cancel.
@@ -495,10 +494,6 @@
             We keep cancellation simple. Use the button below (you’ll later connect it to Stripe’s customer portal),
             or email support and we’ll handle it.
           </p>
-
-          <a class="btn secondary" href="mailto:support@YOURDOMAIN.com?subject=ZenCards%20Cancel%20Subscription">
-            Manage / Cancel subscription
-          </a>
 
           <div class="fineprint">
             <strong>Note:</strong> This landing page is static. The actual cancellation portal link will be added once
@@ -801,7 +796,6 @@ window.startFreeTrial = async function startFreeTrial() {
     // ===== Login modal logic =====
     const loginModal = document.getElementById("loginModal");
     const loginBtn = document.getElementById("loginBtn");
-    const loginBtn2 = document.getElementById("loginBtn2");
     const loginCloseBtn = document.getElementById("loginCloseBtn");
     const loginCancelBtn = document.getElementById("loginCancelBtn");
     const loginSubmitBtn = document.getElementById("loginSubmitBtn");
@@ -875,7 +869,6 @@ setTimeout(() => console.log("[Billing] still running after 5s"), 5000);
     }
 
     loginBtn?.addEventListener("click", openLoginModal);
-    loginBtn2?.addEventListener("click", openLoginModal);
     loginCloseBtn.addEventListener("click", closeLoginModal);
     loginCancelBtn.addEventListener("click", closeLoginModal);
 
