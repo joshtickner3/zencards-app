@@ -294,6 +294,62 @@
       color:#cbd5e1;
       font-size:0.9em;
     }
+    /* ===== When to use ZenCards (under painStrip) ===== */
+.useStrip{
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding: 0.85rem;
+  border-radius: 0.95rem;
+  background: linear-gradient(180deg, rgba(2,6,23,0.82), rgba(2,6,23,0.60));
+  border: 1px solid #111827;
+}
+
+.useTitle{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap: 0.75rem;
+  margin: 0 0 0.65rem 0;
+}
+
+.useTitle h3{
+  margin:0;
+  font-size: 1.05rem;
+}
+
+.useTitle p{
+  margin:0.15rem 0 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.pillRow{
+  display:flex;
+  flex-wrap:wrap;
+  gap:0.5rem;
+}
+
+.pill{
+  display:inline-flex;
+  align-items:center;
+  gap:0.45rem;
+  padding:0.38rem 0.65rem;
+  border-radius:999px;
+  border:1px solid #1f2937;
+  background:#020617;
+  color:#cbd5e1;
+  font-size:0.88rem;
+  white-space:nowrap;
+}
+
+.pill .dot{
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(16,185,129,0.65);
+  box-shadow: 0 0 0 3px rgba(16,185,129,0.10);
+}
+
 
     /* ===== Login Modal ===== */
     .modalOverlay{
@@ -426,6 +482,28 @@
       </div>
       <p>School + work kills your social life, causing loneliness and burnout.</p>
     </div>
+  </div>
+</div>
+<!-- ===== When to use ZenCards (NEW) ===== -->
+<div class="useStrip">
+  <div class="useTitle">
+    <div>
+      <h3>Use ZenCards anywhere</h3>
+      <p>We designed ZenCards to work in <strong>any</strong> setting — so you can study whenever life happens.</p>
+    </div>
+    <div class="muted" style="font-size:0.9rem;">If you can listen (or read), you can review.</div>
+  </div>
+
+  <div class="pillRow">
+    <span class="pill"><span class="dot"></span>Commuting</span>
+    <span class="pill"><span class="dot"></span>Walking to class</span>
+    <span class="pill"><span class="dot"></span>Eating</span>
+    <span class="pill"><span class="dot"></span>Between lectures</span>
+    <span class="pill"><span class="dot"></span>In class (silent mode)</span>
+    <span class="pill"><span class="dot"></span>Doing chores</span>
+    <span class="pill"><span class="dot"></span>At the gym</span>
+    <span class="pill"><span class="dot"></span>Waiting in line</span>
+    <span class="pill"><span class="dot"></span>Anywhere you have 2 minutes</span>
   </div>
 </div>
 
