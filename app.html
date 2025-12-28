@@ -25,6 +25,14 @@
   src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
 </script>
   <style>
+    /* Hide Sign Up button on app.html (users sign up on landing) */
+#signUpBtn {
+  display: none !important;
+}
+#authLoggedOut .row {
+  justify-content: center;
+}
+
     body {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
       background: radial-gradient(circle at top, #1f2937 0, #020617 55%);
@@ -400,8 +408,7 @@ label[for="paywallPassword"],
     <div id="authSection" class="card">
       <h2>Account</h2>
       <p id="authStatus" style="font-size:0.85rem;color:#9ca3af;margin-bottom:0.5rem;">
-        Not signed in. New users- welcome! Create an account and verify your email, then you will be directed to begin your free trial. Happy studying!
-      </p>
+        Not signed in. Please sign in to sync decks and cards across devices. Happy studying- ZenCards LLC
 
       <!-- Shown when logged OUT -->
       <div id="authLoggedOut">
