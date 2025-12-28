@@ -408,8 +408,8 @@ label[for="paywallPassword"],
     <div id="authSection" class="card">
       <h2>Account</h2>
       <p id="authStatus" style="font-size:0.85rem;color:#9ca3af;margin-bottom:0.5rem;">
-        Not signed in. Please sign in to sync decks and cards across devices. Happy studying- ZenCards LLC
-
+        Not signed in. Please sign in to sync decks and cards across devices. Happy studying! ZenCards LLC
+</p>
       <!-- Shown when logged OUT -->
       <div id="authLoggedOut">
         <div class="row">
@@ -975,6 +975,8 @@ let isSigningOut = false;
 // ===== AUTH DOM REFERENCES =====
 const authEmailInput = document.getElementById("authEmail");
 const authPasswordInput = document.getElementById("authPassword");
+const resumeCheckoutBtn = document.getElementById("resumeCheckoutBtn");
+const paywallLogoutBtn = document.getElementById("paywallLogoutBtn");
 
 resumeCheckoutBtn?.addEventListener("click", async () => {
   try {
@@ -2917,8 +2919,6 @@ let awaitingMuteSeconds = false;
 // DOM refs (safe here because index.html already loaded)
 const micMuteTimerEl = document.getElementById("micMuteTimer");
 const micMuteSecondsEl = document.getElementById("micMuteSeconds");
-const paywallLogoutBtn = document.getElementById("paywallLogoutBtn");
-
 
 
     // NEW: track if question/answer have been spoken for current card
