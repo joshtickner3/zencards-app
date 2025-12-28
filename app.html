@@ -436,6 +436,7 @@ label[for="paywallPassword"],
         </p>
         <button id="logOutBtn" class="secondary small">Log Out</button>
         <button id="manageBillingBtn">Manage Billing</button>
+         <button id="resetPasswordLoggedInBtn" class="secondary small">Reset Password</button>
       </div>
     </div>
 
@@ -1056,6 +1057,7 @@ manageBillingBtn?.addEventListener("click", async () => {
 
         // correct ID
 const resetPwBtn = document.getElementById("resetPasswordBtn");  // correct ID
+const resetPwLoggedInBtn = document.getElementById("resetPasswordLoggedInBtn");
 
 const authStatusSpan = document.getElementById("authStatus");
 const deckBadge = document.getElementById("deckBadge");
@@ -1132,57 +1134,41 @@ console.log("✅ LOGGED IN EMAIL:", data.user.email);
 }
 
 async function signOutFromApp() {
-  // We’re explicitly in the middle of a manual sign-out
   isSigningOut = true;
 
+  // ✅ ALWAYS redirect, even if Supabase signOut hangs/fails.
+  // We'll attempt signOut, but we won't wait forever.
+
+  const PROJECT_REF = "elpfcnnrripftxoqeckv"; // your Supabase ref from the URL
+
   try {
-    // Check if this browser even has a session
-    const { data: sessionData, error: sessionError } =
-      await supabaseClient.auth.getSession();
-
-    if (sessionError) {
-      console.error("getSession error during sign-out:", sessionError);
-    }
-
-    // If there's no session in THIS browser, just clear the UI and bail out
-    if (!sessionData || !sessionData.session) {
-  console.log("No auth session in this browser; treating as signed out.");
-  currentUser = null;
-  setAuthStatus("Not signed in.");
-  updateAuthButtons();
-  isSigningOut = false;
-
-  // ✅ ALWAYS redirect
-  window.location.assign("https://zencardstudy.com/");
-  return;
-}
-
-    // There *is* a session here, so try to sign out
-    const { error } = await supabaseClient.auth.signOut();
-
-    // Ignore the special "Auth session missing" case – it just means
-    // Supabase couldn't find a session token, which is fine for log out
-   if (error && error.message !== "Auth session missing") {
-  // Log it for debugging, but do NOT surface it to the user
-  console.warn("Non-fatal sign-out error:", error.message);
-}
- 
-  } catch (err) {
-    console.error("Sign-out exception:", err);
-    setAuthStatus("Sign-out error: " + err.message);
-    isSigningOut = false;
-    return;
+    // Best effort: try to sign out, but timeout quickly
+    await Promise.race([
+      supabaseClient.auth.signOut(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("signOut timeout")), 2500))
+    ]).catch((e) => {
+      console.warn("Non-fatal signOut issue:", e?.message || e);
+    });
+  } catch (e) {
+    console.warn("Non-fatal signOut exception:", e?.message || e);
   }
 
-  // If we get here, we’re treating the user as signed out no matter what
+  try {
+    // ✅ Hard-clear local Supabase session token so you are truly logged out in this browser
+    localStorage.removeItem(`sb-${PROJECT_REF}-auth-token`);
+    // (Optional safety: sometimes there are older keys)
+    localStorage.removeItem(`sb-${PROJECT_REF}-auth-token-code-verifier`);
+  } catch (_) {}
+
+  // Reset app state/UI
   currentUser = null;
-  setAuthStatus("Signed out.");
   updateAuthButtons();
+  setAuthStatus("Signed out.");
 
   isSigningOut = false;
 
-  // ✅ NEW: go back to landing page after logout
-  window.location.replace("https://zencardstudy.com/");
+  // ✅ ALWAYS go back to landing
+  window.location.assign("https://zencardstudy.com/");
 }
    
 async function sendPasswordReset() {
@@ -1235,6 +1221,29 @@ if (resetPwBtn) {
     sendPasswordReset();
   });
 }
+if (resetPwLoggedInBtn) {
+  resetPwLoggedInBtn.addEventListener("click", async () => {
+    if (!currentUser?.email) {
+      setAuthStatus("No user email found.");
+      return;
+    }
+
+    const { error } =
+      await supabaseClient.auth.resetPasswordForEmail(
+        currentUser.email,
+        {
+          redirectTo: "https://zencardstudy.com/reset.html",
+        }
+      );
+
+    if (error) {
+      setAuthStatus("Reset failed: " + error.message);
+    } else {
+      setAuthStatus("Password reset email sent.");
+    }
+  });
+}
+
 
 function setAuthStatus(message) {
   if (authStatusSpan) authStatusSpan.textContent = message;
