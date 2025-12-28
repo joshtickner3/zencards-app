@@ -1137,13 +1137,16 @@ async function signOutFromApp() {
 
     // If there's no session in THIS browser, just clear the UI and bail out
     if (!sessionData || !sessionData.session) {
-      console.log("No auth session in this browser; treating as signed out.");
-      currentUser = null;
-      setAuthStatus("Not signed in.");
-      updateAuthButtons();
-      isSigningOut = false;
-      return;
-    }
+  console.log("No auth session in this browser; treating as signed out.");
+  currentUser = null;
+  setAuthStatus("Not signed in.");
+  updateAuthButtons();
+  isSigningOut = false;
+
+  // ✅ ALWAYS redirect
+  window.location.assign("https://zencardstudy.com/");
+  return;
+}
 
     // There *is* a session here, so try to sign out
     const { error } = await supabaseClient.auth.signOut();
@@ -1211,6 +1214,12 @@ if (signOutBtn) {
     signOutFromApp();
   });
 }
+if (paywallLogoutBtn) {
+  paywallLogoutBtn.addEventListener("click", () => {
+    signOutFromApp();
+  });
+}
+
 
 if (resetPwBtn) {
   resetPwBtn.addEventListener("click", () => {
@@ -2901,6 +2910,8 @@ let awaitingMuteSeconds = false;
 // DOM refs (safe here because index.html already loaded)
 const micMuteTimerEl = document.getElementById("micMuteTimer");
 const micMuteSecondsEl = document.getElementById("micMuteSeconds");
+const paywallLogoutBtn = document.getElementById("paywallLogoutBtn");
+
 
 
     // NEW: track if question/answer have been spoken for current card
