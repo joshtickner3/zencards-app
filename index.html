@@ -279,6 +279,28 @@
       font-size:0.85rem;
       margin:1.25rem 0 0.5rem 0;
     }
+    /* ===== Privacy section ===== */
+.privacyCard{
+  background:#020617;
+  border:1px solid #111827;
+  border-radius:0.9rem;
+  padding:1rem;
+}
+
+.privacyCard h2{
+  margin-top:0;
+}
+
+.privacyCard p{
+  margin:0.5rem 0;
+  color: var(--muted);
+}
+
+.privacyCard ul{
+  margin:0.5rem 0 0 1.15rem;
+  color: var(--muted);
+}
+
     .note{
       background: rgba(34,197,94,0.10);
       border: 1px solid rgba(34,197,94,0.25);
@@ -525,7 +547,7 @@
 
       <div class="row" style="margin-top:0.85rem;">
   <button class="btn secondary" id="loginBtn" type="button">Log in</button>
-  <a class="btn secondary small" href="mailto:support@YOURDOMAIN.com?subject=ZenCards%20Cancel%20Subscription">Manage / Cancel subscription</a>
+  <a class="btn secondary small" href="mailto:support@zencardstudy.com?subject=ZenCards%20Cancel%20Subscription">Manage / Cancel subscription</a>
 </div>
 
       <!-- ===== Account + Gate (Landing Page) ===== -->
@@ -730,6 +752,32 @@
         </p>
       </details>
     </div>
+    <!-- PRIVACY -->
+<div class="card privacyCard">
+  <h2>Privacy & Data Use</h2>
+
+  <p><strong>Your privacy matters to us.</strong> ZenCards is designed to help you study more efficiently — not to collect or exploit your personal data.</p>
+
+  <p><strong>What we do <em>not</em> access or store</strong></p>
+  <ul>
+    <li>We <strong>do not have access to your password</strong>. Passwords are securely handled and hashed by our authentication provider.</li>
+    <li>We <strong>do not read or monitor the content of your decks or flashcards</strong>. Your study materials belong to you.</li>
+    <li>We <strong>do not sell, rent, or share your personal data</strong> with third parties for advertising or marketing purposes.</li>
+  </ul>
+
+  <p><strong>What information is required</strong></p>
+  <p>To provide the ZenCards service, we store only what’s necessary: your email (for account access), your account/subscription status (to manage access), and basic operational data needed to run the app reliably.</p>
+
+  <p><strong>Payments</strong></p>
+  <p>All payments are handled securely by Stripe. ZenCards <strong>never sees or stores your credit card details</strong>.</p>
+
+  <p><strong>Email</strong></p>
+  <p>We send emails only for essential account-related purposes (verification, password resets, and billing notifications). We do not send marketing emails without your consent.</p>
+
+  <p><strong>Questions</strong></p>
+  <p>If you have any privacy questions, contact us at <strong>support@zencardstudy.com</strong>.</p>
+</div>
+
 
     <p class="footer">
       © <span id="year"></span> ZenCards • <span class="muted">Study smarter. Live more.</span>
