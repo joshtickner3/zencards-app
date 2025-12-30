@@ -1362,7 +1362,12 @@ window.addEventListener("DOMContentLoaded", async () => {
   const ok = await enforceAccessOrRedirect();
   if (!ok) return;
 
-  // load state once unlocked
+  // ✅ Always load local first so refresh works
+  loadFromStorage();
+  refreshDeckSelect();
+  refreshCardsList();
+
+  // ✅ Then sync from Supabase (may overwrite if remote exists)
   await loadStateFromSupabase();
   refreshDeckSelect();
   refreshCardsList();
@@ -1473,7 +1478,7 @@ async function saveStateToSupabase() {
   const state = getCurrentState();
   console.log("Saving state to Supabase for user:", currentUser.id, state);
 
-  const { data, error } = await supabaseClient
+  const { error } = await supabaseClient
     .from("zencards_state")
     .upsert(
       {
@@ -1482,9 +1487,7 @@ async function saveStateToSupabase() {
         updated_at: new Date().toISOString(),
       },
       { onConflict: "user_id" }
-    )
-    .select()
-    .maybeSingle();
+    );
 
   if (error) {
     console.error("Supabase save error:", error);
@@ -1492,7 +1495,7 @@ async function saveStateToSupabase() {
     return;
   }
 
-  console.log("✅ Supabase state saved:", data);
+  console.log("✅ Supabase state saved");
 }
 
 async function loadStateFromSupabase() {
@@ -1501,36 +1504,38 @@ async function loadStateFromSupabase() {
     return;
   }
 
-  try {
-    const { data, error } = await supabaseClient
-      .from("zencards_state")
-      .select("state_json")
-      .eq("user_id", currentUser.id)
-      .maybeSingle();
+  const { data, error } = await supabaseClient
+    .from("zencards_state")
+    .select("state_json")
+    .eq("user_id", currentUser.id)
+    .maybeSingle();
 
-    if (error) {
-      console.error("Supabase load error:", error);
-      setAuthStatus("Supabase load error: " + error.message);
-      return;
-    }
-
-    console.log("Supabase load row:", data);
-
-    if (data?.state_json) {
-      const remote = data.state_json;
-
-      if (remote.decks && Array.isArray(remote.decks)) decks = remote.decks;
-      if (remote.schedule && typeof remote.schedule === "object") schedule = remote.schedule;
-
-      console.log("Loaded state from Supabase into app.");
-    } else {
-      console.log("No Supabase state yet; saving initial local state.");
-      await saveStateToSupabase();
-    }
-  } catch (err) {
-    console.error("Supabase load exception:", err);
-    setAuthStatus("Supabase load exception: " + err.message);
+  if (error) {
+    console.error("Supabase load error:", error);
+    setAuthStatus("Supabase load error: " + error.message);
+    return;
   }
+
+  console.log("Supabase load row:", data);
+
+  // ✅ If no remote row exists, KEEP localStorage state and push it to Supabase
+  if (!data?.state_json) {
+    console.log("No Supabase state yet; keeping local and uploading it.");
+    await saveStateToSupabase();
+    return;
+  }
+
+  const remote = data.state_json;
+
+  // ✅ Only overwrite if remote has valid structures
+  if (Array.isArray(remote.decks)) decks = remote.decks;
+  if (remote.schedule && typeof remote.schedule === "object") schedule = remote.schedule;
+
+  // ✅ Also persist remote into localStorage so refresh works
+  localStorage.setItem("srsDecks", JSON.stringify(decks));
+  localStorage.setItem("srsSchedule", JSON.stringify(schedule));
+
+  console.log("Loaded state from Supabase into app.");
 }
 
     function scheduleKey(deckId, cardId) {
