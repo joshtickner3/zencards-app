@@ -1478,12 +1478,15 @@ async function saveStateToSupabase() {
 
   try {
     const { data, error } = await supabaseClient
-      .from("zencards_state")
-      .upsert({
-        user_id: currentUser.id,
-        state_json: state,
-      })
-      .select();
+  .from("zencards_state")
+  .upsert(
+    {
+      user_id: currentUser.id,
+      state_json: state,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" }
+  );
 
     if (error) {
       console.error("Supabase save error:", error);
@@ -1505,10 +1508,11 @@ async function loadStateFromSupabase() {
 
   try {
     const { data, error } = await supabaseClient
-      .from("zencards_state")
-      .select("state_json")
-      .eq("user_id", currentUser.id)
-      .limit(1);
+  .from("zencards_state")
+  .select("state_json")
+  .eq("user_id", currentUser.id)
+  .order("updated_at", { ascending: false })
+  .limit(1);
 
     if (error) {
       console.error("Supabase load error:", error);
