@@ -1455,19 +1455,16 @@ function getCurrentState() {
 
     function saveDecks() {
   localStorage.setItem("srsDecks", JSON.stringify(decks));
-  // Also sync to Supabase (fire and forget)
-  saveStateToSupabase();
+  saveStateToSupabase().catch(console.error);
 }
 
 function saveSchedule() {
   localStorage.setItem("srsSchedule", JSON.stringify(schedule));
-  // Also sync to Supabase (fire and forget)
-  saveStateToSupabase();
+  saveStateToSupabase().catch(console.error);
 }
 
 // ===================== SUPABASE SYNC HELPERS =====================
 async function saveStateToSupabase() {
-  // Only sync when logged in
   if (!supabaseClient || !currentUser) {
     console.log("Not saving to Supabase: no client or no currentUser");
     return;
@@ -1476,28 +1473,26 @@ async function saveStateToSupabase() {
   const state = getCurrentState();
   console.log("Saving state to Supabase for user:", currentUser.id, state);
 
-  try {
-    const { data, error } = await supabaseClient
-  .from("zencards_state")
-  .upsert(
-    {
-      user_id: currentUser.id,
-      state_json: state,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id" }
-  );
+  const { data, error } = await supabaseClient
+    .from("zencards_state")
+    .upsert(
+      {
+        user_id: currentUser.id,
+        state_json: state,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" }
+    )
+    .select()
+    .maybeSingle();
 
-    if (error) {
-      console.error("Supabase save error:", error);
-      setAuthStatus("Supabase save error: " + error.message);
-    } else {
-      console.log("Supabase state saved. Row:", data);
-    }
-  } catch (err) {
-    console.error("Supabase save exception:", err);
-    setAuthStatus("Supabase save exception: " + err.message);
+  if (error) {
+    console.error("Supabase save error:", error);
+    setAuthStatus("Supabase save error: " + error.message);
+    return;
   }
+
+  console.log("✅ Supabase state saved:", data);
 }
 
 async function loadStateFromSupabase() {
@@ -1508,11 +1503,10 @@ async function loadStateFromSupabase() {
 
   try {
     const { data, error } = await supabaseClient
-  .from("zencards_state")
-  .select("state_json")
-  .eq("user_id", currentUser.id)
-  .order("updated_at", { ascending: false })
-  .limit(1);
+      .from("zencards_state")
+      .select("state_json")
+      .eq("user_id", currentUser.id)
+      .maybeSingle();
 
     if (error) {
       console.error("Supabase load error:", error);
@@ -1520,17 +1514,13 @@ async function loadStateFromSupabase() {
       return;
     }
 
-    console.log("Supabase load result:", data);
+    console.log("Supabase load row:", data);
 
-    if (data && data.length > 0 && data[0].state_json) {
-      const remote = data[0].state_json;
+    if (data?.state_json) {
+      const remote = data.state_json;
 
-      if (remote.decks && Array.isArray(remote.decks)) {
-        decks = remote.decks;
-      }
-      if (remote.schedule && typeof remote.schedule === "object") {
-        schedule = remote.schedule;
-      }
+      if (remote.decks && Array.isArray(remote.decks)) decks = remote.decks;
+      if (remote.schedule && typeof remote.schedule === "object") schedule = remote.schedule;
 
       console.log("Loaded state from Supabase into app.");
     } else {
