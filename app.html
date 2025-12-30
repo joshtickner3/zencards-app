@@ -1430,33 +1430,34 @@ function getCurrentState() {
     const SHORT_REVIEW_THRESHOLD_MINUTES = 10;
 
     function loadFromStorage() {
-      try {
-        const d = localStorage.getItem("srsDecks");
-        decks = d ? JSON.parse(d) : [];
-      } catch (_) {
-        decks = [];
-      }
-      if (!Array.isArray(decks)) decks = [];
-      if (decks.length === 0) {
-        // default deck
-        decks = [{
-          id: "deck1",
-          name: "Sample Deck",
-          cards: [
-            { id: "c1", question: "What does DOMS stand for?", answer: "Delayed onset muscle soreness." },
-            { id: "c2", question: "In a dumbbell incline press, what area of the chest is emphasized?", answer: "The upper chest, especially the clavicular head of the pectoralis major." }
-          ]
-        }];
-      }
+  try {
+    const d = localStorage.getItem("srsDecks");
+    decks = d ? JSON.parse(d) : [];
+  } catch (_) {
+    decks = [];
+  }
+  if (!Array.isArray(decks)) decks = [];
 
-      try {
-        const s = localStorage.getItem("srsSchedule");
-        schedule = s ? JSON.parse(s) : {};
-      } catch (_) {
-        schedule = {};
-      }
-      if (typeof schedule !== "object" || schedule === null) schedule = {};
-    }
+  try {
+    const s = localStorage.getItem("srsSchedule");
+    schedule = s ? JSON.parse(s) : {};
+  } catch (_) {
+    schedule = {};
+  }
+  if (typeof schedule !== "object" || schedule === null) schedule = {};
+
+  // ✅ Only create sample deck if NOT logged in
+  if (decks.length === 0 && !currentUser) {
+    decks = [{
+      id: "deck1",
+      name: "Sample Deck",
+      cards: [
+        { id: "c1", question: "What does DOMS stand for?", answer: "Delayed onset muscle soreness." },
+        { id: "c2", question: "In a dumbbell incline press, what area of the chest is emphasized?", answer: "The upper chest, especially the clavicular head of the pectoralis major." }
+      ]
+    }];
+  }
+}
 
     function saveDecks() {
   localStorage.setItem("srsDecks", JSON.stringify(decks));
@@ -1470,19 +1471,24 @@ function saveSchedule() {
 
 // ===================== SUPABASE SYNC HELPERS =====================
 async function saveStateToSupabase() {
-  if (!supabaseClient || !currentUser) {
-    console.log("Not saving to Supabase: no client or no currentUser");
+  if (!supabaseClient) return;
+
+  const { data: userData, error: userErr } = await supabaseClient.auth.getUser();
+  const user = userData?.user;
+
+  if (!user) {
+    console.log("Not saving: no user", userErr);
     return;
   }
 
   const state = getCurrentState();
-  console.log("Saving state to Supabase for user:", currentUser.id, state);
+  console.log("Saving state to Supabase for user:", user.id, state);
 
   const { error } = await supabaseClient
     .from("zencards_state")
     .upsert(
       {
-        user_id: currentUser.id,
+        user_id: user.id,
         state_json: state,
         updated_at: new Date().toISOString(),
       },
@@ -1499,15 +1505,22 @@ async function saveStateToSupabase() {
 }
 
 async function loadStateFromSupabase() {
-  if (!supabaseClient || !currentUser) {
-    console.log("Not loading from Supabase: no client or no currentUser");
+  if (!supabaseClient) return;
+
+  const { data: userData, error: userErr } = await supabaseClient.auth.getUser();
+  const user = userData?.user;
+
+  console.log("loadStateFromSupabase user:", user, "err:", userErr);
+
+  if (!user) {
+    console.log("Not loading: no user");
     return;
   }
 
   const { data, error } = await supabaseClient
     .from("zencards_state")
     .select("state_json")
-    .eq("user_id", currentUser.id)
+    .eq("user_id", user.id)
     .maybeSingle();
 
   if (error) {
@@ -1518,24 +1531,22 @@ async function loadStateFromSupabase() {
 
   console.log("Supabase load row:", data);
 
-  // ✅ If no remote row exists, KEEP localStorage state and push it to Supabase
+  // If no remote row exists, keep local and upload it
   if (!data?.state_json) {
-    console.log("No Supabase state yet; keeping local and uploading it.");
+    console.log("No remote state yet; uploading local state.");
     await saveStateToSupabase();
     return;
   }
 
   const remote = data.state_json;
 
-  // ✅ Only overwrite if remote has valid structures
   if (Array.isArray(remote.decks)) decks = remote.decks;
   if (remote.schedule && typeof remote.schedule === "object") schedule = remote.schedule;
 
-  // ✅ Also persist remote into localStorage so refresh works
   localStorage.setItem("srsDecks", JSON.stringify(decks));
   localStorage.setItem("srsSchedule", JSON.stringify(schedule));
 
-  console.log("Loaded state from Supabase into app.");
+  console.log("✅ Loaded remote state into app + localStorage");
 }
 
     function scheduleKey(deckId, cardId) {
