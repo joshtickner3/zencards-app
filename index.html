@@ -544,10 +544,11 @@
           <p class="small">Choose audio mode or traditional flashcards depending on your setting and current activity.</p>
         </div>
       </div>
-
-      <div class="row" style="margin-top:0.85rem;">
+<div class="row" style="margin-top:0.85rem;">
   <button class="btn secondary" id="loginBtn" type="button">Log in</button>
-  <a class="btn secondary small" href="mailto:support@zencardstudy.com?subject=ZenCards%20Cancel%20Subscription">Manage / Cancel subscription</a>
+
+  <!-- NEW: Start free trial button in the old spot -->
+  <button class="btn" id="startTrialTopBtn" type="button">Start free trial</button>
 </div>
 
       <!-- ===== Account + Gate (Landing Page) ===== -->
@@ -585,7 +586,7 @@
         <div class="feature">
           <h3>Save time</h3>
           <p>
-            The most significant source of unproductive time for students is time we all spend doing everyday activities, such as commuting, walking, exercising, eating, chores, waiting in lines, sitting in that one class you needed to take for your art requirement, etc. ZenCards turns that into productive study time so you don't need to dedicate your valuable hours to review. 
+            The most significant source of unproductive time for students is time we all spend doing everyday activities, such as commuting, walking, exercising, eating, chores, waiting in lines, sitting in that one class you needed to take for your art requirement, etc. ZenCards turns that into productive study time so you don't need to dedicate your valuable hours solely to review. 
         </div>
         <div class="feature">
           <h3>More freedom outside school</h3>
@@ -644,7 +645,7 @@
           </p>
           <ul>
             <li><strong>Play answer after you speak</strong> (hands and eyes-free flow)</li>
-            <li><strong>Play answer after X seconds, perfect for studying in discreet settings. </strong> (timed flow)</li>
+            <li><strong>Play answer after X seconds, perfect for studying in discreet settings. </strong> </li>
             <li><strong>Study-ahead mode</strong>: keep going through the deck without changing your schedule, perfect for cramming the night before an exam with no time to study.</li>
           </ul>
         </div>
@@ -775,7 +776,7 @@
   <p>We send emails only for essential account-related purposes (verification, password resets, and billing notifications). We do not send marketing emails without your consent.</p>
 
   <p><strong>Questions</strong></p>
-  <p>If you have any privacy questions, contact us at <strong>support@zencardstudy.com</strong>.</p>
+  <p>If you have any privacy questions, contact us at <strong>support@zencardstudy.com</strong> and we will answer promptly.</p>
 </div>
 
 
@@ -1282,9 +1283,12 @@ cancel_url:  "https://zencardstudy.com/?canceled=1",
 (async () => {
   await refreshLandingGate();
 })();
+document.getElementById("startTrialBtn")
+  ?.addEventListener("click", () => window.startFreeTrial());
 
-  document.getElementById("startTrialBtn")
-  .addEventListener("click", () => window.startFreeTrial());
+document.getElementById("startTrialTopBtn")
+  ?.addEventListener("click", () => window.startFreeTrial());
+
   </script>
 
 </body>
