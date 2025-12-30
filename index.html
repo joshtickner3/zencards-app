@@ -6,6 +6,55 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ZenCards — Hands-Free Flashcards (3-Day Free Trial)</title>
   <style>
+    /* ===== Top-right user counter ===== */
+.userCounter{
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 12000;
+  background: rgba(2,6,23,0.86);
+  border: 1px solid #111827;
+  border-radius: 999px;
+  padding: 0.5rem 0.75rem;
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  backdrop-filter: blur(8px);
+}
+
+.userCounter .dot{
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(16,185,129,0.75);
+  box-shadow: 0 0 0 3px rgba(16,185,129,0.14);
+}
+
+.userCounter .label{
+  font-size: 0.82rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.userCounter .num{
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: #e5e7eb;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* On small screens, don’t cover content */
+@media (max-width: 520px){
+  .userCounter{
+    top: 10px;
+    right: 10px;
+    transform: scale(0.95);
+    transform-origin: top right;
+  }
+}
+
     #billingModal { z-index: 10000; }
     :root{
       --bg1:#1f2937;
@@ -455,6 +504,13 @@
 </head>
 
 <body>
+  <!-- ===== Top-right user counter ===== -->
+<div class="userCounter" aria-label="Monthly users counter">
+  <span class="dot" aria-hidden="true"></span>
+  <span class="label">Monthly users taking control of their schedule</span>
+  <span class="num" id="monthlyUsersCount">0</span>
+</div>
+
   <div class="container">
 
     <div class="appHeader">
@@ -757,7 +813,7 @@
       <details>
         <summary>I study best with active recall and speaking out loud, so is ZenCards compatible with active recall or does it simply play back the answers to your questions after a certain amount of time?</summary>
         <p class="muted" style="margin:0.5rem 0 0 0;">
-          ZenCards was specifically designed to support active recall. There are two options for this, you can first say "pause study session" after hearing the question so that you can contemplate the question uninterrupted followed by saying "resume study session" at your own request to continue, or you can choose to mute the microphone by saying "mute microphone" which will allow yuo to pause the session for up to a minute. 
+          ZenCards was specifically designed to support active recall. There are two options for this, you can first say "pause study session" after hearing the question so that you can contemplate the question uninterrupted followed by saying "resume study session" at your own request to continue, or you can choose to mute the microphone by saying "mute microphone" which will allow you to pause the session for up to a minute. 
         </p>
       </details>
 
@@ -861,6 +917,15 @@
 
 
   <script>
+    // ===== Monthly users counter (manual daily update) =====
+const MONTHLY_USERS = 254; // <-- change this number whenever you want
+const monthlyUsersEl = document.getElementById("monthlyUsersCount");
+
+// Format like 1,234
+if (monthlyUsersEl) {
+monthlyUsersEl.textContent = Number(MONTHLY_USERS).toLocaleString() + "+";
+}
+
     // Year (keep only one)
     document.getElementById("year").textContent = String(new Date().getFullYear());
 
