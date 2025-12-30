@@ -686,10 +686,6 @@
             <li>Anki import support</li>
           </ul>
 
-          <div class="row" style="margin-top:0.85rem;">
-  <button class="btn" id="startTrialBtn" type="button">Start free trial</button>
-</div>
-
           <div class="fineprint">
             <strong>Auto-billing notice:</strong> After 3 days, you will be charged $9.99/month unless you cancel.
             Cancel anytime before the trial ends to avoid being charged.
@@ -1179,7 +1175,7 @@ setTimeout(() => console.log("[Billing] still running after 5s"), 5000);
       return;
     }
 
-    loginMsg.textContent = "Account created ✅ Check your email to confirm, then you'll be sent to Stripe.";
+    loginMsg.textContent = "Account created ✅ Check your email to confirm, then you'll be sent to Stripe. Once you start your trial, come back to this page to log in.";
     loginMsg.className = "modalMsg ok";
 
     // Optional safety: close modal so user doesn’t keep clicking
@@ -1283,8 +1279,6 @@ cancel_url:  "https://zencardstudy.com/?canceled=1",
 (async () => {
   await refreshLandingGate();
 })();
-document.getElementById("startTrialBtn")
-  ?.addEventListener("click", () => window.startFreeTrial());
 
 document.getElementById("startTrialTopBtn")
   ?.addEventListener("click", () => window.startFreeTrial());
