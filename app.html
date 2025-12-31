@@ -1459,32 +1459,45 @@ function getCurrentState() {
   }
 }
 
-    function saveDecks() {
+  function saveDecks() {
+  console.log("🟩 saveDecks() firing. decks.length =", decks?.length);
   localStorage.setItem("srsDecks", JSON.stringify(decks));
-  saveStateToSupabase().catch(console.error);
+
+  saveStateToSupabase()
+    .then(() => console.log("🟩 saveStateToSupabase() finished OK"))
+    .catch((e) => console.error("🟥 saveStateToSupabase() error", e));
 }
 
+
 function saveSchedule() {
+  console.log("🟩 saveSchedule() firing. schedule keys =", Object.keys(schedule || {}).length);
   localStorage.setItem("srsSchedule", JSON.stringify(schedule));
-  saveStateToSupabase().catch(console.error);
+
+  saveStateToSupabase()
+    .then(() => console.log("🟩 saveStateToSupabase() finished OK (from schedule)"))
+    .catch((e) => console.error("🟥 saveStateToSupabase() error (from schedule)", e));
 }
 
 // ===================== SUPABASE SYNC HELPERS =====================
 async function saveStateToSupabase() {
-  if (!supabaseClient) return;
+  console.log("🟦 saveStateToSupabase() started");
 
-  const { data: userData, error: userErr } = await supabaseClient.auth.getUser();
-  const user = userData?.user;
+  // Make sure session is hydrated (especially important right after login)
+  try { await supabaseClient.auth.refreshSession(); } catch (_) {}
 
+  const { data: sessionData, error: sessErr } = await supabaseClient.auth.getSession();
+  console.log("🟦 getSession()", { sessionData, sessErr });
+
+  const user = sessionData?.session?.user;
   if (!user) {
-    console.log("Not saving: no user", userErr);
+    console.warn("🟨 Not saving: NO SESSION USER");
     return;
   }
 
   const state = getCurrentState();
-  console.log("Saving state to Supabase for user:", user.id, state);
+  console.log("🟦 Upserting state for user:", user.id, "state:", state);
 
-  const { error } = await supabaseClient
+  const { data, error } = await supabaseClient
     .from("zencards_state")
     .upsert(
       {
@@ -1493,15 +1506,16 @@ async function saveStateToSupabase() {
         updated_at: new Date().toISOString(),
       },
       { onConflict: "user_id" }
-    );
+    )
+    .select();
 
   if (error) {
-    console.error("Supabase save error:", error);
+    console.error("🟥 Supabase save error:", error);
     setAuthStatus("Supabase save error: " + error.message);
     return;
   }
 
-  console.log("✅ Supabase state saved");
+  console.log("✅ Supabase state saved:", data);
 }
 
 async function loadStateFromSupabase() {
