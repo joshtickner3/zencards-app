@@ -1497,17 +1497,11 @@ async function queueSaveToSupabase() {
   function saveDecks() {
   console.log("💾 saveDecks() firing. decks.length =", decks.length);
 
-  // 1. Save locally first (instant UX)
+  // 1) Save locally first
   localStorage.setItem("srsDecks", JSON.stringify(decks));
 
-  // 2. Queue Supabase save (debounced + safe)
-  queueSaveToSupabase()
-    .then(() => {
-      console.log("☁️ Supabase save queued successfully");
-    })
-    .catch((err) => {
-      console.error("❌ Supabase save failed", err);
-    });
+  // 2) Trigger Supabase save queue (don’t log success here — it may be deferred)
+  queueSaveToSupabase();
 }
 
 
@@ -1581,11 +1575,18 @@ async function loadStateFromSupabase() {
   // ✅ IMPORTANT: even if there's no row yet, we consider "remote checked"
   // so saves can proceed once we create it.
   if (!data?.state_json) {
-    console.log("🟨 No remote state yet; creating from local…");
-    await saveStateToSupabase();     // creates the row
-    hasLoadedRemote = true;          // ✅ allow future saves
-    return;
+  console.log("🟨 No remote state yet; creating from local…");
+  await saveStateToSupabase();     // creates the row
+  hasLoadedRemote = true;          // ✅ allow future saves
+
+  // ✅ FLUSH the deferred save now that remote is considered loaded
+  if (pendingSaveBeforeRemote) {
+    pendingSaveBeforeRemote = false;
+    queueSaveToSupabase();
   }
+
+  return;
+}
 
   const remote = data.state_json;
 
