@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZenCards — Hands-Free Flashcards (7-Day Free Trial)</title>
+  <style>
+    :root{
+
+      --bg1:#1f2937;
+      --bg2:#020617;
+      --card:#020617cc;
+      --border:#1f2937;
+      --text:#e5e7eb;
+      --muted:#9ca3af;
+      --green:#10b981;
+      --green2:#22c55e;
+      --slate:#374151;
+      --shadow: 0 18px 35px rgba(0,0,0,0.55), 0 0 0 1px rgba(15,23,42,0.7);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      padding:1rem;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(circle at top, var(--bg1) 0, var(--bg2) 55%);
+      color:var(--text);
+      line-height:1.5;
+    }
+    a{color:inherit}
+    .container{max-width:980px;margin:0 auto;}
+    .card{
+      background: var(--card);
+      border-radius: 0.9rem;
+      padding: 1rem;
+      margin-top: 1rem;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+    }
+    .row{
+      display:flex;
+      gap:1rem;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .row > *{flex:1;min-width:260px}
+    .appHeader{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:0.6rem;
+      margin-top:0.25rem;
+      margin-bottom:0.25rem;
+    }
+    .logoMark{
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.9);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.95rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      background: radial-gradient(circle at 30% 0%, var(--green2) 0, #22c55e22 45%, #020617 70%);
+      box-shadow: 0 8px 18px rgba(15,23,42,0.9);
+      color: var(--text);
+      flex-shrink:0;
+    }
+    h1,h2,h3{margin:0.5rem 0}
+    .subtitle{
+      text-align:center;
+      font-size:0.95rem;
+      color:var(--muted);
+      margin:0 0 0.75rem 0;
+    }
+    .hero{
+      padding:1.25rem 1rem;
+    }
+    .hero h1{
+      font-size:2rem;
+      letter-spacing:0.02em;
+      margin:0.25rem 0 0.5rem 0;
+    }
+    .hero p{
+      color:var(--muted);
+      margin:0.5rem 0;
+      font-size:1.02rem;
+    }
+    .badge{
+      display:inline-block;
+      padding:0.2rem 0.55rem;
+      border-radius:999px;
+      background:#1f2937;
+      font-size:0.78rem;
+      color:#cbd5e1;
+      border:1px solid #111827;
+      margin-right:0.5rem;
+    }
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:0.45rem;
+      padding:0.55rem 1.2rem;
+      border-radius:999px;
+      border:none;
+      cursor:pointer;
+      background: var(--green);
+      color: #020617;
+      font-weight:700;
+      font-size:0.98rem;
+      text-decoration:none;
+      box-shadow: 0 8px 18px rgba(16,185,129,0.28);
+      transition: background 0.15s ease, transform 0.08s ease, box-shadow 0.12s ease;
+      white-space:nowrap;
+    }
+    .btn:hover{background:var(--green2); transform:translateY(-1px); box-shadow:0 10px 22px rgba(34,197,94,0.35);}
+    .btn:active{transform:translateY(0); box-shadow:0 4px 10px rgba(15,23,42,0.6);}
+    .btn.secondary{
+      background: var(--slate);
+      color: var(--text);
+      box-shadow:none;
+    }
+    .btn.secondary:hover{background:#4b5563; box-shadow:0 6px 14px rgba(15,23,42,0.65);}
+    .btn.small{padding:0.35rem 0.85rem; font-size:0.85rem}
+    .muted{color:var(--muted)}
+    .grid3{
+      display:grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap:0.75rem;
+    }
+    @media (max-width: 860px){
+      .grid3{grid-template-columns:1fr}
+    }
+    .feature{
+      border:1px solid #111827;
+      border-radius:0.85rem;
+      padding:0.85rem;
+      background:#020617;
+    }
+    .feature h3{margin:0 0 0.35rem 0; font-size:1rem;}
+    .feature p{margin:0; color:var(--muted); font-size:0.92rem;}
+    .pricing{
+      display:flex;
+      gap:1rem;
+      flex-wrap:wrap;
+      align-items:stretch;
+    }
+    .pricing > *{flex:1; min-width:300px;}
+    .priceCard{
+      background:#020617;
+      border:1px solid #111827;
+      border-radius:0.9rem;
+      padding:1rem;
+    }
+    .price{
+      font-size:2rem;
+      font-weight:900;
+      margin:0.25rem 0;
+    }
+    ul{margin:0.5rem 0 0 1.15rem; color:var(--muted);}
+    li{margin:0.35rem 0;}
+    .fineprint{
+      font-size:0.85rem;
+      color:var(--muted);
+      margin-top:0.75rem;
+      border-top:1px solid #111827;
+      padding-top:0.75rem;
+    }
+    .kpiRow{
+      display:flex;
+      gap:0.75rem;
+      flex-wrap:wrap;
+      margin-top:0.75rem;
+    }
+    .kpi{
+      flex:1;
+      min-width:240px;
+      background:#020617;
+      border:1px solid #111827;
+      border-radius:0.85rem;
+      padding:0.85rem;
+    }
+    .kpi .big{font-size:1.35rem; font-weight:900; margin:0;}
+    .kpi .small{margin:0.2rem 0 0 0; color:var(--muted); font-size:0.9rem;}
+    .faq details{
+      background:#020617;
+      border:1px solid #111827;
+      border-radius:0.85rem;
+      padding:0.85rem;
+      margin-top:0.6rem;
+    }
+    .faq summary{
+      cursor:pointer;
+      font-weight:700;
+    }
+    .footer{
+      text-align:center;
+      color:var(--muted);
+      font-size:0.85rem;
+      margin:1.25rem 0 0.5rem 0;
+    }
+    .note{
+      background: rgba(34,197,94,0.10);
+      border: 1px solid rgba(34,197,94,0.25);
+      color: #d1fae5;
+      border-radius: 0.85rem;
+      padding: 0.85rem;
+    }
+    code.inline{
+      background:#111827;
+      padding:0.15rem 0.4rem;
+      border-radius:0.4rem;
+      border:1px solid #0b1220;
+      color:#cbd5e1;
+      font-size:0.9em;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+
+    <div class="appHeader">
+      <div class="logoMark">Z</div>
+      <h2 style="margin:0;">ZenCards</h2>
+    </div>
+    <p class="subtitle">Hands-free & silent spaced-repetition flashcards</p>
+
+    <!-- HERO -->
+    <div class="card hero">
+      <span class="badge">7-Day Free Trial</span>
+      <span class="badge">$9.99/month</span>
+
+      <h1>Turn “dead time” into 2–3 extra hours of study — every day.</h1>
+      <p>
+        ZenCards lets you study your flashcards <strong>without looking at your phone</strong>.
+        Review while walking to class, driving, at the gym, running errands, between lectures, or even when you’re out with friends.
+      </p>
+
+      <div class="kpiRow">
+        <div class="kpi">
+          <p class="big">2–3 hours/day</p>
+          <p class="small">Saved by converting downtime into review time.</p>
+        </div>
+        <div class="kpi">
+          <p class="big">≈ 33¢/day</p>
+          <p class="small">$9.99/month for more time + higher quality repetition.</p>
+        </div>
+        <div class="kpi">
+          <p class="big">Hands-free + Silent</p>
+          <p class="small">Choose audio mode or study-ahead reading mode.</p>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:0.85rem;">
+        <!-- Start free trial goes into your app UI (index.html). You can detect ?trial=1 later. -->
+        <a class="btn" href="index.html?trial=1">Start free trial</a>
+        <a class="btn secondary" href="index.html">Log in</a>
+
+        <!-- Cancel/manage is a link you wire up later (Stripe customer portal). -->
+        <!-- For now, point it to an email or a placeholder cancel.html if you create it. -->
+        <a class="btn secondary small" href="mailto:support@YOURDOMAIN.com?subject=ZenCards%20Cancel%20Subscription">Manage / Cancel subscription</a>
+      </div>
+
+      <div class="fineprint">
+        <strong>Billing:</strong> Your 7-day free trial starts when you create an account.
+        You will be <strong>charged $9.99/month automatically</strong> at the end of the trial unless you cancel beforehand.
+        Cancel anytime from the “Manage / Cancel subscription” option.
+      </div>
+    </div>
+
+    <!-- BENEFITS -->
+    <div class="card">
+      <h2>Why ZenCards works</h2>
+      <div class="grid3">
+        <div class="feature">
+          <h3>Save time (seriously)</h3>
+          <p>
+            Most students have 2–3 hours/day of “dead time” (walking, commuting, waiting, chores).
+            ZenCards turns that into review time — without sacrificing your life.
+          </p>
+        </div>
+        <div class="feature">
+          <h3>More freedom outside school</h3>
+          <p>
+            Extra hours each day can mean a part-time (or even full-time) job, more time with friends/family,
+            or committing fully to a sport or club.
+          </p>
+        </div>
+        <div class="feature">
+          <h3>Better memory with audio + speaking</h3>
+          <p>
+            Hearing information and saying answers out loud boosts recall (often called the <em>production effect</em>).
+            Seeing + hearing together supports <em>dual coding</em> so the same study time goes further.
+          </p>
+        </div>
+      </div>
+
+      <div class="grid3" style="margin-top:0.75rem;">
+        <div class="feature">
+          <h3>Spaced repetition built in</h3>
+          <p>
+            ZenCards schedules reviews so you see cards again right before you forget — the core idea behind spaced repetition.
+            You waste less time re-studying what you already know.
+          </p>
+        </div>
+        <div class="feature">
+          <h3>Raise grades → open doors</h3>
+          <p>
+            Better retention can translate to better exam performance — helping you compete for internships,
+            grad school admissions, and stronger early-career opportunities.
+          </p>
+        </div>
+        <div class="feature">
+          <h3>Works everywhere</h3>
+          <p>
+            Study in the car (passenger), walking to class, at the gym between sets, running errands, or between lectures.
+            If you can listen, you can review.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- HOW IT WORKS -->
+    <div class="card">
+      <h2>How it works</h2>
+      <div class="row">
+        <div>
+          <h3 style="margin-top:0;">1) Add cards</h3>
+          <p class="muted">
+            Create decks, add questions + answers, or import from Anki.
+            (You can also include images + math.)
+          </p>
+
+          <h3>2) Choose your study style</h3>
+          <p class="muted" style="margin-bottom:0.35rem;">
+            ZenCards supports multiple hands-free behaviors:
+          </p>
+          <ul>
+            <li><strong>Play answer after you speak</strong> (hands-free flow)</li>
+            <li><strong>Play answer after X seconds</strong> (timed flow)</li>
+            <li><strong>Automatic mode</strong>: auto-assign the same rating to every card (no voice commands needed)</li>
+            <li><strong>Study-ahead mode</strong>: keep going through the deck without changing your schedule</li>
+          </ul>
+        </div>
+
+        <div>
+          <h3 style="margin-top:0;">3) Rate the card (spaced repetition)</h3>
+          <p class="muted">
+            After you see the answer, you rate it:
+            <strong>Again / Hard / Good / Easy</strong>. ZenCards uses that rating to schedule when you see it next.
+          </p>
+
+          <div class="note" style="margin-top:0.75rem;">
+            <strong>Pro tip:</strong> Use hands-free mode while moving, then do quick silent sessions when you’re sitting.
+            Same decks, same progress.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRICING -->
+    <div class="card">
+      <h2>Pricing</h2>
+      <div class="pricing">
+        <div class="priceCard">
+          <span class="badge">Most popular</span>
+          <h3 style="margin:0.35rem 0 0 0;">ZenCards Premium</h3>
+          <p class="price">$9.99<span style="font-size:0.9rem;font-weight:700;color:var(--muted);">/month</span></p>
+          <p class="muted" style="margin-top:0.25rem;">
+            Start with a <strong>7-day free trial</strong>, then auto-renews monthly.
+          </p>
+          <ul>
+            <li>Hands-free voice study</li>
+            <li>Timed answer mode</li>
+            <li>Automatic rating mode</li>
+            <li>Study-ahead mode</li>
+            <li>Deck + card editor</li>
+            <li>Anki import support</li>
+          </ul>
+
+          <div class="row" style="margin-top:0.85rem;">
+            <a class="btn" href="index.html?trial=1">Start free trial</a>
+            <a class="btn secondary" href="index.html">Log in</a>
+          </div>
+
+          <div class="fineprint">
+            <strong>Auto-billing notice:</strong> After 7 days, you will be charged $9.99/month unless you cancel.
+            Cancel anytime before the trial ends to avoid being charged.
+          </div>
+        </div>
+
+        <div class="priceCard">
+          <h3 style="margin-top:0.35rem;">Cancel anytime</h3>
+          <p class="muted">
+            We keep cancellation simple. Use the button below (you’ll later connect it to Stripe’s customer portal),
+            or email support and we’ll handle it.
+          </p>
+
+          <!-- Wire this to Stripe Customer Portal later -->
+          <a class="btn secondary" href="mailto:support@YOURDOMAIN.com?subject=ZenCards%20Cancel%20Subscription">
+            Manage / Cancel subscription
+          </a>
+
+          <div class="fineprint">
+            <strong>Note:</strong> This landing page is static. The actual cancellation portal link will be added once
+            Stripe billing is connected.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FAQ -->
+    <div class="card faq">
+      <h2>FAQ</h2>
+
+      <details>
+        <summary>Will I be charged automatically after the free trial?</summary>
+        <p class="muted" style="margin:0.5rem 0 0 0;">
+          Yes. Your trial lasts 7 days. If you don’t cancel before it ends, your subscription will begin at
+          <strong>$9.99/month</strong> and renew automatically each month until you cancel.
+        </p>
+      </details>
+
+      <details>
+        <summary>How do I cancel?</summary>
+        <p class="muted" style="margin:0.5rem 0 0 0;">
+          You’ll cancel from the “Manage / Cancel subscription” link (Stripe customer portal) once billing is connected.
+          For now, you can cancel by emailing <strong>support@YOURDOMAIN.com</strong>.
+        </p>
+      </details>
+
+      <details>
+        <summary>Can I study on my phone and on the website with one subscription?</summary>
+        <p class="muted" style="margin:0.5rem 0 0 0;">
+          Yes — one account, one subscription. Log in with the same email and your access follows your account.
+        </p>
+      </details>
+
+      <details>
+        <summary>What’s spaced repetition?</summary>
+        <p class="muted" style="margin:0.5rem 0 0 0;">
+          Spaced repetition is a study method where you review information at increasing intervals,
+          timed around when you’re most likely to forget. It’s designed to maximize long-term retention
+          while minimizing wasted review time.
+        </p>
+      </details>
+
+      <details>
+        <summary>What are “production effect” and “dual coding”?</summary>
+        <p class="muted" style="margin:0.5rem 0 0 0;">
+          In simple terms: memory is stronger when you engage multiple channels.
+          Speaking responses out loud can reinforce recall (often referred to as the production effect),
+          and combining visual + audio supports dual coding — giving your brain more “handles” to retrieve the info later.
+        </p>
+      </details>
+    </div>
+
+    <p class="footer">
+      © <span id="year"></span> ZenCards • <span class="muted">Study smarter. Live more.</span>
+    </p>
+  </div>
+
+  <script>
+    document.getElementById("year").textContent = String(new Date().getFullYear());
+  </script>
+</body>
+</html>

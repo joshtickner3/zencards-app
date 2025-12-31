@@ -1534,11 +1534,15 @@ async function saveStateToSupabase(stateObj) {
 
     const userId = session.user.id;
 
-    // 2) Build row (make sure your table has user_id + state columns)
+    // 2) Build row (the table uses `state_json` column). If caller didn't
+    // pass a state object, construct one from the current in-memory state
+    // so callers like `saveDecks()` can simply queue a save.
+    const resolvedState = stateObj ?? { decks: decks || [], schedule: schedule || {} };
+
     const row = {
       user_id: userId,
-      state: stateObj,                 // should be json/jsonb column
-      updated_at: new Date().toISOString()
+      state_json: resolvedState, // `state_json` should be json/jsonb column in Supabase
+      updated_at: new Date().toISOString(),
     };
 
     console.log("🟦 upserting row:", row);
@@ -1548,6 +1552,7 @@ async function saveStateToSupabase(stateObj) {
       .from("zencards_state")
       .upsert(row, { onConflict: "user_id" })
       .select();
+      if (!error) hasLoadedRemote = true;
 
     console.log("🟩 upsert response data:", data);
     if (error) console.error("❌ upsert error:", error);
@@ -1558,7 +1563,6 @@ async function saveStateToSupabase(stateObj) {
     return { ok: false, error: e };
   }
 }
-
 async function loadStateFromSupabase() {
   try { await supabaseClient.auth.refreshSession(); } catch (_) {}
 
@@ -1581,16 +1585,17 @@ async function loadStateFromSupabase() {
   if (error) {
     console.error("🟥 Supabase load error:", error);
     setAuthStatus("Supabase load error: " + error.message);
-    alert("Supabase load failed: " + error.message); // TEMP
     return;
   }
 
   console.log("🟦 Supabase load row:", data);
 
-  // If no remote row exists, create it from local
+  // ✅ IMPORTANT: even if there's no row yet, we consider "remote checked"
+  // so saves can proceed once we create it.
   if (!data?.state_json) {
     console.log("🟨 No remote state yet; creating from local…");
-    await saveStateToSupabase();
+    await saveStateToSupabase();     // creates the row
+    hasLoadedRemote = true;          // ✅ allow future saves
     return;
   }
 
@@ -1602,8 +1607,10 @@ async function loadStateFromSupabase() {
   localStorage.setItem("srsDecks", JSON.stringify(decks));
   localStorage.setItem("srsSchedule", JSON.stringify(schedule));
 
+  hasLoadedRemote = true;            // ✅ allow future saves
   console.log("✅ Loaded remote state into app + localStorage");
 }
+
 
     function scheduleKey(deckId, cardId) {
       return `${deckId}_${cardId}`;
