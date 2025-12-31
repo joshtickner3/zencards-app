@@ -1546,63 +1546,66 @@ async function saveStateToSupabase() {
 }
 
 async function loadStateFromSupabase() {
+  console.log("📥 loadStateFromSupabase() start");
+
   try { await supabaseClient.auth.refreshSession(); } catch (_) {}
 
-  const { data: userData, error: userErr } = await supabaseClient.auth.getUser();
-  const user = userData?.user;
+  try {
+    const { data: userData, error: userErr } = await supabaseClient.auth.getUser();
+    const user = userData?.user;
 
-  console.log("🟦 loadStateFromSupabase getUser()", { user, userErr });
+    console.log("🟦 loadStateFromSupabase getUser()", { user, userErr });
 
-  if (!user) {
-    console.log("🟨 Not loading: no user");
-    return;
+    // ✅ If no user, we STILL mark remote as "checked" so the app can function.
+    if (!user) {
+      console.warn("🟨 No user in loadStateFromSupabase(). Marking hasLoadedRemote=true anyway.");
+      return;
+    }
+
+    const { data, error } = await supabaseClient
+      .from("zencards_state")
+      .select("state_json, updated_at")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (error) {
+      console.error("🟥 Supabase load error:", error);
+      setAuthStatus("Supabase load error: " + error.message);
+      return;
+    }
+
+    console.log("🟦 Supabase load row:", data);
+
+    // If there’s no row yet, create one from local
+    if (!data?.state_json) {
+      console.log("🟨 No remote state yet; creating from local…");
+      await saveStateToSupabase();
+      return;
+    }
+
+    const remote = data.state_json;
+
+    if (Array.isArray(remote.decks)) decks = remote.decks;
+    if (remote.schedule && typeof remote.schedule === "object") schedule = remote.schedule;
+
+    localStorage.setItem("srsDecks", JSON.stringify(decks));
+    localStorage.setItem("srsSchedule", JSON.stringify(schedule));
+
+    console.log("✅ Loaded remote state into app + localStorage");
+  } catch (e) {
+    console.error("❌ loadStateFromSupabase crashed:", e);
+  } finally {
+    // ✅ CRITICAL: Always release deferring gate
+    hasLoadedRemote = true;
+    console.log("✅ hasLoadedRemote = true");
+
+    // ✅ Flush any deferred save once
+    if (pendingSaveBeforeRemote) {
+      pendingSaveBeforeRemote = false;
+      console.log("⏩ Flushing deferred save now that remote is loaded/checked");
+      queueSaveToSupabase();
+    }
   }
-
-  const { data, error } = await supabaseClient
-    .from("zencards_state")
-    .select("state_json, updated_at")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (error) {
-    console.error("🟥 Supabase load error:", error);
-    setAuthStatus("Supabase load error: " + error.message);
-    return;
-  }
-
-  console.log("🟦 Supabase load row:", data);
-
-  // ✅ IMPORTANT: even if there's no row yet, we consider "remote checked"
-  // so saves can proceed once we create it.
-  if (!data?.state_json) {
-  console.log("🟨 No remote state yet; creating from local…");
-  await saveStateToSupabase();     // creates the row
-  hasLoadedRemote = true;          // ✅ allow future saves
-
-  // ✅ FLUSH the deferred save now that remote is considered loaded
-  if (pendingSaveBeforeRemote) {
-    pendingSaveBeforeRemote = false;
-    queueSaveToSupabase();
-  }
-
-  return;
-}
-
-  const remote = data.state_json;
-
-  if (Array.isArray(remote.decks)) decks = remote.decks;
-  if (remote.schedule && typeof remote.schedule === "object") schedule = remote.schedule;
-
-  localStorage.setItem("srsDecks", JSON.stringify(decks));
-  localStorage.setItem("srsSchedule", JSON.stringify(schedule));
-
-  hasLoadedRemote = true;            // ✅ allow future saves
-  console.log("✅ Loaded remote state into app + localStorage");
-  if (pendingSaveBeforeRemote) {
-  pendingSaveBeforeRemote = false;
-  queueSaveToSupabase();
-}
-
 }
 
 
