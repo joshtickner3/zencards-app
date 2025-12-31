@@ -1464,12 +1464,17 @@ function getCurrentState() {
 // ===================== SUPABASE SAVE QUEUE (prevents overlaps) =====================
 let saveInFlight = false;
 let saveQueued = false;
+let pendingSaveBeforeRemote = false;
+
 
 async function queueSaveToSupabase() {
+  // If remote hasn't been checked/loaded yet, don't drop saves — queue one.
   if (!hasLoadedRemote) {
-  console.warn("Skipping Supabase save: remote state not loaded yet");
-  return;
-}
+    pendingSaveBeforeRemote = true;
+    console.warn("⏳ Deferring Supabase save until remote state is loaded");
+    return;
+  }
+
   if (saveInFlight) {
     saveQueued = true;
     return;
@@ -1484,7 +1489,6 @@ async function queueSaveToSupabase() {
 
     if (saveQueued) {
       saveQueued = false;
-      // run one more time to capture any changes that happened while saving
       queueSaveToSupabase();
     }
   }
@@ -1593,6 +1597,11 @@ async function loadStateFromSupabase() {
 
   hasLoadedRemote = true;            // ✅ allow future saves
   console.log("✅ Loaded remote state into app + localStorage");
+  if (pendingSaveBeforeRemote) {
+  pendingSaveBeforeRemote = false;
+  queueSaveToSupabase();
+}
+
 }
 
 
