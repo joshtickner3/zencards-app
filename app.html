@@ -1359,16 +1359,16 @@ async function enforceAccessOrRedirect() {
 
 // ✅ Run gate on first load
 window.addEventListener("DOMContentLoaded", async () => {
+  setSyncLock(true);            // ✅ lock right away
+
   const ok = await enforceAccessOrRedirect();
   if (!ok) return;
 
-  // ✅ Always load local first so refresh works
   loadFromStorage();
   refreshDeckSelect();
   refreshCardsList();
 
-  // ✅ Then sync from Supabase (may overwrite if remote exists)
-  await loadStateFromSupabase();
+  await loadStateFromSupabase(); // ✅ unlock happens in finally below
   refreshDeckSelect();
   refreshCardsList();
 });
@@ -1511,6 +1511,30 @@ function saveSchedule() {
 
   queueSaveToSupabase().catch(console.error);
 }
+function setSyncLock(locked) {
+  // deck + card actions that can trigger saves
+  const ids = [
+    "addDeckBtn",
+    "deleteDeckBtn",
+    "addCardBtn",
+    "updateCardBtn",
+    "moveCardBtn",
+    "ankiImport",
+    // optional: disable study add card too
+    "studyAddCardBtn",
+  ];
+
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el.tagName === "INPUT") el.disabled = locked;
+    else el.disabled = locked;
+  });
+
+  // also disable typing into “new deck name” while locked (optional)
+  if (newDeckNameInput) newDeckNameInput.disabled = locked;
+}
+
 
 // ===================== SUPABASE SYNC HELPERS =====================
 async function saveStateToSupabase() {
@@ -1599,6 +1623,8 @@ async function loadStateFromSupabase() {
     hasLoadedRemote = true;
     console.log("✅ hasLoadedRemote = true");
 
+      setSyncLock(false);           // ✅ unlock UI after remote checked
+
     // ✅ Flush any deferred save once
     if (pendingSaveBeforeRemote) {
       pendingSaveBeforeRemote = false;
@@ -1607,7 +1633,6 @@ async function loadStateFromSupabase() {
     }
   }
 }
-
 
     function scheduleKey(deckId, cardId) {
       return `${deckId}_${cardId}`;
