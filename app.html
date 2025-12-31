@@ -1410,6 +1410,8 @@ if (!ok) return;
     //   dueTime: ms since epoch
     // }
     let schedule = {};
+    let hasLoadedRemote = false;
+
 function getCurrentState() {
   return {
     decks,
@@ -1464,6 +1466,10 @@ let saveInFlight = false;
 let saveQueued = false;
 
 async function queueSaveToSupabase() {
+  if (!hasLoadedRemote) {
+  console.warn("Skipping Supabase save: remote state not loaded yet");
+  return;
+}
   if (saveInFlight) {
     saveQueued = true;
     return;
@@ -4697,7 +4703,21 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
 
    (async function init() {
   loadFromStorage();
-  // Do NOT call enforceAccessGate() here, because DOMContentLoaded already does it.
+
+  // ✅ If logged in, pull remote state BEFORE allowing any saves to Supabase
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session?.user) {
+      await loadStateFromSupabase(); // <-- this must exist (or we add it)
+      hasLoadedRemote = true;
+    } else {
+      // not logged in, don’t allow remote saves
+      hasLoadedRemote = false;
+    }
+  } catch (e) {
+    console.error("init remote load failed", e);
+    hasLoadedRemote = false;
+  }
 })();
 
   </script>
