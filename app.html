@@ -1488,18 +1488,14 @@ async function queueSaveToSupabase() {
   console.log("🟩 saveDecks() firing. decks.length =", decks?.length);
   localStorage.setItem("srsDecks", JSON.stringify(decks));
 
-  queueSaveToSupabase()
-    .then(() => console.log("🟩 queueSaveToSupabase() finished OK"))
-    .catch((e) => console.error("🟥 queueSaveToSupabase() error", e));
+  queueSaveToSupabase().catch(console.error);
 }
 
 function saveSchedule() {
   console.log("🟩 saveSchedule() firing. schedule keys =", Object.keys(schedule || {}).length);
   localStorage.setItem("srsSchedule", JSON.stringify(schedule));
 
-  queueSaveToSupabase()
-    .then(() => console.log("🟩 queueSaveToSupabase() finished OK (from schedule)"))
-    .catch((e) => console.error("🟥 queueSaveToSupabase() error (from schedule)", e));
+  queueSaveToSupabase().catch(console.error);
 }
 
 // ===================== SUPABASE SYNC HELPERS =====================
