@@ -1502,17 +1502,26 @@ function saveSchedule() {
 async function saveStateToSupabase() {
   console.log("🟦 saveStateToSupabase() started");
 
-  const { data: sessionData, error: sessErr } = await supabaseClient.auth.getSession();
-  console.log("🟦 getSession()", { sessionData, sessErr });
+  // Force-refresh the session so getSession() is not stale
+  try { await supabaseClient.auth.refreshSession(); } catch (_) {}
 
-  const user = sessionData?.session?.user;
+  // Use getUser() (more reliable) + getSession() for token sanity
+  const [{ data: userData, error: userErr }, { data: sessionData, error: sessErr }] =
+    await Promise.all([
+      supabaseClient.auth.getUser(),
+      supabaseClient.auth.getSession(),
+    ]);
+
+  console.log("🟦 getUser()", { user: userData?.user, userErr });
+  console.log("🟦 getSession()", { session: sessionData?.session, sessErr });
+
+  const user = userData?.user;
   if (!user) {
-    console.warn("🟨 Not saving: NO SESSION USER");
+    console.warn("🟨 Not saving: NO USER (auth not ready or not logged in)");
     return;
   }
 
   const state = getCurrentState();
-  console.log("🟦 Upserting state for user:", user.id, "state:", state);
 
   const { data, error } = await supabaseClient
     .from("zencards_state")
@@ -1524,11 +1533,13 @@ async function saveStateToSupabase() {
       },
       { onConflict: "user_id" }
     )
-    .select();
+    .select()
+    .maybeSingle();
 
   if (error) {
     console.error("🟥 Supabase save error:", error);
     setAuthStatus("Supabase save error: " + error.message);
+    alert("Supabase save failed: " + error.message); // TEMP: so you can’t miss it
     return;
   }
 
@@ -1536,35 +1547,36 @@ async function saveStateToSupabase() {
 }
 
 async function loadStateFromSupabase() {
-  if (!supabaseClient) return;
+  try { await supabaseClient.auth.refreshSession(); } catch (_) {}
 
   const { data: userData, error: userErr } = await supabaseClient.auth.getUser();
   const user = userData?.user;
 
-  console.log("loadStateFromSupabase user:", user, "err:", userErr);
+  console.log("🟦 loadStateFromSupabase getUser()", { user, userErr });
 
   if (!user) {
-    console.log("Not loading: no user");
+    console.log("🟨 Not loading: no user");
     return;
   }
 
   const { data, error } = await supabaseClient
     .from("zencards_state")
-    .select("state_json")
+    .select("state_json, updated_at")
     .eq("user_id", user.id)
     .maybeSingle();
 
   if (error) {
-    console.error("Supabase load error:", error);
+    console.error("🟥 Supabase load error:", error);
     setAuthStatus("Supabase load error: " + error.message);
+    alert("Supabase load failed: " + error.message); // TEMP
     return;
   }
 
-  console.log("Supabase load row:", data);
+  console.log("🟦 Supabase load row:", data);
 
-  // If no remote row exists, keep local and upload it
+  // If no remote row exists, create it from local
   if (!data?.state_json) {
-    console.log("No remote state yet; uploading local state.");
+    console.log("🟨 No remote state yet; creating from local…");
     await saveStateToSupabase();
     return;
   }
