@@ -1459,31 +1459,52 @@ function getCurrentState() {
   }
 }
 
+// ===================== SUPABASE SAVE QUEUE (prevents overlaps) =====================
+let saveInFlight = false;
+let saveQueued = false;
+
+async function queueSaveToSupabase() {
+  if (saveInFlight) {
+    saveQueued = true;
+    return;
+  }
+
+  saveInFlight = true;
+
+  try {
+    await saveStateToSupabase();
+  } finally {
+    saveInFlight = false;
+
+    if (saveQueued) {
+      saveQueued = false;
+      // run one more time to capture any changes that happened while saving
+      queueSaveToSupabase();
+    }
+  }
+}
+
   function saveDecks() {
   console.log("🟩 saveDecks() firing. decks.length =", decks?.length);
   localStorage.setItem("srsDecks", JSON.stringify(decks));
 
-  saveStateToSupabase()
-    .then(() => console.log("🟩 saveStateToSupabase() finished OK"))
-    .catch((e) => console.error("🟥 saveStateToSupabase() error", e));
+  queueSaveToSupabase()
+    .then(() => console.log("🟩 queueSaveToSupabase() finished OK"))
+    .catch((e) => console.error("🟥 queueSaveToSupabase() error", e));
 }
-
 
 function saveSchedule() {
   console.log("🟩 saveSchedule() firing. schedule keys =", Object.keys(schedule || {}).length);
   localStorage.setItem("srsSchedule", JSON.stringify(schedule));
 
-  saveStateToSupabase()
-    .then(() => console.log("🟩 saveStateToSupabase() finished OK (from schedule)"))
-    .catch((e) => console.error("🟥 saveStateToSupabase() error (from schedule)", e));
+  queueSaveToSupabase()
+    .then(() => console.log("🟩 queueSaveToSupabase() finished OK (from schedule)"))
+    .catch((e) => console.error("🟥 queueSaveToSupabase() error (from schedule)", e));
 }
 
 // ===================== SUPABASE SYNC HELPERS =====================
 async function saveStateToSupabase() {
   console.log("🟦 saveStateToSupabase() started");
-
-  // Make sure session is hydrated (especially important right after login)
-  try { await supabaseClient.auth.refreshSession(); } catch (_) {}
 
   const { data: sessionData, error: sessErr } = await supabaseClient.auth.getSession();
   console.log("🟦 getSession()", { sessionData, sessErr });
