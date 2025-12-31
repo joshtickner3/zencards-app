@@ -2079,18 +2079,35 @@ function getDeckPhaseCounts(deck) {
     }
 
     addDeckBtn.addEventListener("click", () => {
-      if (!newDeckNameInput.value.trim()) return;
-      const name = newDeckNameInput.value.trim();
-      if (!name) return;
-      const id = "deck_" + Date.now();
-      decks.push({ id, name, cards: [] });
-      saveDecks();
-      newDeckNameInput.value = "";
-      updateAddDeckButtonState();
-      selectedDeckId = id;
-      refreshDeckSelect();
-      refreshCardsList();
-    });
+  console.log("✅ Add Deck clicked");
+
+  const raw = newDeckNameInput.value;
+  console.log("Deck name raw:", raw);
+
+  if (!raw || !raw.trim()) {
+    console.warn("❌ No deck name; aborting");
+    return;
+  }
+
+  const name = raw.trim();
+  const id = "deck_" + Date.now();
+
+  console.log("Creating deck:", { id, name });
+
+  decks.push({ id, name, cards: [] });
+
+  console.log("Decks after push:", decks);
+
+  saveDecks();
+
+  console.log("✅ saveDecks() called");
+
+  newDeckNameInput.value = "";
+  updateAddDeckButtonState();
+  selectedDeckId = id;
+  refreshDeckSelect();
+  refreshCardsList();
+});
 
     deleteDeckBtn.addEventListener("click", () => {
       if (!selectedDeckId) return;
