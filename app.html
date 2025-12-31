@@ -1485,11 +1485,21 @@ async function queueSaveToSupabase() {
 }
 
   function saveDecks() {
-  console.log("🟩 saveDecks() firing. decks.length =", decks?.length);
+  console.log("💾 saveDecks() firing. decks.length =", decks.length);
+
+  // 1. Save locally first (instant UX)
   localStorage.setItem("srsDecks", JSON.stringify(decks));
 
-  queueSaveToSupabase().catch(console.error);
+  // 2. Queue Supabase save (debounced + safe)
+  queueSaveToSupabase()
+    .then(() => {
+      console.log("☁️ Supabase save queued successfully");
+    })
+    .catch((err) => {
+      console.error("❌ Supabase save failed", err);
+    });
 }
+
 
 function saveSchedule() {
   console.log("🟩 saveSchedule() firing. schedule keys =", Object.keys(schedule || {}).length);
@@ -1499,51 +1509,48 @@ function saveSchedule() {
 }
 
 // ===================== SUPABASE SYNC HELPERS =====================
-async function saveStateToSupabase() {
-  console.log("🟦 saveStateToSupabase() started");
+async function saveStateToSupabase(stateObj) {
+  try {
+    console.log("🟦 saveStateToSupabase() started");
 
-  // Force-refresh the session so getSession() is not stale
-  try { await supabaseClient.auth.refreshSession(); } catch (_) {}
+    // 1) Confirm we actually have a session + user
+    const { data: sessionData, error: sessionErr } = await supabaseClient.auth.getSession();
+    if (sessionErr) console.error("❌ getSession error:", sessionErr);
 
-  // Use getUser() (more reliable) + getSession() for token sanity
-  const [{ data: userData, error: userErr }, { data: sessionData, error: sessErr }] =
-    await Promise.all([
-      supabaseClient.auth.getUser(),
-      supabaseClient.auth.getSession(),
-    ]);
+    const session = sessionData?.session;
+    console.log("🟦 session exists?", !!session);
+    console.log("🟦 session user id:", session?.user?.id);
 
-  console.log("🟦 getUser()", { user: userData?.user, userErr });
-  console.log("🟦 getSession()", { session: sessionData?.session, sessErr });
+    if (!session?.user?.id) {
+      console.warn("⚠️ No logged-in user/session. State will NOT be saved.");
+      return { ok: false, reason: "no_session" };
+    }
 
-  const user = userData?.user;
-  if (!user) {
-    console.warn("🟨 Not saving: NO USER (auth not ready or not logged in)");
-    return;
+    const userId = session.user.id;
+
+    // 2) Build row (make sure your table has user_id + state columns)
+    const row = {
+      user_id: userId,
+      state: stateObj,                 // should be json/jsonb column
+      updated_at: new Date().toISOString()
+    };
+
+    console.log("🟦 upserting row:", row);
+
+    // 3) Upsert (requires UNIQUE constraint on user_id)
+    const { data, error } = await supabaseClient
+      .from("zencards_state")
+      .upsert(row, { onConflict: "user_id" })
+      .select();
+
+    console.log("🟩 upsert response data:", data);
+    if (error) console.error("❌ upsert error:", error);
+
+    return { ok: !error, data, error };
+  } catch (e) {
+    console.error("🔥 saveStateToSupabase threw:", e);
+    return { ok: false, error: e };
   }
-
-  const state = getCurrentState();
-
-  const { data, error } = await supabaseClient
-    .from("zencards_state")
-    .upsert(
-      {
-        user_id: user.id,
-        state_json: state,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id" }
-    )
-    .select()
-    .maybeSingle();
-
-  if (error) {
-    console.error("🟥 Supabase save error:", error);
-    setAuthStatus("Supabase save error: " + error.message);
-    alert("Supabase save failed: " + error.message); // TEMP: so you can’t miss it
-    return;
-  }
-
-  console.log("✅ Supabase state saved:", data);
 }
 
 async function loadStateFromSupabase() {
