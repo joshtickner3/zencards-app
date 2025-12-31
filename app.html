@@ -1515,54 +1515,44 @@ function saveSchedule() {
 }
 
 // ===================== SUPABASE SYNC HELPERS =====================
-async function saveStateToSupabase(stateObj) {
+async function saveStateToSupabase() {
   try {
-    console.log("🟦 saveStateToSupabase() started");
-
-    // 1) Confirm we actually have a session + user
-    const { data: sessionData, error: sessionErr } = await supabaseClient.auth.getSession();
-    if (sessionErr) console.error("❌ getSession error:", sessionErr);
-
-    const session = sessionData?.session;
-    console.log("🟦 session exists?", !!session);
-    console.log("🟦 session user id:", session?.user?.id);
-
-    if (!session?.user?.id) {
-      console.warn("⚠️ No logged-in user/session. State will NOT be saved.");
-      return { ok: false, reason: "no_session" };
+    // 1) Must have a logged-in user
+    const { data: { user }, error: userErr } = await supabase.auth.getUser();
+    if (userErr) {
+      console.error("getUser error:", userErr);
+      return;
+    }
+    if (!user) {
+      console.warn("No user — skipping Supabase save");
+      return;
     }
 
-    const userId = session.user.id;
-
-    // 2) Build row (the table uses `state_json` column). If caller didn't
-    // pass a state object, construct one from the current in-memory state
-    // so callers like `saveDecks()` can simply queue a save.
-    const resolvedState = stateObj ?? { decks: decks || [], schedule: schedule || {} };
-
-    const row = {
-      user_id: userId,
-      state_json: resolvedState, // `state_json` should be json/jsonb column in Supabase
+    // 2) Build payload (ONLY these columns)
+    const payload = {
+      user_id: user.id,
+      state_json: {
+        decks,
+        schedule,
+      },
       updated_at: new Date().toISOString(),
     };
 
-    console.log("🟦 upserting row:", row);
-
-    // 3) Upsert (requires UNIQUE constraint on user_id)
-    const { data, error } = await supabaseClient
+    // 3) Upsert ensures one row per user_id (updates if exists, inserts if not)
+    const { error } = await supabase
       .from("zencards_state")
-      .upsert(row, { onConflict: "user_id" })
-      .select();
-      if (!error) hasLoadedRemote = true;
+      .upsert(payload, { onConflict: "user_id" });
 
-    console.log("🟩 upsert response data:", data);
-    if (error) console.error("❌ upsert error:", error);
-
-    return { ok: !error, data, error };
+    if (error) {
+      console.error("Supabase save failed:", error);
+    } else {
+      console.log("✅ Supabase save OK");
+    }
   } catch (e) {
-    console.error("🔥 saveStateToSupabase threw:", e);
-    return { ok: false, error: e };
+    console.error("saveStateToSupabase crashed:", e);
   }
 }
+
 async function loadStateFromSupabase() {
   try { await supabaseClient.auth.refreshSession(); } catch (_) {}
 
