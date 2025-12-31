@@ -1518,7 +1518,7 @@ function saveSchedule() {
 async function saveStateToSupabase() {
   try {
     // 1) Must have a logged-in user
-    const { data: { user }, error: userErr } = await supabase.auth.getUser();
+    const { data: { user }, error: userErr } = await supabaseClient.auth.getUser();
     if (userErr) {
       console.error("getUser error:", userErr);
       return;
@@ -1531,23 +1531,17 @@ async function saveStateToSupabase() {
     // 2) Build payload (ONLY these columns)
     const payload = {
       user_id: user.id,
-      state_json: {
-        decks,
-        schedule,
-      },
+      state_json: { decks, schedule },
       updated_at: new Date().toISOString(),
     };
 
-    // 3) Upsert ensures one row per user_id (updates if exists, inserts if not)
-    const { error } = await supabase
+    // 3) Upsert ensures one row per user_id
+    const { error } = await supabaseClient
       .from("zencards_state")
       .upsert(payload, { onConflict: "user_id" });
 
-    if (error) {
-      console.error("Supabase save failed:", error);
-    } else {
-      console.log("✅ Supabase save OK");
-    }
+    if (error) console.error("Supabase save failed:", error);
+    else console.log("✅ Supabase save OK");
   } catch (e) {
     console.error("saveStateToSupabase crashed:", e);
   }
