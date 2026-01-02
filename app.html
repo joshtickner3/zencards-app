@@ -1560,9 +1560,14 @@ async function saveStateToSupabase() {
     };
 
     // 3) Upsert ensures one row per user_id
-    const { error } = await supabaseClient
-      .from("zencards_state")
-      .upsert(payload, { onConflict: "user_id" });
+    const { data, error } = await supabaseClient
+  .from("zencards_state")
+  .upsert(payload, { onConflict: "user_id" })
+  .select()
+  .single();
+
+console.log("upsert result:", { data, error });
+
 
  if (error) {
   console.error("Supabase save failed:", error);
