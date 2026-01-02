@@ -922,6 +922,7 @@ const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   },
   
 });
+window.supabaseClient = supabaseClient;
 
 function shouldStartTrialFromUrl() {
   return new URLSearchParams(window.location.search).get("startTrial") === "1";
