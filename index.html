@@ -939,8 +939,10 @@ monthlyUsersEl.textContent = Number(MONTHLY_USERS).toLocaleString() + "+";
     autoRefreshToken: true,
     detectSessionInUrl: true,
     storage: window.localStorage,
+    storageKey: "zencards-auth",
   },
 });
+
 // ===== Landing Page Gate UI =====
 const lpWhoami = document.getElementById("lpWhoami");
 const lpStatus = document.getElementById("lpStatus");
@@ -1088,20 +1090,18 @@ return { hasAccess, reason: hasAccess ? "ok" : "no_active_or_trialing_row", rows
     
     // Expose it on window so it's not "undefined" in console
 window.startFreeTrial = async function startFreeTrial() {
-  const authKey = Object.keys(localStorage).find(k => k.endsWith("-auth-token"));
-  const raw = authKey ? localStorage.getItem(authKey) : null;
-  const session = raw ? JSON.parse(raw) : null;
+    const { data } = await supabaseClient.auth.getSession();
+  const token = data?.session?.access_token;
 
-  // If already logged in, start Stripe checkout immediately
-  if (session?.access_token) {
-  const access = await checkUserAccess();
-  if (access.hasAccess) {
-    window.location.href = "app.html";
+  if (token) {
+    const access = await checkUserAccess();
+    if (access.hasAccess) {
+      window.location.href = "app.html";
+      return;
+    }
+    await startCheckoutFromLanding();
     return;
   }
-  await startCheckoutFromLanding();
-  return;
-}
 
   // Otherwise open SIGNUP modal (create account)
 openLoginModal("signup");
