@@ -1359,7 +1359,9 @@ async function enforceAccessOrRedirect() {
 
 // ✅ Run gate on first load
 window.addEventListener("DOMContentLoaded", async () => {
-  setSyncLock(true);            // ✅ lock right away
+  setSyncLock(true);   
+  console.log("✅ DOMContentLoaded fired; UI locked");
+         // ✅ lock right away
 
   const ok = await enforceAccessOrRedirect();
   if (!ok) return;
@@ -1520,20 +1522,20 @@ function setSyncLock(locked) {
     "updateCardBtn",
     "moveCardBtn",
     "ankiImport",
-    // optional: disable study add card too
     "studyAddCardBtn",
   ];
 
   ids.forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
-    if (el.tagName === "INPUT") el.disabled = locked;
-    else el.disabled = locked;
+    el.disabled = locked;
   });
 
-  // also disable typing into “new deck name” while locked (optional)
-  if (newDeckNameInput) newDeckNameInput.disabled = locked;
+  // ✅ IMPORTANT: don't reference newDeckNameInput here (can crash if declared later)
+  const nde = document.getElementById("newDeckName");
+  if (nde) nde.disabled = locked;
 }
+
 
 
 // ===================== SUPABASE SYNC HELPERS =====================
@@ -1575,6 +1577,8 @@ async function saveStateToSupabase() {
 }
 
 async function loadStateFromSupabase() {
+  console.log("✅ loadStateFromSupabase called");
+
   console.log("📥 loadStateFromSupabase() start");
 
   try {
