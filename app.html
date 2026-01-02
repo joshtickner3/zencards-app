@@ -1527,30 +1527,6 @@ function saveSchedule() {
 
   queueSaveToSupabase().catch(console.error);
 }
-function setSyncLock(locked) {
-  // deck + card actions that can trigger saves
-  const ids = [
-    "addDeckBtn",
-    "deleteDeckBtn",
-    "addCardBtn",
-    "updateCardBtn",
-    "moveCardBtn",
-    "ankiImport",
-    "studyAddCardBtn",
-  ];
-
-  ids.forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.disabled = locked;
-  });
-
-  // ✅ IMPORTANT: don't reference newDeckNameInput here (can crash if declared later)
-  const nde = document.getElementById("newDeckName");
-  if (nde) nde.disabled = locked;
-}
-
-
 
 // ===================== SUPABASE SYNC HELPERS =====================
 async function saveStateToSupabase() {
