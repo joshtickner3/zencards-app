@@ -1363,9 +1363,13 @@ window.addEventListener("DOMContentLoaded", async () => {
   setSyncLock(true);   
   console.log("✅ DOMContentLoaded fired; UI locked");
          // ✅ lock right away
+const ok = await enforceAccessOrRedirect();
+if (!ok) {
+  hasLoadedRemote = true;   // so your app doesn't get stuck forever
+  setSyncLock(false);
+  return;
+}
 
-  const ok = await enforceAccessOrRedirect();
-  if (!ok) return;
 
   loadFromStorage();
   refreshDeckSelect();
@@ -1471,11 +1475,20 @@ let pendingSaveBeforeRemote = false;
 
 
 async function queueSaveToSupabase() {
-  // If remote hasn't been checked/loaded yet, don't drop saves — queue one.
+  // If remote hasn't been checked/loaded yet, don't drop saves — BUT allow a first-time
+  // create-row write *if the user is already logged in*.
   if (!hasLoadedRemote) {
-    pendingSaveBeforeRemote = true;
-    console.warn("⏳ Deferring Supabase save until remote state is loaded");
-    return;
+    const { data } = await supabaseClient.auth.getUser();
+
+    // Not logged in yet -> defer
+    if (!data?.user) {
+      pendingSaveBeforeRemote = true;
+      console.warn("⏳ Deferring Supabase save until remote state is loaded (no user yet)");
+      return;
+    }
+
+    // Logged in -> allow save to run now (this lets the first row get created)
+    console.warn("✅ User is logged in; allowing save before remote load");
   }
 
   if (saveInFlight) {
