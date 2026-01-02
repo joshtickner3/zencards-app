@@ -923,14 +923,56 @@ window.supabaseClient = supabaseClient;
 window.setSyncLock = window.setSyncLock || function () {};
 window.lockUI = window.lockUI || function () {};
 
-async function waitForSession(maxMs = 1500) {
-  const start = Date.now();
-  while (Date.now() - start < maxMs) {
-    const { data } = await supabaseClient.auth.getSession();
-    if (data?.session?.user) return data.session;
-    await new Promise(r => setTimeout(r, 150));
+// ===== AUTH RECOVERY: bypass hung getSession lock =====
+async function bootstrapSessionFromStorage() {
+  try {
+    const raw = localStorage.getItem("zencards-auth");
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    const access_token = parsed?.access_token;
+    const refresh_token = parsed?.refresh_token;
+
+    if (!access_token || !refresh_token) return null;
+
+    const { data, error } = await supabaseClient.auth.setSession({
+      access_token,
+      refresh_token,
+    });
+
+    if (error) {
+      console.warn("[bootstrapSessionFromStorage] setSession error:", error);
+      return null;
+    }
+
+    return data?.session ?? null;
+  } catch (e) {
+    console.warn("[bootstrapSessionFromStorage] failed:", e);
+    return null;
   }
-  return null;
+}
+
+async function safeGetToken() {
+  // 1) Prefer token from onAuthStateChange if present
+  if (window.__zcAccessToken) return window.__zcAccessToken;
+
+  // 2) Try getUser (does not usually hang the same way)
+  const { data: u } = await supabaseClient.auth.getUser();
+  if (!u?.user) return null;
+
+  // 3) Try getSession quickly; if it hangs, recover from storage
+  try {
+    const s = await Promise.race([
+      supabaseClient.auth.getSession(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error("getSession hung")), 1200)),
+    ]);
+    const token = s?.data?.session?.access_token || null;
+    if (token) return token;
+  } catch (_) {}
+
+  // 4) Recover by forcing setSession from localStorage
+  const boot = await bootstrapSessionFromStorage();
+  return boot?.access_token || null;
 }
 
 
@@ -943,8 +985,7 @@ async function startTrialIfRequested() {
    if (checkoutStarted) return;
   if (!shouldStartTrialFromUrl()) return;
 
-  const { data: sessionData } = await supabaseClient.auth.getSession();
-  const token = sessionData?.session?.access_token;
+const token = await safeGetToken();
 
   if (!token) {
     // Not logged in yet — do nothing; after login, onAuthStateChange will run and we’ll retry
@@ -995,9 +1036,8 @@ resumeCheckoutBtn?.addEventListener("click", async () => {
     lockUI("Redirecting…", { mode: "inactive" });
 
     // Make sure session/token is fresh
-    await supabaseClient.auth.refreshSession();
-    const { data: sessionData } = await supabaseClient.auth.getSession();
-    const token = sessionData?.session?.access_token;
+   try { await supabaseClient.auth.refreshSession(); } catch (_) {}
+const token = await safeGetToken();
 
     if (!token) {
       lockUI("Session missing. Please log out and log back in.", { mode: "inactive" });
@@ -1291,8 +1331,8 @@ function updateAuthButtons() {
 }
 
 async function getMySubscriptionStatus() {
-  const { data: sessionData } = await supabaseClient.auth.getSession();
-  const userId = sessionData?.session?.user?.id;
+  const { data: userData } = await supabaseClient.auth.getUser();
+const userId = userData?.user?.id;
 
   if (!userId) {
     console.warn("No session user in getMySubscriptionStatus()");
@@ -1314,9 +1354,7 @@ async function getMySubscriptionStatus() {
   return data?.status ?? null;
 }
 async function checkAccessViaEdge() {
-  const { data: sessionData } = await supabaseClient.auth.getSession();
-  const token = sessionData?.session?.access_token;
-
+  const token = await safeGetToken();
   if (!token) return { hasAccess: false, status: "logged_out" };
 
   const res = await fetch(
@@ -1331,23 +1369,23 @@ async function checkAccessViaEdge() {
   );
 
   const json = await res.json().catch(() => ({}));
-  return json; // expected: { hasAccess: boolean, status: "trialing"|"active"|... }
+  return json;
 }
+
 async function enforceAccessOrRedirect() {
-  // Refresh session so token is up-to-date
-  try { await supabaseClient.auth.refreshSession(); } catch (_) {}
+  // If the session system is wedged, this tries to recover it once
+  await bootstrapSessionFromStorage();
 
-  async function waitForSession(maxMs = 1500) {
-  const start = Date.now();
-  while (Date.now() - start < maxMs) {
-    const { data } = await supabaseClient.auth.getSession();
-    if (data?.session?.user) return data.session;
-    await new Promise(r => setTimeout(r, 150));
+  // Must have a user
+  const { data: userData } = await supabaseClient.auth.getUser();
+  const user = userData?.user;
+
+  if (!user) {
+    window.location.replace("https://zencardstudy.com/");
+    return false;
   }
-  return null;
-}
 
-  // Logged in -> verify access via Edge function
+  // Verify access
   let access;
   try {
     access = await checkAccessViaEdge();
@@ -1358,13 +1396,12 @@ async function enforceAccessOrRedirect() {
   }
 
   if (!access?.hasAccess) {
-    // No trial/subscription -> landing page handles Stripe
     window.location.replace("https://zencardstudy.com/");
     return false;
   }
 
   // Allowed
-  currentUser = user;
+  currentUser = user;   // ✅ now defined
   updateAuthButtons();
   return true;
 }
@@ -1395,6 +1432,8 @@ if (!ok) {
 supabaseClient.auth.onAuthStateChange(async (event, session) => {
   // Prevent weird UI flashes during an intentional sign-out
   if (isSigningOut) return;
+  
+  window.__zcAccessToken = session?.access_token || null;
 
   // Keep currentUser in sync
   currentUser = session?.user ?? null;
@@ -4572,37 +4611,32 @@ setCardContent(voiceAnswerText, currentCard.answer);
     });
 
         // Rating buttons for voice (hands-free) mode – optional tap instead of speaking
-    voiceRatingButtons.addEventListener("click", (e) => {
-  const btn = e.target.closest("button[data-voice-rating]");
-  if (!btn || !currentCard) return;
+    if (voiceRatingButtons) {
+  voiceRatingButtons.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-voice-rating]");
+    if (!btn || !currentCard) return;
 
-  const ratingKey = btn.dataset.voiceRating;
+    const ratingKey = btn.dataset.voiceRating;
 
-  // If user taps early (on question screen), we should immediately stop
-  // any timers/listening/TTS so we don't speak the answer after they rated.
-  clearQuestionDelayTimer();
-  clearStudyAheadGapTimer();
-  awaitingAnswerSignal = false;
-  awaitingDifficulty = false;
+    clearQuestionDelayTimer();
+    clearStudyAheadGapTimer();
+    awaitingAnswerSignal = false;
+    awaitingDifficulty = false;
 
-  // Stop any current TTS + stop mic listening
-  stopAllAudio();
+    stopAllAudio();
 
-  // Apply scheduling ONLY in normal mode
-  if (!noScheduleChanges) {
-    const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
-    if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
-      queueCardForAgain(currentDeckId, currentCard);
+    if (!noScheduleChanges) {
+      const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
+      if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
+        queueCardForAgain(currentDeckId, currentCard);
+      }
     }
-  }
 
-  // Hide buttons + move on immediately
-  if (voiceRatingButtons) voiceRatingButtons.classList.add("hidden");
-  setStudyState(StudyState.IDLE);
-
-  // Important: run the next card loop now
-  runVoiceLoop();
-});
+    voiceRatingButtons.classList.add("hidden");
+    setStudyState(StudyState.IDLE);
+    runVoiceLoop();
+  });
+}
 
     silentMainMenuBtn.addEventListener("click", () => {
       silentCompletionControls.classList.add("hidden");
@@ -4750,17 +4784,25 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
   });
 }
 
-   (async function init() {
+ (async function init() {
   loadFromStorage();
 
-  // ✅ If logged in, pull remote state BEFORE allowing any saves to Supabase
   try {
-    const { data: { session } } = await supabaseClient.auth.getSession();
+    const { data: { session }, error } = await supabaseClient.auth.getSession();
+    if (error) console.error("getSession error:", error);
+
+    console.log("[app.html] session:", session);
+    console.log("[app.html] user:", session?.user);
+
     if (session?.user) {
-      await loadStateFromSupabase(); // <-- this must exist (or we add it)
-      hasLoadedRemote = true;
+      if (typeof loadStateFromSupabase === "function") {
+        await loadStateFromSupabase();
+        hasLoadedRemote = true;
+      } else {
+        console.warn("loadStateFromSupabase() missing; skipping remote load.");
+        hasLoadedRemote = false;
+      }
     } else {
-      // not logged in, don’t allow remote saves
       hasLoadedRemote = false;
     }
   } catch (e) {
@@ -4768,6 +4810,7 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
     hasLoadedRemote = false;
   }
 })();
+
 
   </script>
 </body>
