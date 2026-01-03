@@ -1581,6 +1581,9 @@ function saveSchedule() {
 // ===================== SUPABASE SYNC HELPERS =====================
 async function saveStateToSupabase() {
   try {
+    console.log("[SAVE] called", new Date().toISOString(), { hasLoadedRemote, currentDeckId });
+console.log("[SAVE] result", { data, error });
+if (error) console.error("[SAVE] ERROR", error);
     // 1) Must have a logged-in user
     const { data: { user }, error: userErr } = await supabaseClient.auth.getUser();
     if (userErr) {
