@@ -1580,47 +1580,69 @@ function saveSchedule() {
 
 // ===================== SUPABASE SYNC HELPERS =====================
 async function saveStateToSupabase() {
-  try {
-    console.log("[SAVE] called", new Date().toISOString(), { hasLoadedRemote, currentDeckId });
-console.log("[SAVE] result", { data, error });
-if (error) console.error("[SAVE] ERROR", error);
-    // 1) Must have a logged-in user
-    const { data: { user }, error: userErr } = await supabaseClient.auth.getUser();
-    if (userErr) {
-      console.error("getUser error:", userErr);
-      return;
+  console.log(
+    "[SAVE] called",
+    new Date().toISOString(),
+    {
+      hasLoadedRemote,
+      decksCount: decks?.length,
+      scheduleKeys: schedule ? Object.keys(schedule).length : null
     }
-    if (!user) {
-      console.warn("No user — skipping Supabase save");
+  );
+
+  try {
+    // 1) Get current auth user
+    console.log("[SAVE] fetching user…");
+    const { data: { user }, error: userErr } =
+      await supabaseClient.auth.getUser();
+
+    if (userErr) {
+      console.error("[SAVE] getUser error:", userErr);
       return;
     }
 
-    // 2) Build payload (ONLY these columns)
+    if (!user) {
+      console.warn("[SAVE] no user — aborting save");
+      return;
+    }
+
+    console.log("[SAVE] user OK:", user.id);
+
+    // 2) Build payload (ONLY allowed columns)
     const payload = {
       user_id: user.id,
-      state_json: { decks, schedule },
+      state_json: {
+        decks,
+        schedule
+      },
       updated_at: new Date().toISOString(),
     };
 
-    // 3) Upsert ensures one row per user_id
+    console.log("[SAVE] payload built", payload);
+
+    // 3) Perform UPSERT
+    console.log("[SAVE] sending upsert to Supabase…");
     const { data, error } = await supabaseClient
-  .from("zencards_state")
-  .upsert(payload, { onConflict: "user_id" })
-  .select()
-  .single();
+      .from("zencards_state")
+      .upsert(payload, { onConflict: "user_id" })
+      .select()
+      .single();
 
-console.log("upsert result:", { data, error });
+    // 4) RESULT — THIS IS THE MOST IMPORTANT LOG
+    console.log("[SAVE] upsert result:", { data, error });
 
+    if (error) {
+      console.error("[SAVE] ❌ Supabase save failed:", error);
+      setAuthStatus?.(
+        "Supabase save failed: " + (error.message || "unknown error")
+      );
+      return;
+    }
 
- if (error) {
-  console.error("Supabase save failed:", error);
-  setAuthStatus("Supabase save failed: " + (error.message || "unknown"));
-} else {
-  console.log("✅ Supabase save OK");
-}
+    console.log("✅ [SAVE] Supabase save OK");
 
   } catch (e) {
-    console.error("saveStateToSupabase crashed:", e);
+    console.error("[SAVE] 💥 crashed:", e);
   }
 }
 
