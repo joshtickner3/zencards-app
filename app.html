@@ -1595,7 +1595,7 @@ function saveSchedule() {
   console.log("🟩 saveSchedule() firing. schedule keys =", Object.keys(schedule || {}).length);
   localStorage.setItem("srsSchedule", JSON.stringify(schedule));
 
-  queueSaveToSupabase().catch(console.error);
+  queueSaveToSupabase().catch(e => console.error("❌ queueSaveToSupabase rejected:", e));
 }
 
 // ===================== SUPABASE SYNC HELPERS =====================
@@ -1708,8 +1708,8 @@ async function loadStateFromSupabase() {
     // ✅ FIRST-TIME USER CASE: no row yet
     if (!data?.state_json) {
       console.log("🟨 No remote state yet; creating from local…");
-      await saveStateToSupabase();     // create their row
-      return;                          // ✅ still safe because finally runs
+      await queueSaveToSupabase();     // create their row via queue/locking
+return;                        // ✅ still safe because finally runs
     }
 
     // Apply remote -> memory
@@ -1740,6 +1740,7 @@ async function loadStateFromSupabase() {
     }
   }
 }
+loadStateFromSupabase().catch(e => console.error("❌ loadStateFromSupabase crashed on boot:", e));
 
     function scheduleKey(deckId, cardId) {
       return `${deckId}_${cardId}`;
