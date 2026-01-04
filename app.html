@@ -1530,46 +1530,56 @@ async function queueSaveToSupabase() {
     saveQueued
   });
 
-  // If remote hasn't loaded yet, allow a write ONLY if user exists
-  if (!hasLoadedRemote) {
-    const { data: u } = await supabaseClient.auth.getUser();
-    const hasUser = !!u?.user;
+  try {
+    // If remote hasn't loaded yet, allow a write ONLY if user exists
+    if (!hasLoadedRemote) {
+      const { data: u, error: userErr } = await supabaseClient.auth.getUser();
 
-    console.log("[QUEUE] hasLoadedRemote=false; getUser check:", {
-      hasUser,
-      userId: u?.user?.id || null
-    });
+      console.log("[QUEUE] hasLoadedRemote=false; getUser check:", {
+        userErr: userErr ? { message: userErr.message, name: userErr.name } : null,
+        hasUser: !!u?.user,
+        userId: u?.user?.id || null
+      });
 
-    if (!hasUser) {
-      pendingSaveBeforeRemote = true;
-      console.warn("⏳ [QUEUE] Deferring save until remote is loaded (no user yet)");
+      if (userErr) {
+        console.error("❌ [QUEUE] getUser error (this is why saves stop):", userErr);
+        pendingSaveBeforeRemote = true;
+        return;
+      }
+
+      if (!u?.user) {
+        pendingSaveBeforeRemote = true;
+        console.warn("⏳ [QUEUE] Deferring save until remote is loaded (no user yet)");
+        return;
+      }
+
+      console.warn("✅ [QUEUE] User exists; allowing save before remote load");
+    }
+
+    if (saveInFlight) {
+      saveQueued = true;
+      console.log("[QUEUE] saveInFlight=true -> queued next save");
       return;
     }
 
-    console.warn("✅ [QUEUE] User exists; allowing save before remote load");
-  }
+    saveInFlight = true;
 
-  if (saveInFlight) {
-    saveQueued = true;
-    console.log("[QUEUE] saveInFlight=true -> queued next save");
-    return;
-  }
-
-  saveInFlight = true;
-
-  try {
     const res = await saveStateToSupabase();
     console.log("[QUEUE] saveStateToSupabase result:", res);
+  } catch (e) {
+    console.error("❌ [QUEUE] queueSaveToSupabase crashed:", e);
   } finally {
     saveInFlight = false;
 
     if (saveQueued) {
       saveQueued = false;
       console.log("[QUEUE] running queued save now…");
-      queueSaveToSupabase();
+      // important: await so errors don’t get swallowed again
+      await queueSaveToSupabase();
     }
   }
 }
+
 
   function saveDecks() {
   console.log("💾 saveDecks() firing. decks.length =", decks.length);
@@ -1577,7 +1587,7 @@ async function queueSaveToSupabase() {
   localStorage.setItem("srsDecks", JSON.stringify(decks));
 
   // THIS is the critical wiring line:
-  queueSaveToSupabase();
+ queueSaveToSupabase().catch(e => console.error("❌ queueSaveToSupabase rejected:", e));
 }
 
 
@@ -1726,7 +1736,7 @@ async function loadStateFromSupabase() {
     if (pendingSaveBeforeRemote) {
       pendingSaveBeforeRemote = false;
       console.log("⏩ Flushing deferred save now that remote is loaded/checked");
-      queueSaveToSupabase();
+     queueSaveToSupabase().catch(e => console.error("❌ queueSaveToSupabase rejected:", e));
     }
   }
 }
