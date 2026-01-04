@@ -1523,38 +1523,49 @@ let saveInFlight = false;
 let saveQueued = false;
 let pendingSaveBeforeRemote = false;
 
-
 async function queueSaveToSupabase() {
-  // If remote hasn't been checked/loaded yet, don't drop saves — BUT allow a first-time
-  // create-row write *if the user is already logged in*.
-  if (!hasLoadedRemote) {
-    const { data } = await supabaseClient.auth.getUser();
+  console.log("[QUEUE] queueSaveToSupabase() hit", {
+    hasLoadedRemote,
+    saveInFlight,
+    saveQueued
+  });
 
-    // Not logged in yet -> defer
-    if (!data?.user) {
+  // If remote hasn't loaded yet, allow a write ONLY if user exists
+  if (!hasLoadedRemote) {
+    const { data: u } = await supabaseClient.auth.getUser();
+    const hasUser = !!u?.user;
+
+    console.log("[QUEUE] hasLoadedRemote=false; getUser check:", {
+      hasUser,
+      userId: u?.user?.id || null
+    });
+
+    if (!hasUser) {
       pendingSaveBeforeRemote = true;
-      console.warn("⏳ Deferring Supabase save until remote state is loaded (no user yet)");
+      console.warn("⏳ [QUEUE] Deferring save until remote is loaded (no user yet)");
       return;
     }
 
-    // Logged in -> allow save to run now (this lets the first row get created)
-    console.warn("✅ User is logged in; allowing save before remote load");
+    console.warn("✅ [QUEUE] User exists; allowing save before remote load");
   }
 
   if (saveInFlight) {
     saveQueued = true;
+    console.log("[QUEUE] saveInFlight=true -> queued next save");
     return;
   }
 
   saveInFlight = true;
 
   try {
-    await saveStateToSupabase();
+    const res = await saveStateToSupabase();
+    console.log("[QUEUE] saveStateToSupabase result:", res);
   } finally {
     saveInFlight = false;
 
     if (saveQueued) {
       saveQueued = false;
+      console.log("[QUEUE] running queued save now…");
       queueSaveToSupabase();
     }
   }
@@ -1563,10 +1574,9 @@ async function queueSaveToSupabase() {
   function saveDecks() {
   console.log("💾 saveDecks() firing. decks.length =", decks.length);
 
-  // 1) Save locally first
   localStorage.setItem("srsDecks", JSON.stringify(decks));
 
-  // 2) Trigger Supabase save queue (don’t log success here — it may be deferred)
+  // THIS is the critical wiring line:
   queueSaveToSupabase();
 }
 
@@ -1580,69 +1590,72 @@ function saveSchedule() {
 
 // ===================== SUPABASE SYNC HELPERS =====================
 async function saveStateToSupabase() {
-  console.log(
-    "[SAVE] called",
-    new Date().toISOString(),
-    {
-      hasLoadedRemote,
-      decksCount: decks?.length,
-      scheduleKeys: schedule ? Object.keys(schedule).length : null
-    }
-  );
+  console.log("[SAVE] called", new Date().toISOString(), {
+    hasLoadedRemote,
+    decksLen: Array.isArray(decks) ? decks.length : null,
+    hasSchedule: !!schedule
+  });
 
   try {
-    // 1) Get current auth user
-    console.log("[SAVE] fetching user…");
-    const { data: { user }, error: userErr } =
-      await supabaseClient.auth.getUser();
+    // MUST have a logged-in user
+    const { data: userData, error: userErr } = await supabaseClient.auth.getUser();
+
+    console.log("[SAVE] getUser()", {
+      userErr: userErr
+        ? { message: userErr.message, name: userErr.name, status: userErr.status }
+        : null,
+      userId: userData?.user?.id || null,
+      email: userData?.user?.email || null
+    });
 
     if (userErr) {
       console.error("[SAVE] getUser error:", userErr);
-      return;
+      return { ok: false, step: "getUser", error: userErr };
     }
 
+    const user = userData?.user;
     if (!user) {
-      console.warn("[SAVE] no user — aborting save");
-      return;
+      console.warn("[SAVE] No user — skipping Supabase save");
+      return { ok: false, step: "no_user" };
     }
 
-    console.log("[SAVE] user OK:", user.id);
-
-    // 2) Build payload (ONLY allowed columns)
     const payload = {
       user_id: user.id,
-      state_json: {
-        decks,
-        schedule
-      },
-      updated_at: new Date().toISOString(),
+      state_json: { decks, schedule },
+      updated_at: new Date().toISOString()
     };
 
-    console.log("[SAVE] payload built", payload);
+    console.log("[SAVE] about to upsert payload", {
+      table: "zencards_state",
+      user_id: payload.user_id,
+      stateSize: JSON.stringify(payload.state_json || {}).length
+    });
 
-    // 3) Perform UPSERT
-    console.log("[SAVE] sending upsert to Supabase…");
-    const { data, error } = await supabaseClient
+    const { data, error, status } = await supabaseClient
       .from("zencards_state")
-      .upsert(payload, { onConflict: "user_id" })
-      .select()
-      .single();
+      .upsert(payload, { onConflict: "user_id" });
 
-    // 4) RESULT — THIS IS THE MOST IMPORTANT LOG
-    console.log("[SAVE] upsert result:", { data, error });
+    console.log("[SAVE] upsert response", {
+      status,
+      error: error
+        ? { message: error.message, code: error.code, details: error.details, hint: error.hint }
+        : null,
+      data
+    });
 
     if (error) {
-      console.error("[SAVE] ❌ Supabase save failed:", error);
-      setAuthStatus?.(
-        "Supabase save failed: " + (error.message || "unknown error")
-      );
-      return;
+      console.error("[SAVE] Supabase save failed:", error);
+      if (typeof setAuthStatus === "function") {
+        setAuthStatus("Supabase save failed: " + (error.message || "unknown"));
+      }
+      return { ok: false, step: "upsert", error };
     }
 
     console.log("✅ [SAVE] Supabase save OK");
-
+    return { ok: true, status, data };
   } catch (e) {
-    console.error("[SAVE] 💥 crashed:", e);
+    console.error("[SAVE] crashed:", e);
+    return { ok: false, step: "crash", error: e };
   }
 }
 
