@@ -1671,77 +1671,50 @@ async function saveStateToSupabase() {
   }
 }
 
-async function loadStateFromSupabase() {
-  console.log("✅ loadStateFromSupabase called");
+async function requireAuthOrRedirect() {
+  const { data: { session } } = await supabaseClient.auth.getSession();
 
-  console.log("📥 loadStateFromSupabase() start");
-
-  try {
-    // Make sure token is fresh
-    try { await supabaseClient.auth.refreshSession(); } catch (_) {}
-
-    // Get user
-    const { data: userData, error: userErr } = await supabaseClient.auth.getUser();
-    const user = userData?.user;
-
-    console.log("🟦 loadStateFromSupabase getUser()", { user, userErr });
-
-    // ✅ If no user, we still "unlock" in finally.
-    if (!user) {
-      console.warn("🟨 No user in loadStateFromSupabase(). Skipping remote load.");
-      return;
-    }
-
-    // Load row
-    const { data, error } = await supabaseClient
-      .from("zencards_state")
-      .select("state_json, updated_at")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (error) {
-      console.error("🟥 Supabase load error:", error);
-      setAuthStatus("Supabase load error: " + (error.message || "unknown"));
-      return;
-    }
-
-    console.log("🟦 Supabase load row:", data);
-
-    // ✅ FIRST-TIME USER CASE: no row yet
-    if (!data?.state_json) {
-      console.log("🟨 No remote state yet; creating from local…");
-      await queueSaveToSupabase();     // create their row via queue/locking
-return;                        // ✅ still safe because finally runs
-    }
-
-    // Apply remote -> memory
-    const remote = data.state_json;
-
-    if (Array.isArray(remote.decks)) decks = remote.decks;
-    if (remote.schedule && typeof remote.schedule === "object") schedule = remote.schedule;
-
-    // Persist remote -> local
-    localStorage.setItem("srsDecks", JSON.stringify(decks));
-    localStorage.setItem("srsSchedule", JSON.stringify(schedule));
-
-    console.log("✅ Loaded remote state into app + localStorage");
-  } catch (e) {
-    console.error("❌ loadStateFromSupabase crashed:", e);
-  } finally {
-    // ✅ CRITICAL: ALWAYS release the gate so saves can proceed
-    hasLoadedRemote = true;
-    console.log("✅ hasLoadedRemote = true");
-
-    setSyncLock(false); // unlock UI if you use this lock
-
-    // ✅ CRITICAL: flush any deferred save that happened before remote loaded
-    if (pendingSaveBeforeRemote) {
-      pendingSaveBeforeRemote = false;
-      console.log("⏩ Flushing deferred save now that remote is loaded/checked");
-     queueSaveToSupabase().catch(e => console.error("❌ queueSaveToSupabase rejected:", e));
-    }
+  if (!session) {
+    // Not logged in, go back to landing
+    window.location.replace("/");
+    return null;
   }
+
+  return session;
 }
+
+async function initAppGate() {
+  // show loading state (not locked)
+  setUiLoading(true);
+
+  const session = await requireAuthOrRedirect();
+  if (!session) return;
+
+  // Now safe to getUser
+  const { data: userData } = await supabaseClient.auth.getUser();
+  const user = userData?.user || session.user;
+
+  // check subscription (use your existing function)
+  const access = await checkUserAccess(user.id);
+
+  if (access?.hasAccess) {
+    setUiUnlocked(true);
+  } else {
+    setUiUnlocked(false);
+    // optionally show billing modal or keep Manage Billing button highlighted
+  }
+
+  setUiLoading(false);
+}
+
+// run once on load
+initAppGate();
+
+// keep in sync if auth changes
+supabaseClient.auth.onAuthStateChange((_event, _session) => {
+  initAppGate();
+});
+
 loadStateFromSupabase().catch(e => console.error("❌ loadStateFromSupabase crashed on boot:", e));
 
     function scheduleKey(deckId, cardId) {
