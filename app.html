@@ -1644,8 +1644,10 @@ async function saveStateToSupabase() {
     });
 
     const { data, error, status } = await supabaseClient
-      .from("zencards_state")
-      .upsert(payload, { onConflict: "user_id" });
+  .from("zencards_state")
+  .upsert(payload, { onConflict: "user_id" })
+  .select();
+
 
     console.log("[SAVE] upsert response", {
       status,
@@ -1742,8 +1744,6 @@ return;                        // ✅ still safe because finally runs
     }
   }
 }
-loadStateFromSupabase().catch(e => console.error("❌ loadStateFromSupabase crashed on boot:", e));
-
     function scheduleKey(deckId, cardId) {
       return `${deckId}_${cardId}`;
     }
