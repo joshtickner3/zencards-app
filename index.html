@@ -1034,7 +1034,7 @@ lpGoBtn?.addEventListener("click", async () => {
   const access = await checkUserAccess(user.id);
   if (!access?.hasAccess) return;
 
-  window.location.href = "https://zencardstudy.com/app.html";
+  window.location.href = "https://zencardstudy.com/app.html?forceLogin=1";
 });
 
 lpLogoutBtn?.addEventListener("click", async () => {

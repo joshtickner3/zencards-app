@@ -922,6 +922,53 @@ const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
 });
 
 window.supabaseClient = supabaseClient;
+// ===================== TEMP TEST: FORCE LOGOUT ON APP LOAD =====================
+function shouldForceFreshLogin() {
+  return new URLSearchParams(window.location.search).get("forceLogin") === "1";
+}
+
+// remove ?forceLogin=1 from URL so it doesn't keep triggering
+function stripForceFreshLoginParam() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("forceLogin");
+  window.history.replaceState({}, document.title, url.toString());
+}
+
+// aggressively clear any Supabase auth state for this origin
+async function forceFreshLoginOnApp() {
+  console.warn("🧪 TEST MODE: Forcing logged-out state on app.html");
+
+  const PROJECT_REF = "elpfcnnrripftxoqeckv";
+
+  // 1) Best-effort Supabase signOut (timeout so it can't hang)
+  try {
+    await Promise.race([
+      supabaseClient.auth.signOut(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("signOut timeout")), 1500))
+    ]).catch(() => {});
+  } catch (_) {}
+
+  // 2) Hard-clear known auth keys
+  try {
+    localStorage.removeItem("zencards-auth"); // your custom key
+    localStorage.removeItem(`sb-${PROJECT_REF}-auth-token`);
+    localStorage.removeItem(`sb-${PROJECT_REF}-auth-token-code-verifier`);
+  } catch (_) {}
+
+  // 3) Reset local app user and UI
+  currentUser = null;
+  window.__zcAccessToken = null;
+  updateAuthButtons();
+  setAuthStatus("TEST MODE: Please log in on app.html to continue.");
+
+  // 4) Important: stop any redirect loops
+  stripForceFreshLoginParam();
+
+  // 5) Make sure your sync gate doesn't wedge forever
+  hasLoadedRemote = true;
+  setSyncLock(false);
+}
+
 window.setSyncLock = window.setSyncLock || function () {};
 window.lockUI = window.lockUI || function () {};
 
@@ -1181,9 +1228,13 @@ console.log("✅ LOGGED IN EMAIL:", data.user.email);
   currentUser = data.user;
   setAuthStatus("Logged in as: " + currentUser.email);
   updateAuthButtons();
-  await loadStateFromSupabase();
-  refreshDeckSelect();
-  refreshCardsList();
+
+const ok = await enforceAccessOrRedirect();
+if (!ok) return;
+
+await loadStateFromSupabase();
+refreshDeckSelect();
+refreshCardsList();
 }
 
 async function signOutFromApp() {
@@ -1410,52 +1461,59 @@ async function enforceAccessOrRedirect() {
 
 // ✅ Run gate on first load
 window.addEventListener("DOMContentLoaded", async () => {
-  setSyncLock(true);   
+  setSyncLock(true);
   console.log("✅ DOMContentLoaded fired; UI locked");
-         // ✅ lock right away
-const ok = await enforceAccessOrRedirect();
-if (!ok) {
-  hasLoadedRemote = true;   // so your app doesn't get stuck forever
-  setSyncLock(false);
-  return;
-}
 
+  // 🧪 TEST MODE: force app.html to be logged out even if landing was logged in
+  if (shouldForceFreshLogin()) {
+    await forceFreshLoginOnApp();
+
+    // Load LOCAL state just for UI (or sample deck if not logged in)
+    loadFromStorage();
+    refreshDeckSelect();
+    refreshCardsList();
+    return; // <-- DO NOT run enforceAccessOrRedirect in test mode
+  }
+
+  // Normal behavior (production)
+  const ok = await enforceAccessOrRedirect();
+  if (!ok) {
+    hasLoadedRemote = true;
+    setSyncLock(false);
+    return;
+  }
 
   loadFromStorage();
   refreshDeckSelect();
   refreshCardsList();
 
-  await loadStateFromSupabase(); // ✅ unlock happens in finally below
+  await loadStateFromSupabase();
   refreshDeckSelect();
   refreshCardsList();
 });
 
-
 supabaseClient.auth.onAuthStateChange(async (event, session) => {
-  // Prevent weird UI flashes during an intentional sign-out
   if (isSigningOut) return;
-  
-  window.__zcAccessToken = session?.access_token || null;
 
-  // Keep currentUser in sync
+  // If we're in test mode during the forced logout phase, don't run paywall gate
+  // (We strip the param right after forcing logout, so this only affects initial moment)
+  if (shouldForceFreshLogin()) {
+    return;
+  }
+
+  window.__zcAccessToken = session?.access_token || null;
   currentUser = session?.user ?? null;
 
   updateAuthButtons();
-  // ✅ Always enforce paywall after auth changes
-const ok = await enforceAccessOrRedirect();
-if (!ok) return;
 
-  // Optional: if you already do these, keep them
+  const ok = await enforceAccessOrRedirect();
+  if (!ok) return;
+
   if (currentUser) {
     await loadStateFromSupabase();
     refreshDeckSelect();
     refreshCardsList();
-
-    // ✅ THE IMPORTANT LINE:
-    // If the URL has ?startTrial=1, this will now run RIGHT AFTER LOGIN too.
     await startTrialIfRequested();
-  } else {
-    // logged out state — you can keep whatever you currently do here
   }
 });
 
@@ -1742,7 +1800,6 @@ return;                        // ✅ still safe because finally runs
     }
   }
 }
-loadStateFromSupabase().catch(e => console.error("❌ loadStateFromSupabase crashed on boot:", e));
 
     function scheduleKey(deckId, cardId) {
       return `${deckId}_${cardId}`;
