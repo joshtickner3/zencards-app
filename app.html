@@ -928,72 +928,26 @@ window.lockUI = window.lockUI || function () {};
 // ===== AUTH RECOVERY: bypass hung getSession lock =====
 async function bootstrapSessionFromStorage() {
   try {
-    // Try several possible keys + formats so we can recover sessions stored
-    // by different client instances or older versions.
-    const keys = Object.keys(localStorage || {});
+    const raw = localStorage.getItem("zencards-auth");
+    if (!raw) return null;
 
-    // Candidate keys: explicit shared key, any key that looks like an auth token
-    const candidates = new Set();
-    candidates.add("zencards-auth");
-    for (const k of keys) {
-      if (!k) continue;
-      const low = k.toLowerCase();
-      if (low.includes("auth") || low.includes("-auth-token") || low.includes("zencards")) {
-        candidates.add(k);
-      }
+    const parsed = JSON.parse(raw);
+    const access_token = parsed?.access_token;
+    const refresh_token = parsed?.refresh_token;
+
+    if (!access_token || !refresh_token) return null;
+
+    const { data, error } = await supabaseClient.auth.setSession({
+      access_token,
+      refresh_token,
+    });
+
+    if (error) {
+      console.warn("[bootstrapSessionFromStorage] setSession error:", error);
+      return null;
     }
 
-    for (const key of Array.from(candidates)) {
-      try {
-        const raw = localStorage.getItem(key);
-        if (!raw) continue;
-
-        let parsed = null;
-        try { parsed = JSON.parse(raw); } catch (e) { parsed = null; }
-        if (!parsed) continue;
-
-        // Try common shapes for stored session data
-        const access_token = parsed?.access_token || parsed?.accessToken || parsed?.currentSession?.access_token || parsed?.session?.access_token || parsed?.currentSession?.accessToken || parsed?.session?.accessToken;
-        const refresh_token = parsed?.refresh_token || parsed?.refreshToken || parsed?.currentSession?.refresh_token || parsed?.session?.refresh_token || parsed?.currentSession?.refreshToken || parsed?.session?.refreshToken;
-
-        // Some older/local shapes store the token object nested inside another property
-        if ((!access_token || !refresh_token) && typeof parsed === "object") {
-          for (const v of Object.values(parsed)) {
-            if (!v || typeof v !== "object") continue;
-            if (v.access_token && v.refresh_token) {
-              parsed = v;
-              break;
-            }
-          }
-        }
-
-        const at = parsed?.access_token || parsed?.accessToken || parsed?.currentSession?.access_token || parsed?.session?.access_token || parsed?.access_token;
-        const rt = parsed?.refresh_token || parsed?.refreshToken || parsed?.currentSession?.refresh_token || parsed?.session?.refresh_token || parsed?.refresh_token;
-
-        if (!at || !rt) {
-          // Not a usable candidate
-          continue;
-        }
-
-        const { data, error } = await supabaseClient.auth.setSession({
-          access_token: at,
-          refresh_token: rt,
-        });
-
-        if (error) {
-          console.warn(`[bootstrapSessionFromStorage] setSession error for key=${key}:`, error);
-          continue;
-        }
-
-        console.log(`[bootstrapSessionFromStorage] restored session from localStorage key=${key}`);
-        return data?.session ?? null;
-      } catch (e) {
-        console.warn("[bootstrapSessionFromStorage] candidate parse failed:", e);
-        continue;
-      }
-    }
-
-    return null;
+    return data?.session ?? null;
   } catch (e) {
     console.warn("[bootstrapSessionFromStorage] failed:", e);
     return null;
