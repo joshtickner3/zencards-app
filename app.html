@@ -1432,6 +1432,16 @@ return;                        // ✅ still safe because finally runs
   }
 }
 initAppSession().catch(e => console.error("❌ initAppSession crashed:", e));
+function restoreLastDeckSelection() {
+  const lastDeckId = getLastDeckId();
+  if (!lastDeckId) return;
+
+  if (decks && decks.some(d => d.id === lastDeckId)) {
+    selectedDeckId = lastDeckId;
+    if (deckSelect) deckSelect.value = lastDeckId;
+  }
+}
+
 async function initAppSession() {
   console.log("[BOOT] initAppSession()");
 
@@ -1460,6 +1470,7 @@ async function initAppSession() {
   // 4) Load local immediately so app feels instant
   loadFromStorage();
   refreshDeckSelect();
+  restoreLastDeckSelection();
   refreshCardsList();
 
   // 5) Load remote once (this will set hasLoadedRemote=true in finally)
@@ -1467,6 +1478,7 @@ async function initAppSession() {
 
   // 6) After remote load, re-render (remote may overwrite local)
   refreshDeckSelect();
+  restoreLastDeckSelection();
   refreshCardsList();
 
   console.log("[BOOT] done", { hasLoadedRemote, userId: currentUser?.id });
@@ -1819,6 +1831,29 @@ document.querySelectorAll("[data-insert-image]").forEach(btn => {
 
     let selectedDeckId = null;
     let selectedCardId = null;
+    // ===================== CONTINUE WHERE I LEFT OFF =====================
+const LAST_DECK_KEY = "zc_lastDeckId";
+const LAST_MODE_KEY = "zc_lastMode";
+const AUTO_RESUME_KEY = "zc_autoResume"; // optional toggle (default false)
+
+function saveLastDeckId(deckId) {
+  if (!deckId) return;
+  localStorage.setItem(LAST_DECK_KEY, String(deckId));
+}
+
+function saveLastMode(mode) {
+  if (!mode) return;
+  localStorage.setItem(LAST_MODE_KEY, String(mode));
+}
+
+function getLastDeckId() {
+  return localStorage.getItem(LAST_DECK_KEY);
+}
+
+function getLastMode() {
+  return localStorage.getItem(LAST_MODE_KEY);
+}
+
 
     function getDeckById(id) {
       return decks.find(d => d.id === id) || null;
@@ -2028,6 +2063,7 @@ function getDeckPhaseCounts(deck) {
   newDeckNameInput.value = "";
   updateAddDeckButtonState();
   selectedDeckId = id;
+  saveLastDeckId(selectedDeckId);
   refreshDeckSelect();
   refreshCardsList();
 });
@@ -2059,9 +2095,10 @@ function getDeckPhaseCounts(deck) {
     });
 
     deckSelect.addEventListener("change", () => {
-      selectedDeckId = deckSelect.value;
-      refreshCardsList();
-    });
+  selectedDeckId = deckSelect.value;
+  saveLastDeckId(selectedDeckId);
+  refreshCardsList();
+});
 
     addCardBtn.addEventListener("click", () => {
       const q = cardQuestionInput.value.trim();
@@ -4439,6 +4476,8 @@ setCardContent(voiceAnswerText, currentCard.answer);
     });
 
     startSilentBtn.addEventListener("click", () => {
+      saveLastMode("silent");
+if (selectedDeckId) saveLastDeckId(selectedDeckId);
       currentDeckId = selectedDeckId;
       if (!currentDeckId) return;
       skipInstructionsAfterFirst = !!skipInstructionsAfterFirstCheckbox.checked;
@@ -4478,6 +4517,8 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
 
     // >>> MODIFIED: add async + inline mic permission request here <<<
     startVoiceBtn.addEventListener("click", async () => {
+      saveLastMode("voice");
+if (selectedDeckId) saveLastDeckId(selectedDeckId);
       // 🔊 Browser-only: Request microphone permission first (required in Safari/etc).
       // If we're using the native iOS plugin, it handles mic/speech permissions natively.
       if (!nativeVoicePlugin && !autoGoodMode && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
