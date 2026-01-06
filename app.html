@@ -122,6 +122,38 @@
   gap:0;
   margin-bottom:0.35rem;
 }
+/* Logo header blending panel */
+.appHeader{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin-bottom:0.35rem;
+  padding: 10px 12px;
+  border-radius: 16px;
+
+  /* This is the "match" layer behind the logo */
+  background:
+    radial-gradient(circle at 50% 20%, rgba(148,163,184,0.14), rgba(2,6,23,0) 60%),
+    linear-gradient(90deg, rgba(2,6,23,0.0), rgba(15,23,42,0.55), rgba(2,6,23,0.0));
+
+  border: 1px solid rgba(30,41,59,0.6);
+  box-shadow: 0 18px 35px rgba(0,0,0,0.35);
+  width: fit-content;
+  margin-left:auto;
+  margin-right:auto;
+
+  /* helps blend if your logo has subtle edges */
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.brandLogo{
+  height: clamp(56px, 7vw, 92px);
+  width: auto;
+  display:block;
+  .brandLogo { mix-blend-mode: lighten; }
+}
+
     .logoMark {
       width: 32px;
       height: 32px;
