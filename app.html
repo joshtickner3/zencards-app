@@ -961,16 +961,16 @@ async function openStripeCustomerPortal() {
     const fnUrl = `${SUPABASE_URL}/functions/v1/create-portal-link`;
 
     const res = await fetch(fnUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        // optional but useful: where Stripe should send them back after portal
-        return_url: getBaseUrlForSameFolder() + "app.html",
-      }),
-    });
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "apikey": SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${session.access_token}`,
+  },
+  body: JSON.stringify({
+    return_url: getBaseUrlForSameFolder() + "app.html",
+  }),
+});
 
     const json = await res.json().catch(() => ({}));
 
@@ -998,43 +998,6 @@ async function openStripeCustomerPortal() {
 // Hook up the button
 if (manageBillingBtn) {
   manageBillingBtn.addEventListener("click", openStripeCustomerPortal);
-}
-// ===================== RESET PASSWORD (EMAIL) =====================
-
-async function sendResetPasswordEmailFromApp() {
-  try {
-    // Use the logged-in user's email
-    const { data: userData, error: userErr } = await supabaseClient.auth.getUser();
-    if (userErr) throw userErr;
-
-    const email = userData?.user?.email;
-    if (!email) {
-      alert("No email found for this user. Please log in again.");
-      return;
-    }
-
-    // reset.html is in same folder as app.html
-    const redirectTo = new URL("reset.html", window.location.href).href;
-
-    const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-      redirectTo,
-    });
-
-    if (error) {
-      console.error("[RESET] resetPasswordForEmail error:", error);
-      alert("Reset email failed. Check console.");
-      return;
-    }
-
-    alert("Password reset email sent. Check your inbox (and spam).");
-  } catch (e) {
-    console.error("[RESET] Failed:", e);
-    alert("Reset email failed. Check console.");
-  }
-}
-
-if (resetPasswordLoggedInBtn) {
-  resetPasswordLoggedInBtn.addEventListener("click", sendResetPasswordEmailFromApp);
 }
 
 
