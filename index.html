@@ -14,6 +14,20 @@
   width: auto;
   display:block;
 }
+/* Focus helper for Go button */
+#lpGoBtn:focus{
+  outline: 3px solid rgba(34,197,94,0.55);
+  outline-offset: 3px;
+}
+.lpGoPulse{
+  animation: lpPulse 0.9s ease-in-out 0s 2;
+}
+@keyframes lpPulse{
+  0% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
 /* ===== Top-left signed-in box (matches app.html style) ===== */
 .signedInBox{
   position: fixed;
@@ -1375,6 +1389,9 @@ async function refreshLandingGate() {
   }
 
   setLpGoButton(!!access?.hasAccess);
+  if (access?.hasAccess) {
+  focusGoToZenCardsBtn();
+}
 }
 function setSignedInBoxVisible(visible){
   if (!signedInBox) return;
@@ -1517,6 +1534,23 @@ const hasAccess =
 
 return { hasAccess, reason: hasAccess ? "ok" : "no_active_or_trialing_row", rows: data || [] };
 }
+function focusGoToZenCardsBtn(){
+  if (!lpGoBtn) return;
+
+  // If it's still disabled, don't focus (focus won't feel right)
+  if (lpGoBtn.disabled) return;
+
+  // Scroll it into view and focus it
+  lpGoBtn.scrollIntoView({ behavior: "smooth", block: "center" });
+  lpGoBtn.focus({ preventScroll: true });
+
+  // Optional: visual pulse so user notices it
+  lpGoBtn.classList.remove("lpGoPulse");
+  // reflow to restart animation
+  void lpGoBtn.offsetWidth;
+  lpGoBtn.classList.add("lpGoPulse");
+}
+
     
     // Expose it on window so it's not "undefined" in console
 window.startFreeTrial = async function startFreeTrial() {

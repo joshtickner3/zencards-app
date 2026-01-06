@@ -27,6 +27,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             print("Speech recognition authorization: \(status.rawValue)")
         }
 
+        // ✅ Enable pinch-zoom in the Capacitor WKWebView (iOS app)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            if let bridgeVC = self.window?.rootViewController as? CAPBridgeViewController,
+               let webView = bridgeVC.webView {
+                webView.scrollView.isScrollEnabled = true
+                webView.scrollView.pinchGestureRecognizer?.isEnabled = true
+            }
+        }
+
         return true
     }
 
