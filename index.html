@@ -57,17 +57,36 @@
 
     #billingModal { z-index: 10000; }
     :root{
-      --bg1:#1f2937;
-      --bg2:#020617;
-      --card:#020617cc;
-      --border:#1f2937; 
-      --text:#e5e7eb;
-      --muted:#9ca3af;
-      --green:#10b981;
-      --green2:#22c55e;
-      --slate:#374151;
-      --shadow: 0 18px 35px rgba(0,0,0,0.55), 0 0 0 1px rgba(15,23,42,0.7);
-    }
+  /* Backgrounds (deep slate blue = trust/premium) */
+  --bg1:#0f172a;            /* deep slate */
+  --bg2:#020617;            /* near-black blue */
+
+  /* Surfaces */
+  --card: rgba(15,23,42,0.92);
+  --border:#1e293b;
+
+  /* Text */
+  --text:#e5e7eb;
+  --muted:#94a3b8;
+
+  /* CTA (Green) */
+  --green:#22c55e;          /* emerald */
+  --green2:#16a34a;         /* hover emerald */
+
+  /* Secondary button */
+  --slate:#334155;
+
+  /* NEW: Amber for badges */
+  --amber:#f59e0b;
+  --amber2:#d97706;
+
+  /* NEW: Soft blue for links */
+  --link:#60a5fa;
+  --link2:#93c5fd;
+
+  --shadow: 0 18px 35px rgba(0,0,0,0.55), 0 0 0 1px rgba(15,23,42,0.7);
+}
+
     *{box-sizing:border-box}
     body{
       margin:0;
@@ -77,7 +96,15 @@
       color:var(--text);
       line-height:1.5;
     }
-    a{color:inherit}
+  a{
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+a:hover{
+  color: var(--link2);
+}
+
     .container{max-width:980px;margin:0 auto;}
     .card{
       background: var(--card);
@@ -139,15 +166,16 @@
       font-size:1.02rem;
     }
     .badge{
-      display:inline-block;
-      padding:0.2rem 0.55rem;
-      border-radius:999px;
-      background:#1f2937;
-      font-size:0.78rem;
-      color:#cbd5e1;
-      border:1px solid #111827;
-      margin-right:0.5rem;
-    }
+  display:inline-block;
+  padding:0.2rem 0.55rem;
+  border-radius:999px;
+  background: rgba(245,158,11,0.16);      /* amber tint */
+  font-size:0.78rem;
+  color: #fde68a;                         /* light amber text */
+  border: 1px solid rgba(245,158,11,0.35);
+  margin-right:0.5rem;
+  font-weight: 800;
+}
     .btn{
       display:inline-flex;
       align-items:center;
@@ -173,8 +201,17 @@
       color: var(--text);
       box-shadow:none;
     }
-    .btn.secondary:hover{background:#4b5563; box-shadow:0 6px 14px rgba(15,23,42,0.65);}
+   .btn.secondary:hover{
+  background:#475569; 
+  box-shadow:0 6px 14px rgba(15,23,42,0.65);
+}
     .btn.small{padding:0.35rem 0.85rem; font-size:0.85rem}
+    /* Make the Start Free Trial button feel more “primary” */
+#startTrialTopBtn{
+  font-weight: 900;
+  letter-spacing: 0.01em;
+}
+
     .muted{color:var(--muted)}
     .grid3{
       display:grid;
@@ -1014,7 +1051,7 @@
 
       <h4>10) Contact</h4>
       <p class="muted">
-        Questions? Email <strong>support@zencardsstudy.com</strong>
+        Questions? Email <strong>support@zencardstudy.com</strong>
       </p>
     </div>
 
