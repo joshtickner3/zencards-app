@@ -151,7 +151,7 @@
   height: clamp(56px, 7vw, 92px);
   width: auto;
   display:block;
-  .brandLogo { mix-blend-mode: lighten; }
+  /* mix-blend-mode: lighten;  <-- optional, only if you want it */
 }
 
     .logoMark {
@@ -453,6 +453,60 @@ input[type="number"]:focus{
       color: #9ca3af;
       margin-bottom: 0.35rem;
     }
+/* ===== app.html: make the top signed-in bar feel clean on small screens ===== */
+@media (max-width: 430px){
+  .topUserBar{
+    top: 10px;
+    left: 10px;
+    right: 10px;                 /* allows it to size nicely */
+    max-width: none;             /* override max-width calc */
+    padding: 8px 10px;
+    border-radius: 14px;
+  }
+
+  .topUserBar .signedInLine{
+    font-size: 0.85rem;
+    margin: 0 0 6px 0;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;     /* prevents long emails from blowing layout */
+  }
+
+  .topUserBar .btnRow{
+    gap: 6px;
+  }
+
+  .topUserBar .btnRow button{
+    padding: 0.28rem 0.7rem;     /* smaller pill buttons */
+    font-size: 0.82rem;
+  }
+
+  /* Important: remove your global button margins inside this bar
+     so it never "double spaces" and pushes off-screen */
+  .topUserBar button{
+    margin: 0 !important;
+  }
+}
+
+/* ===== app.html: prevent top UI from covering your header content ===== */
+:root{
+  --topBarClearance: 86px;  /* default space reserved for fixed top bar */
+}
+
+@media (max-width: 430px){
+  :root{
+    --topBarClearance: 98px; /* a bit more room because buttons may wrap */
+  }
+}
+
+/* Push the main app content down so the fixed bar doesn't overlap */
+.appHeader,
+.appSubtitle,
+#mainMenu,
+#studySection{
+  margin-top: calc(var(--topBarClearance));
+}
 
   </style>
 </head>
