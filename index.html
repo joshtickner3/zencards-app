@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>ZenCards — Hands-Free Flashcards (3-Day Free Trial)</title>
   <style>
     .brandLogo{
@@ -622,6 +622,20 @@ a:hover{
 .legalModalBody ul{
   margin: 0.5rem 0 0 1.15rem;
 }
+/* ===== iOS app portrait safe-area fix (website unchanged) ===== */
+.nativeApp .userCounter{
+  top: calc(env(safe-area-inset-top, 0px) + 10px) !important;
+}
+
+.nativeApp .signedInBox{
+  top: calc(env(safe-area-inset-top, 0px) + 10px) !important;
+}
+
+/* Optional: give the whole page breathing room in-app */
+.nativeApp body{
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
 
   </style>
 </head>
@@ -1194,6 +1208,26 @@ monthlyUsersEl.textContent = Number(MONTHLY_USERS).toLocaleString() + "+";
     storageKey: "zencards-auth",
   },
 });
+// ===== Native app detection + safe navigation =====
+function isNativeApp(){
+  return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+}
+// Add a CSS hook ONLY when running inside the iOS app (Capacitor WebView)
+if (isNativeApp()) {
+  document.documentElement.classList.add("nativeApp");
+}
+
+
+function goToAppHtml(){
+  // ✅ Native app must use relative URL so it stays in the WebView
+  if (isNativeApp()) {
+    window.location.href = "app.html?forceLogin=1";
+  } else {
+    // ✅ Website can use full domain
+    window.location.href = "https://zencardstudy.com/app.html?forceLogin=1";
+  }
+}
+
 
 // ===== Landing Page Gate UI =====
 const lpWhoami = document.getElementById("lpWhoami");
@@ -1367,7 +1401,7 @@ lpGoBtn?.addEventListener("click", async () => {
   const access = await checkUserAccess(user.id);
   if (!access?.hasAccess) return;
 
-  window.location.href = "https://zencardstudy.com/app.html?forceLogin=1";
+   goToAppHtml();
 });
 
 lpLogoutBtn?.addEventListener("click", async () => {

@@ -8,6 +8,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <!-- MathJax for rendering LaTeX equations in cards -->
    <script>
+    console.log("APP VERSION:", "2026-01-04 10:33am");
+
     
   window.MathJax = {
     startup: {
@@ -25,14 +27,84 @@
   src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
 </script>
   <style>
-    body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-      background: radial-gradient(circle at top, #1f2937 0, #020617 55%);
-      color: #e5e7eb;
-      margin: 0;
-      padding: 1rem;
-      line-height: 1.5;
-    }
+    :root{
+  --bg1:#0f172a;
+  --bg2:#020617;
+
+  --card: rgba(15,23,42,0.92);
+  --border:#1e293b;
+
+  --text:#e5e7eb;
+  --muted:#94a3b8;
+
+  --green:#22c55e;
+  --green2:#16a34a;
+
+  --slate:#334155;
+
+  --amber:#f59e0b;
+  --amber2:#d97706;
+
+  --link:#60a5fa;
+  --link2:#93c5fd;
+
+  --shadow: 0 18px 35px rgba(0,0,0,0.55), 0 0 0 1px rgba(15,23,42,0.7);
+}
+
+  .brandLogo{
+  height: clamp(56px, 7vw, 92px); /* grows on desktop, safe on small screens */
+  width: auto;
+  display: block;
+}
+    /* ===== Top-left signed-in bar ===== */
+.topUserBar {
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 12000;
+
+  background: rgba(2, 6, 23, 0.86);
+  border: 1px solid #1f2937;
+  border-radius: 14px;
+  padding: 10px 12px;
+
+  box-shadow: 0 18px 35px rgba(0,0,0,0.55);
+  max-width: calc(100% - 28px);
+}
+
+.topUserBar .signedInLine {
+  margin: 0 0 6px 0;
+  font-size: 0.95rem;
+  color: #e5e7eb;
+}
+
+.topUserBar .btnRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.topUserBar button {
+  margin: 0; /* important: override your default button margin */
+}
+
+    /* Hide Sign Up button on app.html (users sign up on landing) */
+#signUpBtn {
+  display: none !important;
+}
+#authLoggedOut .row {
+  justify-content: center;
+}
+
+    body{
+  margin:0;
+  padding:1rem;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: radial-gradient(circle at top, var(--bg1) 0, var(--bg2) 55%);
+  color: var(--text);
+  line-height:1.5;
+}
     h1, h2, h3 {
       margin: 0.5rem 0;
     }
@@ -43,13 +115,45 @@
 }
 
     /* App header + logo */
-    .appHeader {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.6rem;
-      margin-bottom: 0.15rem;
-    }
+    .appHeader{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:0;
+  margin-bottom:0.35rem;
+}
+/* Logo header blending panel */
+.appHeader{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin-bottom:0.35rem;
+  padding: 10px 12px;
+  border-radius: 16px;
+
+  /* This is the "match" layer behind the logo */
+  background:
+    radial-gradient(circle at 50% 20%, rgba(148,163,184,0.14), rgba(2,6,23,0) 60%),
+    linear-gradient(90deg, rgba(2,6,23,0.0), rgba(15,23,42,0.55), rgba(2,6,23,0.0));
+
+  border: 1px solid rgba(30,41,59,0.6);
+  box-shadow: 0 18px 35px rgba(0,0,0,0.35);
+  width: fit-content;
+  margin-left:auto;
+  margin-right:auto;
+
+  /* helps blend if your logo has subtle edges */
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.brandLogo{
+  height: clamp(56px, 7vw, 92px);
+  width: auto;
+  display:block;
+  .brandLogo { mix-blend-mode: lighten; }
+}
+
     .logoMark {
       width: 32px;
       height: 32px;
@@ -82,39 +186,37 @@
       max-width: 900px;
       margin: 0 auto;
     }
-    .card {
-      background: #020617cc;
-      border-radius: 0.9rem;
-      padding: 1rem;
-      margin-top: 1rem;
-      border: 1px solid #1f2937;
-      box-shadow:
-        0 18px 35px rgba(0,0,0,0.55),
-        0 0 0 1px rgba(15,23,42,0.7);
-    }
+    .card{
+  background: var(--card);
+  border-radius: 0.9rem;
+  padding: 1rem;
+  margin-top: 1rem;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
     label {
       display: inline-block;
       margin: 0.25rem 0;
       font-size: 0.9rem;
     }
-    input[type="text"], textarea, select, input[type="number"] {
-      width: 100%;
-      padding: 0.55rem 0.65rem;
-      border-radius: 0.6rem;
-      border: 1px solid #374151;
-      background: #020617;
-      color: #e5e7eb;
-      box-sizing: border-box;
-      font-size: 0.9rem;
-    }
+    input[type="text"], textarea, select, input[type="number"]{
+  width:100%;
+  padding:0.55rem 0.65rem;
+  border-radius:0.6rem;
+  border:1px solid #1f2937;
+  background:#0b1220;
+  color:var(--text);
+  box-sizing:border-box;
+  font-size:0.9rem;
+}
     input[type="text"]:focus,
-    textarea:focus,
-    select:focus,
-    input[type="number"]:focus {
-      outline: none;
-      border-color: #22c55e;
-      box-shadow: 0 0 0 1px rgba(34,197,94,0.35);
-    }
+textarea:focus,
+select:focus,
+input[type="number"]:focus{
+  outline:none;
+  border-color: rgba(34,197,94,0.55);
+  box-shadow: 0 0 0 3px rgba(34,197,94,0.12);
+}
     textarea {
       min-height: 60px;
     }
@@ -351,50 +453,30 @@
       color: #9ca3af;
       margin-bottom: 0.35rem;
     }
+
   </style>
 </head>
 <body>
-  <div class="container">
-        <!-- ========== AUTH / ACCOUNT ========== -->
-    <div id="authSection" class="card">
-      <h2>Account</h2>
-      <p id="authStatus" style="font-size:0.85rem;color:#9ca3af;margin-bottom:0.5rem;">
-        Not signed in.
-      </p>
+    <div>
+  </div>
+</div>
 
-      <!-- Shown when logged OUT -->
-      <div id="authLoggedOut">
-        <div class="row">
-          <div>
-            <label for="authEmail">Email</label>
-            <input id="authEmail" type="text" placeholder="you@example.com" />
-          </div>
-          <div>
-            <label for="authPassword">Password</label>
-            <input id="authPassword" type="password" placeholder="••••••••" />
-          </div>
-        </div>
-        <div class="row" style="margin-top:0.5rem;">
-          <button id="signUpBtn">Sign Up</button>
-          <button id="logInBtn" class="secondary">Log In</button>
-          <button id="resetPasswordBtn" class="secondary small">Reset Password</button>
-        </div>
-      </div>
+  <!-- Top-left signed-in bar -->
+<div id="authLoggedIn" class="topUserBar hidden">
+  <p class="signedInLine">
+    Signed in as <strong id="userEmailLabel"></strong>
+  </p>
 
-      <!-- Shown when logged IN -->
-      <div id="authLoggedIn" class="hidden">
-        <p style="margin-bottom:0.5rem;">
-          Signed in as <strong id="userEmailLabel"></strong>
-        </p>
-        <button id="logOutBtn" class="secondary small">Log Out</button>
-        <button id="manageBillingBtn">Manage Billing</button>
-      </div>
-    </div>
+  <div class="btnRow">
+    <button id="logOutBtn" class="secondary small">Log Out</button>
+    <button id="manageBillingBtn" class="small">Manage Billing</button>
+  </div>
+</div>
 
-    <div class="appHeader">
-      <div class="logoMark">Z</div>
-      <h1 class="appTitle">ZenCards</h1>
-    </div>
+   <div class="appHeader">
+  <img src="zencards-logo.png" alt="ZenCards logo" class="brandLogo" />
+</div>
+
     <p class="appSubtitle">Hands-free & silent spaced&nbsp;repetition flashcards</p>
 
     <!-- ========== MAIN SETTINGS / MENU ========== -->
@@ -474,7 +556,7 @@
         <!-- Move card to another deck -->
 <div class="row" style="margin-top:0.5rem;">
   <div>
-    <label for="moveDeckSelect">Move selected card to deck (edit a card to select one):</label>
+    <label for="moveDeckSelect">Move selected card to deck (edit a card to select it):</label>
     <select id="moveDeckSelect"></select>
   </div>
   <div style="flex:0 0 auto;">
@@ -858,40 +940,69 @@
   <script>
     // ===================== SUPABASE CONFIG =====================
 const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
+    const { createClient } = window.supabase;
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: window.localStorage,
+    storageKey: "zencards-auth",
+  },
+});
 
-// Use the UMD global from the CDN
-const { createClient } = window.supabase;
-const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+window.supabaseClient = supabaseClient;
+window.setSyncLock = window.setSyncLock || function () {};
+window.lockUI = window.lockUI || function () {};
 
 let currentUser = null;
 let isSigningOut = false;
+async function signOutFromApp() {
+  if (isSigningOut) return;
+  isSigningOut = true;
+
+  try {
+    console.log("[LOGOUT] signing out...");
+
+    // Stop any study audio/listening
+    try { stopAllAudio(); } catch (_) {}
+
+    // Supabase sign out
+    await supabaseClient.auth.signOut();
+
+    // Clear ONLY your app’s local state (not everything)
+    localStorage.removeItem("srsDecks");
+    localStorage.removeItem("srsSchedule");
+
+    // Clear Supabase session storage key
+    localStorage.removeItem("zencards-auth");
+
+    currentUser = null;
+    hasLoadedRemote = false;
+    pendingSaveBeforeRemote = false;
+
+    console.log("[LOGOUT] done, redirecting to index.html");
+    window.location.replace("index.html");
+  } catch (e) {
+    console.error("[LOGOUT] failed:", e);
+    alert("Logout failed. Check console.");
+  } finally {
+    isSigningOut = false;
+  }
+}
+
+
 
 // ===== AUTH DOM REFERENCES =====
-const authEmailInput = document.getElementById("authEmail");
-const authPasswordInput = document.getElementById("authPassword");
-
-const signUpBtn = document.getElementById("signUpBtn");
-const signInBtn = document.getElementById("logInBtn");           // correct ID
-const signOutBtn = document.getElementById("logOutBtn"); 
-const manageBillingBtn = document.getElementById("manageBillingBtn");
-manageBillingBtn?.addEventListener("click", async () => {
-  if (!currentUser) {
-    alert("You must be logged in.");
-    return;
-  }
-
-  // Stripe Customer Portal link (you generate this once in Stripe)
-  window.location.href = "https://billing.stripe.com/p/login/4gMfZh7E9aX72wK0jI1VK00";
-});
-
-        // correct ID
-const resetPwBtn = document.getElementById("resetPasswordBtn");  // correct ID
-
-const authStatusSpan = document.getElementById("authStatus");
 const deckBadge = document.getElementById("deckBadge");
+// ===== AUTH UI refs =====
+const authLoggedIn = document.getElementById("authLoggedIn");
+const userEmailLabel = document.getElementById("userEmailLabel");
+const signOutBtn = document.getElementById("logOutBtn");
 
-
+// Optional buttons (keep if you use them)
+const manageBillingBtn = document.getElementById("manageBillingBtn");
 const studyAddCardBtn = document.getElementById("studyAddCardBtn");
 const addCardModal = document.getElementById("addCardModal");
 const addCardModalCloseBtn = document.getElementById("addCardModalCloseBtn");
@@ -905,195 +1016,77 @@ const openInstructionsBtn = document.getElementById("openInstructionsBtn");
 const instructionsModal = document.getElementById("instructionsModal");
 const instructionsCloseBtn = document.getElementById("instructionsCloseBtn");
 
-
-// ===== AUTH FUNCTIONS (SIGN UP / SIGN IN / SIGN OUT / RESET PASSWORD) =====
-async function signUpWithEmail() {
-  const email = authEmailInput.value.trim();
-  const password = authPasswordInput.value.trim();
-  if (!email || !password) {
-    setAuthStatus("Please enter an email and password.");
-    return;
-  }
-
-  const { data, error } = await supabaseClient.auth.signUp({
-    email,
-    password,
-  });
-
-  if (error) {
-    console.error("Sign-up error:", error);
-    setAuthStatus("Sign-up error: " + error.message);
-    return;
-  }
-
-  setAuthStatus("Please check email for verification.");
-}
-
-async function signInWithEmail() {
-  const email = authEmailInput.value.trim();
-  const password = authPasswordInput.value.trim();
-  if (!email || !password) {
-    setAuthStatus("Please enter an email and password.");
-    return;
-  }
-
-  const { data, error } = await supabaseClient.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error) {
-    console.error("Log-in error:", error);
-    setAuthStatus("Log-in error: " + error.message);
-    return;
-  }
-
-  currentUser = data.user;
-  setAuthStatus("Logged in as: " + currentUser.email);
-  updateAuthButtons();
-  await loadStateFromSupabase();
-  refreshDeckSelect();
-  refreshCardsList();
-}
-
-async function signOutFromApp() {
-  // We’re explicitly in the middle of a manual sign-out
-  isSigningOut = true;
-
-  try {
-    // Check if this browser even has a session
-    const { data: sessionData, error: sessionError } =
-      await supabaseClient.auth.getSession();
-
-    if (sessionError) {
-      console.error("getSession error during sign-out:", sessionError);
-    }
-
-    // If there's no session in THIS browser, just clear the UI and bail out
-    if (!sessionData || !sessionData.session) {
-      console.log("No auth session in this browser; treating as signed out.");
-      currentUser = null;
-      setAuthStatus("Not signed in.");
-      updateAuthButtons();
-      isSigningOut = false;
-      return;
-    }
-
-    // There *is* a session here, so try to sign out
-    const { error } = await supabaseClient.auth.signOut();
-
-    // Ignore the special "Auth session missing" case – it just means
-    // Supabase couldn't find a session token, which is fine for log out
-   if (error && error.message !== "Auth session missing") {
-  // Log it for debugging, but do NOT surface it to the user
-  console.warn("Non-fatal sign-out error:", error.message);
-}
- 
-  } catch (err) {
-    console.error("Sign-out exception:", err);
-    setAuthStatus("Sign-out error: " + err.message);
-    isSigningOut = false;
-    return;
-  }
-
-  // If we get here, we’re treating the user as signed out no matter what
-  currentUser = null;
-  setAuthStatus("Signed out.");
-  updateAuthButtons();
-
-  isSigningOut = false;
-}
-   
-async function sendPasswordReset() {
-  const email = authEmailInput.value.trim();
-  if (!email) {
-    setAuthStatus("Enter your email to reset password.");
-    return;
-  }
- 
-  const { data, error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-  redirectTo: "https://joshtickner3.github.io/zencards-app/reset.html"
-});
-
-  if (error) {
-    console.error("Reset password error:", error);
-    setAuthStatus("Reset error: " + error.message);
-    return;
-  }
-
-  setAuthStatus("Password reset email sent.");
-}
-
 // ===== BUTTON EVENT HOOKS =====
-if (signUpBtn) {
-  signUpBtn.addEventListener("click", () => {
-    signUpWithEmail();
-  });
-}
-
-if (signInBtn) {
-  signInBtn.addEventListener("click", () => {
-    signInWithEmail();
-  });
-}
 
 if (signOutBtn) {
   signOutBtn.addEventListener("click", () => {
     signOutFromApp();
   });
 }
+// ===================== BILLING (STRIPE PORTAL) =====================
 
-if (resetPwBtn) {
-  resetPwBtn.addEventListener("click", () => {
-    sendPasswordReset();
-  });
+// Helper: returns a good redirect base for GitHub Pages + local
+function getBaseUrlForSameFolder() {
+  // app.html, reset.html, etc are in the same folder
+  return new URL(".", window.location.href).href; // ends with trailing slash
 }
 
-function setAuthStatus(message) {
-  if (authStatusSpan) authStatusSpan.textContent = message;
-}
+async function openStripeCustomerPortal() {
+  try {
+    // Make sure we have a session token to authorize the edge function
+    const { data: sessionData, error: sessErr } = await supabaseClient.auth.getSession();
+    if (sessErr) throw sessErr;
 
-function updateAuthButtons() {
-  if (!currentUser) {
-    // Logged OUT state
-    if (signOutBtn) signOutBtn.disabled = true;
+    const session = sessionData?.session;
+    if (!session?.access_token) {
+      alert("No active session. Please log in again.");
+      window.location.replace("index.html");
+      return;
+    }
 
-    // Hide logged-in UI
-    const loggedIn = document.getElementById("authLoggedIn");
-    const loggedOut = document.getElementById("authLoggedOut");
-    if (loggedIn) loggedIn.classList.add("hidden");
-    if (loggedOut) loggedOut.classList.remove("hidden");
+    // Call your edge function: create-portal-link
+    const fnUrl = `${SUPABASE_URL}/functions/v1/create-portal-link`;
 
-    setAuthStatus("Not signed in.");
-  } else {
-    // Logged IN state
-    if (signOutBtn) signOutBtn.disabled = false;
-
-    // Update label “Signed in as …”
-    const emailLabel = document.getElementById("userEmailLabel");
-    if (emailLabel) emailLabel.textContent = currentUser.email;
-
-    // Show correct UI blocks
-    const loggedIn = document.getElementById("authLoggedIn");
-    const loggedOut = document.getElementById("authLoggedOut");
-    if (loggedIn) loggedIn.classList.remove("hidden");
-    if (loggedOut) loggedOut.classList.add("hidden");
-
-    setAuthStatus("Signed in as: " + currentUser.email);
-  }
-}
-
-supabaseClient.auth.onAuthStateChange((event, session) => {
-  // Ignore auth events triggered during manual sign-out
-  if (isSigningOut) return;
-
-  currentUser = session?.user || null;
-  updateAuthButtons();
-
-  if (currentUser) {
-    loadStateFromSupabase();
-  }
+    const res = await fetch(fnUrl, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "apikey": SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${session.access_token}`,
+  },
+  body: JSON.stringify({
+    return_url: getBaseUrlForSameFolder() + "app.html",
+  }),
 });
+
+    const json = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      console.error("[PORTAL] Edge function error:", json);
+      alert("Could not open billing portal. Check console.");
+      return;
+    }
+
+    const url = json?.url;
+    if (!url) {
+      console.error("[PORTAL] No url returned:", json);
+      alert("Billing portal link not returned. Check console.");
+      return;
+    }
+
+    // Redirect to Stripe portal
+    window.location.assign(url);
+  } catch (e) {
+    console.error("[PORTAL] Failed:", e);
+    alert("Could not open billing portal. Check console.");
+  }
+}
+
+// Hook up the button
+if (manageBillingBtn) {
+  manageBillingBtn.addEventListener("click", openStripeCustomerPortal);
+}
+
 
     // ===================== DATA & STORAGE =====================
     let decks = [];
@@ -1105,6 +1098,8 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
     //   dueTime: ms since epoch
     // }
     let schedule = {};
+    let hasLoadedRemote = false;
+
 function getCurrentState() {
   return {
     decks,
@@ -1125,118 +1120,301 @@ function getCurrentState() {
     const SHORT_REVIEW_THRESHOLD_MINUTES = 10;
 
     function loadFromStorage() {
-      try {
-        const d = localStorage.getItem("srsDecks");
-        decks = d ? JSON.parse(d) : [];
-      } catch (_) {
-        decks = [];
-      }
-      if (!Array.isArray(decks)) decks = [];
-      if (decks.length === 0) {
-        // default deck
-        decks = [{
-          id: "deck1",
-          name: "Sample Deck",
-          cards: [
-            { id: "c1", question: "What does DOMS stand for?", answer: "Delayed onset muscle soreness." },
-            { id: "c2", question: "In a dumbbell incline press, what area of the chest is emphasized?", answer: "The upper chest, especially the clavicular head of the pectoralis major." }
-          ]
-        }];
-      }
+  try {
+    const d = localStorage.getItem("srsDecks");
+    decks = d ? JSON.parse(d) : [];
+  } catch (_) {
+    decks = [];
+  }
+  if (!Array.isArray(decks)) decks = [];
 
-      try {
-        const s = localStorage.getItem("srsSchedule");
-        schedule = s ? JSON.parse(s) : {};
-      } catch (_) {
-        schedule = {};
-      }
-      if (typeof schedule !== "object" || schedule === null) schedule = {};
-    }
+  try {
+    const s = localStorage.getItem("srsSchedule");
+    schedule = s ? JSON.parse(s) : {};
+  } catch (_) {
+    schedule = {};
+  }
+  if (typeof schedule !== "object" || schedule === null) schedule = {};
 
-    function saveDecks() {
-  localStorage.setItem("srsDecks", JSON.stringify(decks));
-  // Also sync to Supabase (fire and forget)
-  saveStateToSupabase();
+  // ✅ Only create sample deck if NOT logged in
+  if (decks.length === 0 && !currentUser) {
+    decks = [{
+      id: "deck1",
+      name: "Sample Deck",
+      cards: [
+        { id: "c1", question: "What does DOMS stand for?", answer: "Delayed onset muscle soreness." },
+        { id: "c2", question: "In a dumbbell incline press, what area of the chest is emphasized?", answer: "The upper chest, especially the clavicular head of the pectoralis major." }
+      ]
+    }];
+  }
 }
 
+// ===================== SUPABASE SAVE QUEUE (prevents overlaps) =====================
+let saveInFlight = false;
+let saveQueued = false;
+let pendingSaveBeforeRemote = false;
+
+async function queueSaveToSupabase() {
+  if (!currentUser) {
+  pendingSaveBeforeRemote = true;
+  console.warn("[QUEUE] No currentUser yet; deferring save");
+  return;
+}
+  console.log("[QUEUE] queueSaveToSupabase() hit", {
+    hasLoadedRemote,
+    saveInFlight,
+    saveQueued
+  });
+
+  try {
+    // If remote hasn't loaded yet, allow a write ONLY if user exists
+    if (!hasLoadedRemote) {
+      const { data: u, error: userErr } = await supabaseClient.auth.getUser();
+
+      console.log("[QUEUE] hasLoadedRemote=false; getUser check:", {
+        userErr: userErr ? { message: userErr.message, name: userErr.name } : null,
+        hasUser: !!u?.user,
+        userId: u?.user?.id || null
+      });
+
+      if (userErr) {
+        console.error("❌ [QUEUE] getUser error (this is why saves stop):", userErr);
+        pendingSaveBeforeRemote = true;
+        return;
+      }
+
+      if (!u?.user) {
+        pendingSaveBeforeRemote = true;
+        console.warn("⏳ [QUEUE] Deferring save until remote is loaded (no user yet)");
+        return;
+      }
+
+      console.warn("✅ [QUEUE] User exists; allowing save before remote load");
+    }
+
+    if (saveInFlight) {
+      saveQueued = true;
+      console.log("[QUEUE] saveInFlight=true -> queued next save");
+      return;
+    }
+
+    saveInFlight = true;
+
+    const res = await saveStateToSupabase();
+    console.log("[QUEUE] saveStateToSupabase result:", res);
+  } catch (e) {
+    console.error("❌ [QUEUE] queueSaveToSupabase crashed:", e);
+  } finally {
+    saveInFlight = false;
+
+    if (saveQueued) {
+      saveQueued = false;
+      console.log("[QUEUE] running queued save now…");
+      // important: await so errors don’t get swallowed again
+      await queueSaveToSupabase();
+    }
+  }
+}
+
+
+  function saveDecks() {
+  console.log("💾 saveDecks() firing. decks.length =", decks.length);
+
+  localStorage.setItem("srsDecks", JSON.stringify(decks));
+
+  // THIS is the critical wiring line:
+ queueSaveToSupabase().catch(e => console.error("❌ queueSaveToSupabase rejected:", e));
+}
+
+
 function saveSchedule() {
+  console.log("🟩 saveSchedule() firing. schedule keys =", Object.keys(schedule || {}).length);
   localStorage.setItem("srsSchedule", JSON.stringify(schedule));
-  // Also sync to Supabase (fire and forget)
-  saveStateToSupabase();
+
+  queueSaveToSupabase().catch(e => console.error("❌ queueSaveToSupabase rejected:", e));
 }
 
 // ===================== SUPABASE SYNC HELPERS =====================
 async function saveStateToSupabase() {
-  // Only sync when logged in
-  if (!supabaseClient || !currentUser) {
-    console.log("Not saving to Supabase: no client or no currentUser");
-    return;
-  }
-
-  const state = getCurrentState();
-  console.log("Saving state to Supabase for user:", currentUser.id, state);
+  console.log("[SAVE] called", new Date().toISOString(), {
+    hasLoadedRemote,
+    decksLen: Array.isArray(decks) ? decks.length : null,
+    hasSchedule: !!schedule
+  });
 
   try {
-    const { data, error } = await supabaseClient
+    // MUST have a logged-in user
+    const { data: userData, error: userErr } = await supabaseClient.auth.getUser();
+
+    console.log("[SAVE] getUser()", {
+      userErr: userErr
+        ? { message: userErr.message, name: userErr.name, status: userErr.status }
+        : null,
+      userId: userData?.user?.id || null,
+      email: userData?.user?.email || null
+    });
+
+    if (userErr) {
+      console.error("[SAVE] getUser error:", userErr);
+      return { ok: false, step: "getUser", error: userErr };
+    }
+
+    const user = userData?.user;
+    if (!user) {
+      console.warn("[SAVE] No user — skipping Supabase save");
+      return { ok: false, step: "no_user" };
+    }
+
+    const payload = {
+      user_id: user.id,
+      state_json: { decks, schedule },
+      updated_at: new Date().toISOString()
+    };
+
+    console.log("[SAVE] about to upsert payload", {
+      table: "zencards_state",
+      user_id: payload.user_id,
+      stateSize: JSON.stringify(payload.state_json || {}).length
+    });
+
+    const { data, error, status } = await supabaseClient
       .from("zencards_state")
-      .upsert({
-        user_id: currentUser.id,
-        state_json: state,
-      })
-      .select();
+      .upsert(payload, { onConflict: "user_id" });
+
+    console.log("[SAVE] upsert response", {
+      status,
+      error: error
+        ? { message: error.message, code: error.code, details: error.details, hint: error.hint }
+        : null,
+      data
+    });
 
     if (error) {
-      console.error("Supabase save error:", error);
-      setAuthStatus("Supabase save error: " + error.message);
-    } else {
-      console.log("Supabase state saved. Row:", data);
+      console.error("[SAVE] Supabase save failed:", error);
+      if (typeof setAuthStatus === "function") {
+        setAuthStatus("Supabase save failed: " + (error.message || "unknown"));
+      }
+      return { ok: false, step: "upsert", error };
     }
-  } catch (err) {
-    console.error("Supabase save exception:", err);
-    setAuthStatus("Supabase save exception: " + err.message);
+
+    console.log("✅ [SAVE] Supabase save OK");
+    return { ok: true, status, data };
+  } catch (e) {
+    console.error("[SAVE] crashed:", e);
+    return { ok: false, step: "crash", error: e };
   }
 }
 
 async function loadStateFromSupabase() {
-  if (!supabaseClient || !currentUser) {
-    console.log("Not loading from Supabase: no client or no currentUser");
-    return;
-  }
+  console.log("✅ loadStateFromSupabase called");
+
+  console.log("📥 loadStateFromSupabase() start");
 
   try {
-    const { data, error } = await supabaseClient
-      .from("zencards_state")
-      .select("state_json")
-      .eq("user_id", currentUser.id)
-      .limit(1);
+    // Make sure token is fresh
+    try { await supabaseClient.auth.refreshSession(); } catch (_) {}
 
-    if (error) {
-      console.error("Supabase load error:", error);
-      setAuthStatus("Supabase load error: " + error.message);
+    // Get user
+    const { data: userData, error: userErr } = await supabaseClient.auth.getUser();
+    const user = userData?.user;
+
+    console.log("🟦 loadStateFromSupabase getUser()", { user, userErr });
+
+    // ✅ If no user, we still "unlock" in finally.
+    if (!user) {
+      console.warn("🟨 No user in loadStateFromSupabase(). Skipping remote load.");
       return;
     }
 
-    console.log("Supabase load result:", data);
+    // Load row
+    const { data, error } = await supabaseClient
+      .from("zencards_state")
+      .select("state_json, updated_at")
+      .eq("user_id", user.id)
+      .maybeSingle();
 
-    if (data && data.length > 0 && data[0].state_json) {
-      const remote = data[0].state_json;
-
-      if (remote.decks && Array.isArray(remote.decks)) {
-        decks = remote.decks;
-      }
-      if (remote.schedule && typeof remote.schedule === "object") {
-        schedule = remote.schedule;
-      }
-
-      console.log("Loaded state from Supabase into app.");
-    } else {
-      console.log("No Supabase state yet; saving initial local state.");
-      await saveStateToSupabase();
+    if (error) {
+      console.error("🟥 Supabase load error:", error);
+      setAuthStatus("Supabase load error: " + (error.message || "unknown"));
+      return;
     }
-  } catch (err) {
-    console.error("Supabase load exception:", err);
-    setAuthStatus("Supabase load exception: " + err.message);
+
+    console.log("🟦 Supabase load row:", data);
+
+    // ✅ FIRST-TIME USER CASE: no row yet
+    if (!data?.state_json) {
+      console.log("🟨 No remote state yet; creating from local…");
+      await queueSaveToSupabase();     // create their row via queue/locking
+return;                        // ✅ still safe because finally runs
+    }
+
+    // Apply remote -> memory
+    const remote = data.state_json;
+
+    if (Array.isArray(remote.decks)) decks = remote.decks;
+    if (remote.schedule && typeof remote.schedule === "object") schedule = remote.schedule;
+
+    // Persist remote -> local
+    localStorage.setItem("srsDecks", JSON.stringify(decks));
+    localStorage.setItem("srsSchedule", JSON.stringify(schedule));
+
+    console.log("✅ Loaded remote state into app + localStorage");
+  } catch (e) {
+    console.error("❌ loadStateFromSupabase crashed:", e);
+  } finally {
+    // ✅ CRITICAL: ALWAYS release the gate so saves can proceed
+    hasLoadedRemote = true;
+    console.log("✅ hasLoadedRemote = true");
+
+    setSyncLock(false); // unlock UI if you use this lock
+
+    // ✅ CRITICAL: flush any deferred save that happened before remote loaded
+    if (pendingSaveBeforeRemote) {
+      pendingSaveBeforeRemote = false;
+      console.log("⏩ Flushing deferred save now that remote is loaded/checked");
+     queueSaveToSupabase().catch(e => console.error("❌ queueSaveToSupabase rejected:", e));
+    }
   }
+}
+initAppSession().catch(e => console.error("❌ initAppSession crashed:", e));
+async function initAppSession() {
+  console.log("[BOOT] initAppSession()");
+
+  // 1) Check session first (fast)
+  const { data: sessionData, error: sessErr } = await supabaseClient.auth.getSession();
+  const session = sessionData?.session || null;
+
+  console.log("[BOOT] getSession()", {
+    hasSession: !!session,
+    sessErr: sessErr ? { message: sessErr.message, name: sessErr.name } : null
+  });
+
+  // 2) If no session → go back to landing/login page
+  if (!session) {
+    console.warn("[BOOT] No session. Redirecting to index.html");
+    window.location.replace("index.html");
+    return;
+  }
+
+  // 3) Set currentUser + show UI
+  currentUser = session.user;
+
+  if (userEmailLabel) userEmailLabel.textContent = currentUser.email || "";
+  if (authLoggedIn) authLoggedIn.classList.remove("hidden");
+
+  // 4) Load local immediately so app feels instant
+  loadFromStorage();
+  refreshDeckSelect();
+  refreshCardsList();
+
+  // 5) Load remote once (this will set hasLoadedRemote=true in finally)
+  await loadStateFromSupabase();
+
+  // 6) After remote load, re-render (remote may overwrite local)
+  refreshDeckSelect();
+  refreshCardsList();
+
+  console.log("[BOOT] done", { hasLoadedRemote, userId: currentUser?.id });
 }
 
     function scheduleKey(deckId, cardId) {
@@ -1769,18 +1947,35 @@ function getDeckPhaseCounts(deck) {
     }
 
     addDeckBtn.addEventListener("click", () => {
-      if (!newDeckNameInput.value.trim()) return;
-      const name = newDeckNameInput.value.trim();
-      if (!name) return;
-      const id = "deck_" + Date.now();
-      decks.push({ id, name, cards: [] });
-      saveDecks();
-      newDeckNameInput.value = "";
-      updateAddDeckButtonState();
-      selectedDeckId = id;
-      refreshDeckSelect();
-      refreshCardsList();
-    });
+  console.log("✅ Add Deck clicked");
+
+  const raw = newDeckNameInput.value;
+  console.log("Deck name raw:", raw);
+
+  if (!raw || !raw.trim()) {
+    console.warn("❌ No deck name; aborting");
+    return;
+  }
+
+  const name = raw.trim();
+  const id = "deck_" + Date.now();
+
+  console.log("Creating deck:", { id, name });
+
+  decks.push({ id, name, cards: [] });
+
+  console.log("Decks after push:", decks);
+
+  saveDecks();
+
+  console.log("✅ saveDecks() called");
+
+  newDeckNameInput.value = "";
+  updateAddDeckButtonState();
+  selectedDeckId = id;
+  refreshDeckSelect();
+  refreshCardsList();
+});
 
     deleteDeckBtn.addEventListener("click", () => {
       if (!selectedDeckId) return;
@@ -4140,37 +4335,32 @@ setCardContent(voiceAnswerText, currentCard.answer);
     });
 
         // Rating buttons for voice (hands-free) mode – optional tap instead of speaking
-    voiceRatingButtons.addEventListener("click", (e) => {
-  const btn = e.target.closest("button[data-voice-rating]");
-  if (!btn || !currentCard) return;
+    if (voiceRatingButtons) {
+  voiceRatingButtons.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-voice-rating]");
+    if (!btn || !currentCard) return;
 
-  const ratingKey = btn.dataset.voiceRating;
+    const ratingKey = btn.dataset.voiceRating;
 
-  // If user taps early (on question screen), we should immediately stop
-  // any timers/listening/TTS so we don't speak the answer after they rated.
-  clearQuestionDelayTimer();
-  clearStudyAheadGapTimer();
-  awaitingAnswerSignal = false;
-  awaitingDifficulty = false;
+    clearQuestionDelayTimer();
+    clearStudyAheadGapTimer();
+    awaitingAnswerSignal = false;
+    awaitingDifficulty = false;
 
-  // Stop any current TTS + stop mic listening
-  stopAllAudio();
+    stopAllAudio();
 
-  // Apply scheduling ONLY in normal mode
-  if (!noScheduleChanges) {
-    const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
-    if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
-      queueCardForAgain(currentDeckId, currentCard);
+    if (!noScheduleChanges) {
+      const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
+      if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
+        queueCardForAgain(currentDeckId, currentCard);
+      }
     }
-  }
 
-  // Hide buttons + move on immediately
-  if (voiceRatingButtons) voiceRatingButtons.classList.add("hidden");
-  setStudyState(StudyState.IDLE);
-
-  // Important: run the next card loop now
-  runVoiceLoop();
-});
+    voiceRatingButtons.classList.add("hidden");
+    setStudyState(StudyState.IDLE);
+    runVoiceLoop();
+  });
+}
 
     silentMainMenuBtn.addEventListener("click", () => {
       silentCompletionControls.classList.add("hidden");
@@ -4318,17 +4508,33 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
   });
 }
 
-    (async function init() {
-  // 1) Start with whatever is in localStorage (or sample deck)
+ (async function init() {
   loadFromStorage();
 
-  // 2) Then try to overwrite with Supabase state if it exists
-  await loadStateFromSupabase();
+  try {
+    const { data: { session }, error } = await supabaseClient.auth.getSession();
+    if (error) console.error("getSession error:", error);
 
-  // 3) Finally, draw the UI
-  refreshDeckSelect();
-  refreshCardsList();
+    console.log("[app.html] session:", session);
+    console.log("[app.html] user:", session?.user);
+
+    if (session?.user) {
+      if (typeof loadStateFromSupabase === "function") {
+        await loadStateFromSupabase();
+        hasLoadedRemote = true;
+      } else {
+        console.warn("loadStateFromSupabase() missing; skipping remote load.");
+        hasLoadedRemote = false;
+      }
+    } else {
+      hasLoadedRemote = false;
+    }
+  } catch (e) {
+    console.error("init remote load failed", e);
+    hasLoadedRemote = false;
+  }
 })();
+
 
   </script>
 </body>

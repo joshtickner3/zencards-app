@@ -99,101 +99,112 @@
     <p id="status">Checking your reset link…</p>
 
     <div id="formContainer" style="display:none;">
-      <label for="newPassword">New password</label>
-      <input id="newPassword" type="password" placeholder="Enter a new password" />
+  <form id="resetForm">
+    <label for="newPassword">New password</label>
+    <input
+      id="newPassword"
+      type="password"
+      placeholder="Enter a new password"
+      autocomplete="new-password"
+    />
 
-      <button id="resetBtn">Set new password</button>
-    </div>
+    <button id="resetBtn" type="submit">Set new password</button>
+  </form>
+</div>
 
     <p id="doneMessage" style="display:none;margin-top:0.75rem;">
       Password updated. You can now
-      <a href="https://joshtickner3.github.io/zencards-app/">open ZenCards</a>
+     <a href="https://zencardstudy.com/">open ZenCards</a>
       and log in with your new password.
     </p>
   </div>
 
-  <script>
-    const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+ <script>
+  const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
 
-    let supabaseClient = null;
+   const statusEl = document.getElementById("status");
+  const formContainer = document.getElementById("formContainer");
+  const doneMessage = document.getElementById("doneMessage");
 
-    const statusEl = document.getElementById("status");
-    const formContainer = document.getElementById("formContainer");
-    const newPasswordInput = document.getElementById("newPassword");
-    const resetBtn = document.getElementById("resetBtn");
-    const doneMessage = document.getElementById("doneMessage");
+  function setStatus(msg) { statusEl.textContent = msg; }
 
-    function setStatus(msg) {
-      statusEl.textContent = msg;
+  function hashParams() {
+    const h = (window.location.hash || "").replace(/^#/, "");
+    return new URLSearchParams(h);
+  }
+
+  async function main() {
+    setStatus("Verifying reset link…");
+
+    if (!window.supabase?.createClient) {
+      setStatus("Supabase failed to load.");
+      return;
     }
 
-    async function main() {
-      if (typeof supabase === "undefined") {
-        setStatus("Error: Supabase library failed to load.");
-        return;
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: false,        // IMPORTANT: keep reset isolated
+        autoRefreshToken: false,
+        detectSessionInUrl: false,    // IMPORTANT: we do it manually
       }
+    });
 
-      // Create client – in a browser, this will automatically
-      // detect the hash (#access_token=...) and set the session.
-      supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // --- Force session from hash ---
+    const hp = hashParams();
+    const type = hp.get("type");
+    const access_token = hp.get("access_token");
+    const refresh_token = hp.get("refresh_token");
 
-      setStatus("Verifying reset link…");
+    console.log("[reset] type:", type);
+    console.log("[reset] has access_token:", !!access_token);
+    console.log("[reset] has refresh_token:", !!refresh_token);
 
-      let sessionResult;
-      try {
-        sessionResult = await supabaseClient.auth.getSession();
-      } catch (err) {
-        console.error("getSession threw:", err);
-        setStatus("This reset link is invalid or expired. Please request a new reset email.");
-        return;
-      }
-
-      const { data, error } = sessionResult || {};
-      if (error) {
-        console.error("getSession error:", error);
-        setStatus("This reset link is invalid or expired. Please request a new reset email.");
-        return;
-      }
-
-      const session = data && data.session;
-      if (!session) {
-        setStatus("This reset link is invalid or expired. Please request a new reset email.");
-        return;
-      }
-
-      // We now have a valid session from the hash
-      setStatus("Link verified. Enter a new password below.");
-      formContainer.style.display = "block";
-
-      resetBtn.addEventListener("click", async () => {
-        const newPw = newPasswordInput.value.trim();
-        if (!newPw) {
-          setStatus("Please enter a new password.");
-          return;
-        }
-
-        resetBtn.disabled = true;
-        setStatus("Updating password…");
-
-        const { data: updateData, error: updateError } =
-          await supabaseClient.auth.updateUser({ password: newPw });
-
-        if (updateError) {
-          console.error("updateUser error:", updateError);
-          setStatus("Error updating password: " + updateError.message);
-          resetBtn.disabled = false;
-          return;
-        }
-
-        setStatus("");
-        formContainer.style.display = "none";
-        doneMessage.style.display = "block";
-      });
+    if (type !== "recovery" || !access_token || !refresh_token) {
+      setStatus("Reset link is missing required tokens. Request a new reset email.");
+      return;
     }
 
-    main();
-  </script>
+    const { data: sessData, error: sessErr } =
+      await sb.auth.setSession({ access_token, refresh_token });
+
+    console.log("[reset] setSession:", { sessErr, sessData });
+
+    if (sessErr || !sessData?.session) {
+      setStatus("This reset link is invalid or expired. Request a new reset email.");
+      return;
+    }
+
+    // ✅ Session is valid -> show form
+    setStatus("Link verified. Enter a new password below.");
+    formContainer.style.display = "block";
+
+    document.getElementById("resetForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const newPw = document.getElementById("newPassword").value.trim();
+      if (!newPw || newPw.length < 8) {
+        setStatus("Please enter a new password (8+ characters).");
+        return;
+      }
+
+      setStatus("Updating password…");
+
+      const { error: upErr } = await sb.auth.updateUser({ password: newPw });
+      console.log("[reset] updateUser:", { upErr });
+
+      if (upErr) {
+        setStatus("Error updating password: " + upErr.message);
+        return;
+      }
+
+      setStatus("");
+      formContainer.style.display = "none";
+      doneMessage.style.display = "block";
+    });
+  }
+
+  main();
+</script>
 </body>
 </html>

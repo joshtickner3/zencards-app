@@ -2,21 +2,128 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ZenCards — Hands-Free Flashcards (7-Day Free Trial)</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>ZenCards — Hands-Free Flashcards (3-Day Free Trial)</title>
   <style>
+    .brandLogo{
+  height: clamp(56px, 7vw, 92px);
+  width: auto;
+  display:block;
+}
+/* ===== Top-left signed-in box (matches app.html style) ===== */
+.signedInBox{
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 12000;
+  background: rgba(2,6,23,0.86);
+  border: 1px solid #111827;
+  border-radius: 14px;
+  padding: 0.75rem 0.85rem;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  min-width: 260px;
+  display: none; /* shown only when logged in */
+}
+
+.signedInBox .who{
+  color: #e5e7eb;
+  font-weight: 800;
+  font-size: 0.92rem;
+  margin-bottom: 0.5rem;
+  word-break: break-word;
+}
+
+.signedInBox .actions{
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+
+    /* ===== Top-right user counter ===== */
+.userCounter{
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 12000;
+  background: rgba(2,6,23,0.86);
+  border: 1px solid #111827;
+  border-radius: 999px;
+  padding: 0.5rem 0.75rem;
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  backdrop-filter: blur(8px);
+}
+
+.userCounter .dot{
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(16,185,129,0.75);
+  box-shadow: 0 0 0 3px rgba(16,185,129,0.14);
+}
+
+.userCounter .label{
+  font-size: 0.82rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.userCounter .num{
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: #e5e7eb;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* On small screens, don’t cover content */
+@media (max-width: 520px){
+  .userCounter{
+    top: 10px;
+    right: 10px;
+    transform: scale(0.95);
+    transform-origin: top right;
+  }
+}
+
+    #billingModal { z-index: 10000; }
     :root{
-      --bg1:#1f2937;
-      --bg2:#020617;
-      --card:#020617cc;
-      --border:#1f2937;
-      --text:#e5e7eb;
-      --muted:#9ca3af;
-      --green:#10b981;
-      --green2:#22c55e;
-      --slate:#374151;
-      --shadow: 0 18px 35px rgba(0,0,0,0.55), 0 0 0 1px rgba(15,23,42,0.7);
-    }
+  /* Backgrounds (deep slate blue = trust/premium) */
+  --bg1:#0f172a;            /* deep slate */
+  --bg2:#020617;            /* near-black blue */
+
+  /* Surfaces */
+  --card: rgba(15,23,42,0.92);
+  --border:#1e293b;
+
+  /* Text */
+  --text:#e5e7eb;
+  --muted:#94a3b8;
+
+  /* CTA (Green) */
+  --green:#22c55e;          /* emerald */
+  --green2:#16a34a;         /* hover emerald */
+
+  /* Secondary button */
+  --slate:#334155;
+
+  /* NEW: Amber for badges */
+  --amber:#f59e0b;
+  --amber2:#d97706;
+
+  /* NEW: Soft blue for links */
+  --link:#60a5fa;
+  --link2:#93c5fd;
+
+  --shadow: 0 18px 35px rgba(0,0,0,0.55), 0 0 0 1px rgba(15,23,42,0.7);
+}
+
     *{box-sizing:border-box}
     body{
       margin:0;
@@ -26,7 +133,15 @@
       color:var(--text);
       line-height:1.5;
     }
-    a{color:inherit}
+  a{
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+a:hover{
+  color: var(--link2);
+}
+
     .container{max-width:980px;margin:0 auto;}
     .card{
       background: var(--card);
@@ -43,14 +158,32 @@
       align-items:center;
     }
     .row > *{flex:1;min-width:260px}
-    .appHeader{
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      gap:0.6rem;
-      margin-top:0.25rem;
-      margin-bottom:0.25rem;
-    }
+    /* ===== Header logo blend panel (matches app.html look) ===== */
+.appHeader{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+
+  padding: 10px 12px;
+  border-radius: 16px;
+
+  /* "blend layer" behind the logo */
+  background:
+    radial-gradient(circle at 50% 20%, rgba(148,163,184,0.14), rgba(2,6,23,0) 60%),
+    linear-gradient(90deg, rgba(2,6,23,0.0), rgba(15,23,42,0.55), rgba(2,6,23,0.0));
+
+  border: 1px solid rgba(30,41,59,0.6);
+  box-shadow: 0 18px 35px rgba(0,0,0,0.35);
+
+  width: fit-content;
+  margin-left:auto;
+  margin-right:auto;
+
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
     .logoMark{
       width: 34px;
       height: 34px;
@@ -88,15 +221,16 @@
       font-size:1.02rem;
     }
     .badge{
-      display:inline-block;
-      padding:0.2rem 0.55rem;
-      border-radius:999px;
-      background:#1f2937;
-      font-size:0.78rem;
-      color:#cbd5e1;
-      border:1px solid #111827;
-      margin-right:0.5rem;
-    }
+  display:inline-block;
+  padding:0.2rem 0.55rem;
+  border-radius:999px;
+  background: rgba(245,158,11,0.16);      /* amber tint */
+  font-size:0.78rem;
+  color: #fde68a;                         /* light amber text */
+  border: 1px solid rgba(245,158,11,0.35);
+  margin-right:0.5rem;
+  font-weight: 800;
+}
     .btn{
       display:inline-flex;
       align-items:center;
@@ -122,8 +256,17 @@
       color: var(--text);
       box-shadow:none;
     }
-    .btn.secondary:hover{background:#4b5563; box-shadow:0 6px 14px rgba(15,23,42,0.65);}
+   .btn.secondary:hover{
+  background:#475569; 
+  box-shadow:0 6px 14px rgba(15,23,42,0.65);
+}
     .btn.small{padding:0.35rem 0.85rem; font-size:0.85rem}
+    /* Make the Start Free Trial button feel more “primary” */
+#startTrialTopBtn{
+  font-weight: 900;
+  letter-spacing: 0.01em;
+}
+
     .muted{color:var(--muted)}
     .grid3{
       display:grid;
@@ -168,6 +311,82 @@
       border-top:1px solid #111827;
       padding-top:0.75rem;
     }
+    /* ===== Student pain strip (goes above KPI row) ===== */
+.painStrip{
+  margin-top: 0.9rem;
+  margin-bottom: 0.75rem;
+  padding: 0.85rem;
+  border-radius: 0.95rem;
+  background: linear-gradient(180deg, rgba(2,6,23,0.85), rgba(2,6,23,0.65));
+  border: 1px solid #111827;
+}
+
+.painTitle{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 0.75rem;
+  margin: 0 0 0.65rem 0;
+}
+
+.painTitle h3{
+  margin:0;
+  font-size: 1.05rem;
+}
+
+.painTitle .muted{
+  font-size: 0.9rem;
+}
+
+.painGrid{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+@media (max-width: 860px){
+  .painGrid{ grid-template-columns: 1fr; }
+}
+
+.painItem{
+  background:#020617;
+  border:1px solid #111827;
+  border-radius:0.85rem;
+  padding:0.85rem;
+}
+
+.painItemTop{
+  display:flex;
+  align-items:center;
+  gap:0.55rem;
+  margin-bottom: 0.25rem;
+}
+
+.painIcon{
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid #1f2937;
+  background: rgba(16,185,129,0.10);
+  color: #bbf7d0;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.painItem h4{
+  margin:0;
+  font-size: 0.98rem;
+}
+
+.painItem p{
+  margin:0.2rem 0 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
     .kpiRow{
       display:flex;
       gap:0.75rem;
@@ -176,7 +395,7 @@
     }
     .kpi{
       flex:1;
-      min-width:240px;
+      min-width:210px;
       background:#020617;
       border:1px solid #111827;
       border-radius:0.85rem;
@@ -201,6 +420,28 @@
       font-size:0.85rem;
       margin:1.25rem 0 0.5rem 0;
     }
+    /* ===== Privacy section ===== */
+.privacyCard{
+  background:#020617;
+  border:1px solid #111827;
+  border-radius:0.9rem;
+  padding:1rem;
+}
+
+.privacyCard h2{
+  margin-top:0;
+}
+
+.privacyCard p{
+  margin:0.5rem 0;
+  color: var(--muted);
+}
+
+.privacyCard ul{
+  margin:0.5rem 0 0 1.15rem;
+  color: var(--muted);
+}
+
     .note{
       background: rgba(34,197,94,0.10);
       border: 1px solid rgba(34,197,94,0.25);
@@ -216,58 +457,369 @@
       color:#cbd5e1;
       font-size:0.9em;
     }
+    /* ===== When to use ZenCards (under painStrip) ===== */
+.useStrip{
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding: 0.85rem;
+  border-radius: 0.95rem;
+  background: linear-gradient(180deg, rgba(2,6,23,0.82), rgba(2,6,23,0.60));
+  border: 1px solid #111827;
+}
+
+.useTitle{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap: 0.75rem;
+  margin: 0 0 0.65rem 0;
+}
+
+.useTitle h3{
+  margin:0;
+  font-size: 1.05rem;
+}
+
+.useTitle p{
+  margin:0.15rem 0 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.pillRow{
+  display:flex;
+  flex-wrap:wrap;
+  gap:0.5rem;
+}
+
+.pill{
+  display:inline-flex;
+  align-items:center;
+  gap:0.45rem;
+  padding:0.38rem 0.65rem;
+  border-radius:999px;
+  border:1px solid #1f2937;
+  background:#020617;
+  color:#cbd5e1;
+  font-size:0.88rem;
+  white-space:nowrap;
+}
+
+.pill .dot{
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(16,185,129,0.65);
+  box-shadow: 0 0 0 3px rgba(16,185,129,0.10);
+}
+
+
+    /* ===== Login Modal ===== */
+    .modalOverlay{
+      position:fixed;
+      inset:0;
+      background: rgba(0,0,0,0.55);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding: 1rem;
+      z-index: 9999;
+    }
+    .modalOverlay.show{display:flex;}
+    .modal{
+      width: 100%;
+      max-width: 440px;
+      background: #020617;
+      border: 1px solid #111827;
+      border-radius: 1rem;
+      box-shadow: var(--shadow);
+      padding: 1rem;
+    }
+    .modalHeader{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 0.75rem;
+    }
+    .modalHeader h3{margin:0.25rem 0;}
+    .modalClose{
+      background: transparent;
+      border: 1px solid #1f2937;
+      color: var(--text);
+      border-radius: 999px;
+      padding: 0.25rem 0.6rem;
+      cursor:pointer;
+    }
+    .field{
+      display:flex;
+      flex-direction:column;
+      gap:0.35rem;
+      margin-top: 0.75rem;
+    }
+    .input{
+      width: 100%;
+      padding: 0.65rem 0.75rem;
+      border-radius: 0.75rem;
+      border: 1px solid #1f2937;
+      background: #0b1220;
+      color: var(--text);
+      outline: none;
+    }
+    .input:focus{
+      border-color: rgba(34,197,94,0.55);
+      box-shadow: 0 0 0 3px rgba(34,197,94,0.12);
+    }
+    .modalActions{
+      display:flex;
+      gap:0.75rem;
+      align-items:center;
+      margin-top: 1rem;
+    }
+    .modalMsg{
+      margin-top: 0.75rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+      word-break: break-word;
+    }
+    .modalMsg.error{color:#fecaca;}
+    .modalMsg.ok{color:#bbf7d0;}
+    .smallLink{
+      color: #cbd5e1;
+      font-size: 0.9rem;
+      text-decoration: underline;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+    }
+    /* ===== Terms of Service Modal ===== */
+.legalLink{
+  color:#cbd5e1;
+  text-decoration: underline;
+  cursor:pointer;
+}
+.legalModalBody{
+  margin-top: 0.75rem;
+  max-height: 55vh;
+  overflow: auto;
+  border: 1px solid #111827;
+  border-radius: 0.85rem;
+  padding: 0.85rem;
+  background: #0b1220;
+  color: var(--text);
+}
+
+.legalModalBody h4{
+  margin: 0 0 0.5rem 0;
+}
+
+.legalModalBody p,
+.legalModalBody li{
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.legalModalBody ul{
+  margin: 0.5rem 0 0 1.15rem;
+}
+/* ===== iOS app portrait safe-area fix (website unchanged) ===== */
+.nativeApp .userCounter{
+  top: calc(env(safe-area-inset-top, 0px) + 10px) !important;
+}
+
+.nativeApp .signedInBox{
+  top: calc(env(safe-area-inset-top, 0px) + 10px) !important;
+}
+
+/* Optional: give the whole page breathing room in-app */
+.nativeApp body{
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+
   </style>
 </head>
 
 <body>
+  <!-- ===== Top-right user counter ===== -->
+<div class="userCounter" aria-label="Monthly users counter">
+  <span class="dot" aria-hidden="true"></span>
+  <span class="label">Monthly users taking control of their schedule</span>
+  <span class="num" id="monthlyUsersCount">0</span>
+</div>
+<!-- ===== Top-left signed-in box ===== -->
+<div class="signedInBox" id="signedInBox" aria-label="Signed-in status">
+  <div class="who" id="signedInWho">Signed in as …</div>
+  <div class="actions">
+    <button class="btn secondary small" id="signedOutLogoutBtn" type="button">Log out</button>
+    <button class="btn small" id="signedInManageBillingBtn" type="button">Manage Billing</button>
+  </div>
+</div>
+
+
   <div class="container">
 
     <div class="appHeader">
-      <div class="logoMark">Z</div>
-      <h2 style="margin:0;">ZenCards</h2>
-    </div>
+  <img class="brandLogo" src="zencards-logo.png" alt="ZenCards" />
+</div>
     <p class="subtitle">Hands-free & silent spaced-repetition flashcards</p>
 
     <!-- HERO -->
     <div class="card hero">
-      <span class="badge">7-Day Free Trial</span>
+      <span class="badge">3-Day Free Trial</span>
       <span class="badge">$9.99/month</span>
 
-      <h1>Turn “dead time” into 2–3 extra hours of study — every day.</h1>
+      <h1>Saving time and money as a student is a challenge, <strong>until now.</strong>  ZenCards is the world's first study tool designed for fully hands and eyes-free studying on the go.</h1>
       <p>
-        ZenCards lets you study your flashcards <strong>without looking at your phone</strong>.
-        Review while walking to class, driving, at the gym, running errands, between lectures, or even when you’re out with friends.
+        Goal-oriented students like you have little time to spare after balancing studying with schoolwork and a job, <strong>until now</strong>. ZenCards allows you to study your flashcards completely hands-free <strong>without looking at your phone</strong>.
+        Review while doing everyday activities so you can turn unproductive "dead" time into high quality review time, freeing up your schedule for a full time job as a student so you can invest in your future upon graduation. 
       </p>
+      <!-- ===== Student pain strip (NEW) ===== -->
+<div class="painStrip">
+  <div class="painTitle">
+    <h3>The student trap: Either grades, finances, or your social life suffers</h3>
+    <div class="muted"></div>
+  </div>
 
-      <div class="kpiRow">
-        <div class="kpi">
-          <p class="big">2–3 hours/day</p>
-          <p class="small">Saved by converting downtime into review time.</p>
-        </div>
-        <div class="kpi">
-          <p class="big">≈ 33¢/day</p>
-          <p class="small">$9.99/month for more time + higher quality repetition.</p>
-        </div>
-        <div class="kpi">
-          <p class="big">Hands-free + Silent</p>
-          <p class="small">Choose audio mode or study-ahead reading mode.</p>
-        </div>
+  <div class="painGrid">
+    <div class="painItem">
+      <div class="painItemTop">
+        <div class="painIcon">⏱</div>
+        <h4>Grades slip</h4>
       </div>
+      <p>In working a full time job and maintaining a social life, there’s often not enough time to study, so performance drops and post-graduation opportunities close, limiting your options and wasting your educational opportunity.</p>
+    </div>
 
-      <div class="row" style="margin-top:0.85rem;">
-        <!-- Start free trial goes into your app UI (index.html). You can detect ?trial=1 later. -->
-        <a class="btn" href="index.html?trial=1">Start free trial</a>
-        <a class="btn secondary" href="index.html">Log in</a>
-
-        <!-- Cancel/manage is a link you wire up later (Stripe customer portal). -->
-        <!-- For now, point it to an email or a placeholder cancel.html if you create it. -->
-        <a class="btn secondary small" href="mailto:support@YOURDOMAIN.com?subject=ZenCards%20Cancel%20Subscription">Manage / Cancel subscription</a>
+    <div class="painItem">
+      <div class="painItemTop">
+        <div class="painIcon">💸</div>
+        <h4>Money stays tight</h4>
       </div>
+      <p>In prioritizing studying and relationships over work, studying eats your schedule, leaving little time to work, save, and build wealth early in life when it is most beneficial to be doing so to prevent financial stagnation early and ultimately later in life.</p>
+    </div>
+
+    <div class="painItem">
+      <div class="painItemTop">
+        <div class="painIcon">😶</div>
+        <h4>No free time</h4>
+      </div>
+      <p>School + work kills your social life, causing loneliness, burnout, stress, and unhappiness. Working as a student does not need to feature sacrificing your social life.</p>
+    </div>
+  </div>
+</div>
+<!-- ===== When to use ZenCards (NEW) ===== -->
+<div class="useStrip">
+  <div class="useTitle">
+    <div>
+      <h3>Use ZenCards anywhere</h3>
+      <p>We designed ZenCards to work in <strong>any</strong> setting.</p>
+    </div>
+    <div class="muted" style="font-size:0.9rem;">If you can listen, you can review.</div>
+  </div>
+
+  <div class="pillRow">
+    <span class="pill"><span class="dot"></span>Commuting</span>
+    <span class="pill"><span class="dot"></span>Walking to class</span>
+    <span class="pill"><span class="dot"></span>Eating</span>
+    <span class="pill"><span class="dot"></span>Between lectures</span>
+    <span class="pill"><span class="dot"></span>In class (silent mode)</span>
+    <span class="pill"><span class="dot"></span>Doing chores</span>
+    <span class="pill"><span class="dot"></span>At the gym</span>
+    <span class="pill"><span class="dot"></span>Waiting in line</span>
+    <span class="pill"><span class="dot"></span>Anywhere you have 2 minutes</span>
+  </div>
+</div>
+
+
+    <div class="kpiRow">
+  <div class="kpi">
+    <p class="big">Roughly 3 hours/day</p>
+    <p class="small">Of study time gained or saved by converting unproductive time into review time.</p>
+  </div>
+
+  <div class="kpi">
+    <p class="big">≈ 33¢/day</p>
+    <p class="small">$9.99/month for a massive upgrade in the student lifestyle experience, potentially hundreds if not thousands of dollars saved per month by being able to now take on more hours working and bolstered memory retention.</p>
+  </div>
+
+  <div class="kpi">
+    <p class="big">Hands-free + Silent</p>
+    <p class="small">Choose audio mode or traditional flashcards depending on your setting and current activity.</p>
+  </div>
+
+  <!-- NEW 4th KPI -->
+  <div class="kpi">
+    <p class="big">Built by a student, for students</p>
+    <p class="small">
+      ZenCards was created to solve the exact problem I faced in wanting to work full time while maintaining a 4.0 gpa as a pre-med student and refusing to sacrifice my social life.
+    </p>
+  </div>
+</div>
+
+  <!-- ===== Trust strip (NEW) ===== -->
+<div class="kpiRow" style="margin-top:0.75rem;">
+  <div class="kpi">
+    <p class="big">Effortess integration with bluetooth, airpods, and carplay</p>
+    <p class="small">
+      ZenCards was designed so that there wasn't a single setting that you couldn't use it in, so it works seamlessly with bluetooth headphones, AirPods, and CarPlay.
+    </p>
+  </div>
+
+  <div class="kpi">
+    <p class="big">Secure payments by Stripe</p>
+    <p class="small">
+      Payments are processed securely by Stripe. ZenCards never sees or stores your card details.
+    </p>
+  </div>
+
+  <div class="kpi">
+    <p class="big">Works on iPhone + web</p>
+    <p class="small">
+      One account works across the web app and the iPhone app — your access follows your email.
+    </p>
+  </div>
+
+  <div class="kpi">
+    <p class="big">Cancel anytime in 2 clicks</p>
+    <p class="small">
+      Cancel from “Manage Billing” — no emails required. Email us at support@zencardstudy.com if having any difficulties. We respond within 24 hours at most, if not significantly sooner.
+    </p>
+  </div>
+</div>
+
+
+<div class="row" style="margin-top:0.85rem;">
+  <button class="btn secondary" id="loginBtn" type="button">Log in</button>
+
+  <!-- NEW: Start free trial button in the old spot -->
+  <button class="btn" id="startTrialTopBtn" type="button">Start free trial</button>
+</div>
+
+      <!-- ===== Account + Gate (Landing Page) ===== -->
+<div class="card" style="margin-top:1rem;background:#0b1220;border:1px solid #111827;">
+  <div class="row" style="align-items:center;">
+    <div style="flex:2;min-width:260px;">
+      <h3 style="margin:0;">Account</h3>
+      <div id="lpWhoami" class="muted" style="margin-top:0.25rem;">Not logged in</div>
+      <div id="lpStatus" class="muted" style="margin-top:0.25rem;"></div>
+    </div>
+
+    <div style="display:flex;gap:0.6rem;justify-content:flex-end;flex:1;min-width:260px;">
+      <button class="btn secondary small" id="lpLogoutBtn" type="button" style="display:none;">Log out</button>
+
+      <button class="btn" id="lpGoBtn" type="button" disabled
+        style="background:#334155;color:#94a3b8;box-shadow:none;cursor:not-allowed;">
+        Go to ZenCards (locked)
+      </button>
+    </div>
+  </div>
+</div>
+
 
       <div class="fineprint">
-        <strong>Billing:</strong> Your 7-day free trial starts when you create an account.
+        <strong>Billing:</strong> Your 3-day free trial starts when you create an account.
         You will be <strong>charged $9.99/month automatically</strong> at the end of the trial unless you cancel beforehand.
-        Cancel anytime from the “Manage / Cancel subscription” option.
+        <strong></strong>Cancel anytime<strong></strong> from the “Manage billing” button after logging in to avoid being charged.
       </div>
     </div>
 
@@ -276,24 +828,21 @@
       <h2>Why ZenCards works</h2>
       <div class="grid3">
         <div class="feature">
-          <h3>Save time (seriously)</h3>
+          <h3>Save time</h3>
           <p>
-            Most students have 2–3 hours/day of “dead time” (walking, commuting, waiting, chores).
-            ZenCards turns that into review time — without sacrificing your life.
-          </p>
+            The most significant source of unproductive time for students is time we all spend doing everyday activities, such as commuting, walking, exercising, eating, chores, waiting in lines, sitting in that one class you needed to take for your art requirement, etc. ZenCards turns that into productive study time so you don't need to dedicate your valuable hours after class solely to review. 
         </div>
         <div class="feature">
           <h3>More freedom outside school</h3>
           <p>
-            Extra hours each day can mean a part-time (or even full-time) job, more time with friends/family,
-            or committing fully to a sport or club.
+            An extra few hours every day gives you the time to fully commit to a sport or club, giving you a massive advantage over the competition and enabling you to pursue an athletic career post graduation. Working full time as a student is easier than ever allowing you to save and invest early, setting you up for financial freedom sooner in life. 
           </p>
         </div>
         <div class="feature">
-          <h3>Better memory with audio + speaking</h3>
+          <h3>Active recall on another level: Better memory with audio + speaking</h3>
           <p>
-            Hearing information and saying answers out loud boosts recall (often called the <em>production effect</em>).
-            Seeing + hearing together supports <em>dual coding</em> so the same study time goes further.
+            Uninterrupted active recall has been proven to be one of, if not the most effective studying methods. Hearing questions and saying answers out loud boosts recall (often called the <em>production effect</em>).
+            Seeing + hearing together supports <em>dual coding</em> so the same study time goes further as well, making ZenCards effective both for when you want to focus solely on studying and also when you are on the go.
           </p>
         </div>
       </div>
@@ -310,14 +859,14 @@
           <h3>Raise grades → open doors</h3>
           <p>
             Better retention can translate to better exam performance — helping you compete for internships,
-            grad school admissions, and stronger early-career opportunities.
+            grad school admissions, and stronger early-career opportunities, as well as scholarships, preventing you from crippling debt impairing you financially later in life. 
           </p>
         </div>
         <div class="feature">
           <h3>Works everywhere</h3>
           <p>
-            Study in the car (passenger), walking to class, at the gym between sets, running errands, or between lectures.
-            If you can listen, you can review.
+            Safely study while driving, walking to class, at the gym between sets, running errands, or between lectures.
+            If you can listen, you can review. 
           </p>
         </div>
       </div>
@@ -331,18 +880,17 @@
           <h3 style="margin-top:0;">1) Add cards</h3>
           <p class="muted">
             Create decks, add questions + answers, or import from Anki.
-            (You can also include images + math.)
+            (You can also include images + math equations, as ZenCards is designed for reading math equations)
           </p>
 
           <h3>2) Choose your study style</h3>
           <p class="muted" style="margin-bottom:0.35rem;">
-            ZenCards supports multiple hands-free behaviors:
+            ZenCards supports multiple hands-free behaviors through the use of text-to-speech and responds to spoken commands (STT)when you answer, as well as spaced repetition scheduling to prioritize information you don't currently know over things you have mastered. ZenCards uses your spoken difficulty ratings to determine when you will see your cards again.
           </p>
           <ul>
-            <li><strong>Play answer after you speak</strong> (hands-free flow)</li>
-            <li><strong>Play answer after X seconds</strong> (timed flow)</li>
-            <li><strong>Automatic mode</strong>: auto-assign the same rating to every card (no voice commands needed)</li>
-            <li><strong>Study-ahead mode</strong>: keep going through the deck without changing your schedule</li>
+            <li><strong>Play answer after you speak</strong> (hands and eyes-free flow)</li>
+            <li><strong>Play answer after X seconds, perfect for studying in discreet settings. </strong> </li>
+            <li><strong>Study-ahead mode</strong>: keep going through the deck without changing your schedule, perfect for cramming the night before an exam with no time to study.</li>
           </ul>
         </div>
 
@@ -350,7 +898,8 @@
           <h3 style="margin-top:0;">3) Rate the card (spaced repetition)</h3>
           <p class="muted">
             After you see the answer, you rate it:
-            <strong>Again / Hard / Good / Easy</strong>. ZenCards uses that rating to schedule when you see it next.
+            <strong>Again / Hard / Good / Easy, entirely with your voice commands.</strong>. ZenCards uses that rating to schedule when you see it next.
+             <li><strong>Automatic mode</strong>: auto-assign the same rating to every card (no voice commands needed)</li>
           </p>
 
           <div class="note" style="margin-top:0.75rem;">
@@ -370,7 +919,7 @@
           <h3 style="margin:0.35rem 0 0 0;">ZenCards Premium</h3>
           <p class="price">$9.99<span style="font-size:0.9rem;font-weight:700;color:var(--muted);">/month</span></p>
           <p class="muted" style="margin-top:0.25rem;">
-            Start with a <strong>7-day free trial</strong>, then auto-renews monthly.
+            Start with a <strong>3-day free trial</strong>, then auto-renews monthly.
           </p>
           <ul>
             <li>Hands-free voice study</li>
@@ -381,11 +930,6 @@
             <li>Anki import support</li>
           </ul>
 
-          <div class="row" style="margin-top:0.85rem;">
-            <a class="btn" href="index.html?trial=1">Start free trial</a>
-            <a class="btn secondary" href="index.html">Log in</a>
-          </div>
-
           <div class="fineprint">
             <strong>Auto-billing notice:</strong> After 7 days, you will be charged $9.99/month unless you cancel.
             Cancel anytime before the trial ends to avoid being charged.
@@ -395,18 +939,11 @@
         <div class="priceCard">
           <h3 style="margin-top:0.35rem;">Cancel anytime</h3>
           <p class="muted">
-            We keep cancellation simple. Use the button below (you’ll later connect it to Stripe’s customer portal),
-            or email support and we’ll handle it.
+            We keep cancellation simple. Use the manage billing button while logged in on the studying screen to cancel any time. No hoops, no hard feelings.
           </p>
 
-          <!-- Wire this to Stripe Customer Portal later -->
-          <a class="btn secondary" href="mailto:support@YOURDOMAIN.com?subject=ZenCards%20Cancel%20Subscription">
-            Manage / Cancel subscription
-          </a>
-
           <div class="fineprint">
-            <strong>Note:</strong> This landing page is static. The actual cancellation portal link will be added once
-            Stripe billing is connected.
+            <strong>Note:</strong> If you have any questions, feel more than free to reach out to support@zencardstudy.com and our group will get back to you promptly. 
           </div>
         </div>
       </div>
@@ -425,15 +962,21 @@
       </details>
 
       <details>
-        <summary>How do I cancel?</summary>
+        <summary>How does ZenCards differ from quizlet and anki?</summary>
         <p class="muted" style="margin:0.5rem 0 0 0;">
-          You’ll cancel from the “Manage / Cancel subscription” link (Stripe customer portal) once billing is connected.
-          For now, you can cancel by emailing <strong>support@YOURDOMAIN.com</strong>.
+          Anki and Quizlet are phenomenal tools for traditional studying, however they cannot be used when you are occupied with everyday tasks, so you must dedicate specific study time in order to review with them which overloads your schedule. ZenCards is designed specifically to allow you to study during activities where traditional studying is impossible, and we put a massive emphasis on the quality of this study time as well by giving you a range of different modes to use depending on your setting.  
         </p>
       </details>
 
       <details>
-        <summary>Can I study on my phone and on the website with one subscription?</summary>
+        <summary>How do I cancel?</summary>
+        <p class="muted" style="margin:0.5rem 0 0 0;">
+          You’ll cancel from the “Manage billing” link (Stripe customer portal) when you are logged in. If you have issues cancelling, reach out to us at support@zencardstudy.com and we will assist you. 
+        </p>
+      </details>
+
+      <details>
+        <summary>Can I study on my phone with the app version and on the website with one subscription?</summary>
         <p class="muted" style="margin:0.5rem 0 0 0;">
           Yes — one account, one subscription. Log in with the same email and your access follows your account.
         </p>
@@ -448,6 +991,20 @@
         </p>
       </details>
 
+       <details>
+        <summary>Is ZenCards compatible with airpods, carplay, bluetooth, and headphones?</summary>
+        <p class="muted" style="margin:0.5rem 0 0 0;">
+          Certainly. ZenCards is compatible with all of these features. 
+        </p>
+      </details>
+
+      <details>
+        <summary>I study best with active recall and speaking out loud, so is ZenCards compatible with active recall or does it simply play back the answers to your questions after a certain amount of time?</summary>
+        <p class="muted" style="margin:0.5rem 0 0 0;">
+          ZenCards was specifically designed to support active recall. There are two options for this, you can first say "pause study session" after hearing the question so that you can contemplate the question uninterrupted followed by saying "resume study session" at your own request to continue, or you can choose to mute the microphone by saying "mute microphone" which will allow you to pause the session for up to a minute. 
+        </p>
+      </details>
+
       <details>
         <summary>What are “production effect” and “dual coding”?</summary>
         <p class="muted" style="margin:0.5rem 0 0 0;">
@@ -457,14 +1014,799 @@
         </p>
       </details>
     </div>
+    <!-- PRIVACY -->
+<div class="card privacyCard" id="privacy">
+
+  <h2>Privacy & Data Use</h2>
+
+  <p><strong>Your privacy matters to us.</strong> ZenCards is designed to help you study more efficiently — not to collect or exploit your personal data.</p>
+
+  <p><strong>What we do <em>not</em> access or store</strong></p>
+  <ul>
+    <li>We <strong>do not have access to your password</strong>. Passwords are securely handled and hashed by our authentication provider.</li>
+    <li>We <strong>do not read or monitor the content of your decks or flashcards</strong>. Your study materials belong to you.</li>
+    <li>We <strong>do not sell, rent, or share your personal data</strong> with third parties for advertising or marketing purposes.</li>
+  </ul>
+
+  <p><strong>What information is required</strong></p>
+  <p>To provide the ZenCards service, we store only what’s necessary: your email to sign up and your account/subscription status from stripe.</p>
+
+  <p><strong>Payments</strong></p>
+  <p>All payments are handled securely by Stripe. ZenCards <strong>never sees or stores your credit card details</strong>.</p>
+
+  <p><strong>Email</strong></p>
+  <p>We send emails only for essential account-related purposes (verification, password resets, and billing notifications). We do not send marketing emails without your consent.</p>
+
+  <p><strong>Questions</strong></p>
+  <p>If you have any privacy questions, contact us at <strong>support@zencardstudy.com</strong> and we will answer promptly.</p>
+</div>
+
 
     <p class="footer">
-      © <span id="year"></span> ZenCards • <span class="muted">Study smarter. Live more.</span>
-    </p>
+  © <span id="year"></span> ZenCards • <span class="muted">Study smarter. Live more.</span>
+  <span class="muted"> • </span>
+  <span class="legalLink" id="openTermsLink">Terms of Service</span>
+</p>
   </div>
 
+  <!-- ===== Login Modal (MOVED ABOVE SCRIPTS so JS can find it) ===== -->
+  <div class="modalOverlay" id="loginModal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+      <div class="modalHeader">
+        <div>
+          <h3 id="loginTitle">Log in</h3>
+          <div class="muted" style="font-size:0.9rem;">Enter your ZenCards email + password.</div>
+        </div>
+        <button class="modalClose" id="loginCloseBtn" type="button">✕</button>
+      </div>
+
+      <div class="field">
+        <label class="muted" for="loginEmail">Email</label>
+        <input class="input" id="loginEmail" type="email" autocomplete="email" placeholder="you@example.com" />
+      </div>
+
+      <div class="field">
+        <label class="muted" for="loginPassword">Password</label>
+        <input class="input" id="loginPassword" type="password" autocomplete="current-password" placeholder="Your password" />
+      </div>
+
+      <div class="modalActions">
+        <button class="btn" id="loginSubmitBtn" type="button">Log in</button>
+        <button class="btn secondary" id="loginCancelBtn" type="button">Cancel</button>
+      </div>
+
+      <div class="modalMsg" id="loginMsg"></div>
+
+      <div style="margin-top:0.75rem; display:flex; justify-content:space-between; gap:12px;">
+  <button class="smallLink" id="forgotPwBtn" type="button">Forgot password?</button>
+  <button class="smallLink" id="toggleAuthModeBtn" type="button">Create account</button>
+</div>
+    </div>
+  </div>
+
+  <!-- ===== Billing Modal (shown after login if no subscription yet) ===== -->
+<div class="modalOverlay" id="billingModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="billingTitle">
+    <div class="modalHeader">
+      <div>
+        <h3 id="billingTitle">ZenCards Premium</h3>
+        <div class="muted" style="font-size:0.9rem;">
+          Your account is ready. Continue to Stripe to start your free trial.
+        </div>
+      </div>
+      <button class="modalClose" id="billingCloseBtn" type="button">✕</button>
+    </div>
+
+    <div class="modalActions" style="margin-top:1rem;">
+      <button class="btn" id="continueToBillingBtn" type="button">Continue to billing</button>
+      <button class="btn secondary" id="billingCancelBtn" type="button">Cancel</button>
+    </div>
+
+    <div class="modalMsg" id="billingMsg"></div>
+  </div>
+</div>
+<!-- ===== Terms of Service Modal ===== -->
+<div class="modalOverlay" id="termsModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="termsTitle">
+    <div class="modalHeader">
+      <div>
+        <h3 id="termsTitle">ZenCards Terms of Service</h3>
+        <div class="muted" style="font-size:0.9rem;">Last updated: January 2026</div>
+      </div>
+      <button class="modalClose" id="termsCloseBtn" type="button">✕</button>
+    </div>
+
+    <div class="legalModalBody">
+      <p class="muted">
+        By using ZenCards (“the Service”), you agree to these Terms. If you do not agree, do not use ZenCards.
+      </p>
+
+      <h4>1) What ZenCards is</h4>
+      <p class="muted">
+        ZenCards is a study tool that helps users review flashcards using hands-free audio and silent study modes.
+      </p>
+
+      <h4>2) Accounts (no sharing)</h4>
+      <ul>
+        <li>Each ZenCards account is for <strong>one individual user only</strong>.</li>
+        <li><strong>Colleges, universities, classrooms, study groups, clubs, or organizations may not share one account among multiple people.</strong></li>
+        <li>Each person must have their <strong>own account and subscription</strong>.</li>
+        <li>You are responsible for keeping your login credentials secure.</li>
+      </ul>
+
+      <h4>3) Subscriptions & billing</h4>
+      <p class="muted">
+        ZenCards may offer free trials and paid subscriptions. Billing and subscription management are handled by our payment provider (such as Stripe).
+      </p>
+
+      <h4>4) Acceptable use</h4>
+      <p class="muted">
+        You agree not to share your account, bypass subscriptions or limits, reverse engineer, copy, resell, or use ZenCards for unlawful purposes.
+      </p>
+
+      <h4>5) Your content</h4>
+      <p class="muted">
+        You own the flashcards and study content you create. You grant us permission to store and process it only to provide the Service.
+      </p>
+
+      <h4>6) Availability & changes</h4>
+      <p class="muted">
+        We may update, modify, or discontinue parts of ZenCards at any time. We do not guarantee uninterrupted service.
+      </p>
+
+      <h4>7) Disclaimer</h4>
+      <p class="muted">
+        ZenCards is provided “as is.” We do not guarantee academic outcomes.
+      </p>
+
+      <h4>8) Limitation of liability</h4>
+      <p class="muted">
+        To the maximum extent permitted by law, ZenCards is not liable for indirect or incidental damages arising from your use of the Service.
+      </p>
+
+      <h4>9) Termination</h4>
+      <p class="muted">
+        We may suspend or terminate accounts that violate these Terms, including account sharing by groups or institutions.
+      </p>
+
+      <h4>10) Contact</h4>
+      <p class="muted">
+        Questions? Email <strong>support@zencardstudy.com</strong>
+      </p>
+    </div>
+
+    <div class="modalActions" style="margin-top: 1rem;">
+      <button class="btn secondary" id="termsOkBtn" type="button">Close</button>
+    </div>
+  </div>
+</div>
+
+
   <script>
+    // ===== Monthly users counter (manual daily update) =====
+const MONTHLY_USERS = 254; // <-- change this number whenever you want
+const monthlyUsersEl = document.getElementById("monthlyUsersCount");
+
+// Format like 1,234
+if (monthlyUsersEl) {
+monthlyUsersEl.textContent = Number(MONTHLY_USERS).toLocaleString() + "+";
+}
+
+    // Year (keep only one)
     document.getElementById("year").textContent = String(new Date().getFullYear());
+
+    // ===== Supabase client (same anon key as app.html) =====
+    const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
+    const { createClient } = window.supabase;
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: window.localStorage,
+    storageKey: "zencards-auth",
+  },
+});
+// ===== Native app detection + safe navigation =====
+function isNativeApp(){
+  return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+}
+// Add a CSS hook ONLY when running inside the iOS app (Capacitor WebView)
+if (isNativeApp()) {
+  document.documentElement.classList.add("nativeApp");
+}
+
+
+function goToAppHtml(){
+  // ✅ Native app must use relative URL so it stays in the WebView
+  if (isNativeApp()) {
+    window.location.href = "app.html?forceLogin=1";
+  } else {
+    // ✅ Website can use full domain
+    window.location.href = "https://zencardstudy.com/app.html?forceLogin=1";
+  }
+}
+
+
+// ===== Landing Page Gate UI =====
+const lpWhoami = document.getElementById("lpWhoami");
+const lpStatus = document.getElementById("lpStatus");
+const lpGoBtn = document.getElementById("lpGoBtn");
+const lpLogoutBtn = document.getElementById("lpLogoutBtn");
+// ===== Top-left signed-in box UI =====
+const signedInBox = document.getElementById("signedInBox");
+const signedInWho = document.getElementById("signedInWho");
+const signedOutLogoutBtn = document.getElementById("signedOutLogoutBtn");
+const signedInManageBillingBtn = document.getElementById("signedInManageBillingBtn");
+
+
+function setLpGoButton(unlocked) {
+  if (unlocked) {
+    lpGoBtn.disabled = false;
+    lpGoBtn.textContent = "Go to ZenCards";
+    lpGoBtn.style.background = "var(--green)";
+    lpGoBtn.style.color = "#020617";
+    lpGoBtn.style.cursor = "pointer";
+    lpGoBtn.style.boxShadow = "0 8px 18px rgba(16,185,129,0.28)";
+  } else {
+    lpGoBtn.disabled = true;
+    lpGoBtn.textContent = "Go to ZenCards (locked)";
+    lpGoBtn.style.background = "#334155";
+    lpGoBtn.style.color = "#94a3b8";
+    lpGoBtn.style.cursor = "not-allowed";
+    lpGoBtn.style.boxShadow = "none";
+  }
+}
+async function waitForAccess({ maxMs = 30000, intervalMs = 1500 } = {}) {
+  const start = Date.now();
+  while (Date.now() - start < maxMs) {
+    try { await supabaseClient.auth.refreshSession(); } catch (_) {}
+
+    const access = await checkUserAccess();
+    if (access?.hasAccess) return true;
+
+    await new Promise(r => setTimeout(r, intervalMs));
+  }
+  return false;
+}
+
+async function refreshLandingGate() {
+   const { data: sessionData } = await supabaseClient.auth.getSession();
+  const session = sessionData?.session || null;
+
+  if (!session) {
+    lpWhoami.textContent = "Not logged in";
+    lpStatus.textContent = "";
+    lpLogoutBtn.style.display = "none";
+    setLpGoButton(false);
+    return;
+  }
+
+  // Only now call getUser (safe)
+  const { data: userData } = await supabaseClient.auth.getUser();
+  const user = userData?.user || session.user; // fallback
+
+  lpWhoami.textContent = `Logged in as: ${user.email || user.id}`;
+  lpLogoutBtn.style.display = "inline-flex";
+
+  lpStatus.textContent = "Checking access…";
+  let access = await checkUserAccess(user.id);
+
+  // If they just came back from Stripe, wait a bit for webhook/DB update
+  const params = new URLSearchParams(window.location.search);
+  const cameFromStripe = params.has("success") || params.has("session_id");
+
+  if (!access?.hasAccess && cameFromStripe) {
+    lpStatus.textContent = "Finishing setup… (this can take a few seconds)";
+    const ok = await waitForAccess({ maxMs: 30000, intervalMs: 1500 });
+    if (ok) access = await checkUserAccess(user.id);
+
+    // Optional: clean the URL so refresh doesn't keep polling
+    history.replaceState({}, document.title, window.location.pathname);
+  }
+
+  // Show status info
+  if (access?.rows?.length) {
+    const statuses = access.rows.map(r => String(r.status || "").toLowerCase()).join(", ");
+    lpStatus.textContent = `Subscription status: ${statuses || "(none)"}`;
+  } else {
+    lpStatus.textContent = access?.hasAccess ? "Subscription status: ok" : "No active/trial subscription found.";
+  }
+
+  setLpGoButton(!!access?.hasAccess);
+}
+function setSignedInBoxVisible(visible){
+  if (!signedInBox) return;
+  signedInBox.style.display = visible ? "block" : "none";
+}
+
+async function refreshSignedInBox(){
+  const { data: sessionData } = await supabaseClient.auth.getSession();
+  const session = sessionData?.session || null;
+
+  if (!session) {
+    setSignedInBoxVisible(false);
+    return;
+  }
+
+  // Safe to call getUser after session exists
+  const { data: userData } = await supabaseClient.auth.getUser();
+  const user = userData?.user || session.user;
+
+  signedInWho.textContent = `Signed in as ${user?.email || user?.id || ""}`;
+  setSignedInBoxVisible(true);
+}
+
+// Log out
+signedOutLogoutBtn?.addEventListener("click", async () => {
+  await supabaseClient.auth.signOut();
+  await refreshLandingGate();      // your existing gate UI
+  await refreshSignedInBox();
+});
+
+// Manage Billing (Stripe portal)
+signedInManageBillingBtn?.addEventListener("click", async () => {
+  // If they aren't logged in, just open login
+  const { data } = await supabaseClient.auth.getSession();
+  const token = data?.session?.access_token;
+  if (!token) {
+    openLoginModal("login");
+    return;
+  }
+
+  signedInManageBillingBtn.disabled = true;
+  signedInManageBillingBtn.textContent = "Opening…";
+
+  try {
+    // IMPORTANT: replace this URL with your REAL portal function URL
+    // If your app.html uses a different endpoint for billing portal,
+    // copy that exact fetch call here.
+    const resp = await fetch(
+      "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/create-portal-link",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+          "apikey": SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          return_url: "https://zencardstudy.com/"
+        }),
+      }
+    );
+
+    const json = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(json.error || json.message || "Portal failed");
+    if (!json.url) throw new Error("No portal URL returned");
+
+    window.location.href = json.url;
+  } catch (e) {
+    console.error(e);
+    alert("Could not open billing portal. Check console.");
+  } finally {
+    signedInManageBillingBtn.disabled = false;
+    signedInManageBillingBtn.textContent = "Manage Billing";
+  }
+});
+
+
+lpGoBtn?.addEventListener("click", async () => {
+  // safety re-check on click
+  const { data } = await supabaseClient.auth.getUser();
+  const user = data?.user;
+  if (!user) return;
+
+  const access = await checkUserAccess(user.id);
+  if (!access?.hasAccess) return;
+
+   goToAppHtml();
+});
+
+lpLogoutBtn?.addEventListener("click", async () => {
+  await supabaseClient.auth.signOut();
+  await refreshLandingGate();
+});
+
+// Keep UI in sync when auth changes
+supabaseClient.auth.onAuthStateChange(() => {
+  refreshLandingGate();
+  refreshSignedInBox();
+});
+
+// Initial draw
+refreshLandingGate();
+
+
+async function checkUserAccess(userIdFromLogin) {
+  // Prefer uid from login response
+  let uid = userIdFromLogin;
+
+  // Fallback to current session user
+  if (!uid) {
+    const { data: userData, error: userErr } = await supabaseClient.auth.getUser();
+    console.log("[checkUserAccess] getUser:", { userErr, user: userData?.user });
+    uid = userData?.user?.id;
+  }
+
+  if (!uid) return { hasAccess: false, reason: "not_logged_in" };
+
+  // IMPORTANT: order by a column that exists.
+  // Most tables have "id". If yours doesn't, see Step 2 below.
+ const { data, error, status } = await supabaseClient
+  .from("subscriptions")
+  .select("status,user_id,stripe_subscription_id")
+  .eq("user_id", uid);
+
+const safe = {
+  uid,
+  statusCode: status,
+  error: error ? { message: error.message, code: error.code, details: error.details, hint: error.hint } : null,
+  rows: Array.isArray(data) ? data : null,
+};
+console.log("[checkUserAccess] subscriptions raw:", safe);
+
+if (error) {
+  return { hasAccess: false, reason: "subs_read_failed", error: error.message };
+}
+
+const hasAccess =
+  Array.isArray(data) &&
+  data.some(r => ["active", "trialing"].includes(String(r?.status || "").toLowerCase()));
+
+return { hasAccess, reason: hasAccess ? "ok" : "no_active_or_trialing_row", rows: data || [] };
+}
+    
+    // Expose it on window so it's not "undefined" in console
+window.startFreeTrial = async function startFreeTrial() {
+  // Prefer the shared storageKey
+  let raw = localStorage.getItem("zencards-auth");
+
+  // Fallback to old default key if needed
+  if (!raw) {
+    const authKey = Object.keys(localStorage).find(k => k.endsWith("-auth-token"));
+    raw = authKey ? localStorage.getItem(authKey) : null;
+  }
+
+  const session = raw ? JSON.parse(raw) : null;
+
+  if (session?.access_token) {
+    const access = await checkUserAccess();
+    if (access.hasAccess) {
+      window.location.href = "app.html";
+      return;
+    }
+    await startCheckoutFromLanding();
+    return;
+  }
+
+  openLoginModal("signup");
+};
+
+    // ===== Login modal logic =====
+    const loginModal = document.getElementById("loginModal");
+    const loginBtn = document.getElementById("loginBtn");
+    const loginCloseBtn = document.getElementById("loginCloseBtn");
+    const loginCancelBtn = document.getElementById("loginCancelBtn");
+    const loginSubmitBtn = document.getElementById("loginSubmitBtn");
+    const loginEmail = document.getElementById("loginEmail");
+    const loginPassword = document.getElementById("loginPassword");
+    const loginMsg = document.getElementById("loginMsg");
+    const forgotPwBtn = document.getElementById("forgotPwBtn");
+    const toggleAuthModeBtn = document.getElementById("toggleAuthModeBtn");
+
+let authMode = "login"; // "login" | "signup"
+
+function setAuthMode(mode) {
+  authMode = mode;
+
+  const titleEl = document.getElementById("loginTitle");
+  const subtitleEl = titleEl?.nextElementSibling; // the small muted text under title (in your HTML)
+
+  if (mode === "signup") {
+    titleEl.textContent = "Create account";
+if (subtitleEl) {
+  subtitleEl.innerHTML =
+    `Enter an email + password. We'll email you a confirmation link. ` +
+    `In starting your free trial, you hereby acknowledge and agree to our ` +
+    `<a href="#terms" class="legalLink" id="tosInlineLink">Terms of Service</a> ` +
+    `and <a href="#privacy" class="legalLink">Privacy Policy</a>.`;
+}
+    loginSubmitBtn.textContent = "Create account";
+    forgotPwBtn.style.display = "none";
+    if (toggleAuthModeBtn) toggleAuthModeBtn.textContent = "Already have an account? Log in";
+  } else {
+    titleEl.textContent = "Log in";
+    if (subtitleEl) subtitleEl.textContent = "Enter your ZenCards email + password. Refresh the page if login is unresponsive.";
+    loginSubmitBtn.textContent = "Log in";
+    forgotPwBtn.style.display = "inline-block";
+    if (toggleAuthModeBtn) toggleAuthModeBtn.textContent = "Create account";
+  }
+}
+toggleAuthModeBtn?.addEventListener("click", () => {
+  setAuthMode(authMode === "login" ? "signup" : "login");
+});
+
+
+        // ===== Billing modal logic =====
+    const billingModal = document.getElementById("billingModal");
+    const billingCloseBtn = document.getElementById("billingCloseBtn");
+    const continueToBillingBtn = document.getElementById("continueToBillingBtn");
+    const billingCancelBtn = document.getElementById("billingCancelBtn");
+    const billingMsg = document.getElementById("billingMsg");
+    // ===== Terms modal logic =====
+const termsModal = document.getElementById("termsModal");
+const openTermsLink = document.getElementById("openTermsLink");
+const termsCloseBtn = document.getElementById("termsCloseBtn");
+const termsOkBtn = document.getElementById("termsOkBtn");
+
+function openTermsModal(){
+  termsModal.classList.add("show");
+}
+function closeTermsModal(){
+  termsModal.classList.remove("show");
+}
+
+// Make inline "Terms of Service" link open the modal (instead of jumping)
+document.addEventListener("click", (e) => {
+  const a = e.target.closest('a[href="#terms"]');
+  if (!a) return;
+
+  e.preventDefault();
+  openTermsModal();
+});
+// Smooth-scroll to Privacy when clicked from modal text
+document.addEventListener("click", (e) => {
+  const a = e.target.closest('a[href="#privacy"]');
+  if (!a) return;
+
+  e.preventDefault();
+
+  // Close login modal so it doesn't block the view
+  closeLoginModal();
+
+  // Smooth scroll to Privacy section
+  document
+    .getElementById("privacy")
+    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+
+openTermsLink?.addEventListener("click", openTermsModal);
+termsCloseBtn?.addEventListener("click", closeTermsModal);
+termsOkBtn?.addEventListener("click", closeTermsModal);
+
+// close if click outside
+termsModal?.addEventListener("click", (e) => {
+  if (e.target === termsModal) closeTermsModal();
+});
+
+// escape key closes if open
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && termsModal?.classList.contains("show")) {
+    closeTermsModal();
+  }
+});
+
+
+    function openBillingModal(){
+      billingMsg.textContent = "";
+      billingMsg.className = "modalMsg";
+      billingModal.classList.add("show");
+    }
+    function closeBillingModal(){
+      billingModal.classList.remove("show");
+    }
+
+    billingCloseBtn.addEventListener("click", closeBillingModal);
+    billingCancelBtn.addEventListener("click", async () => {
+      // Optional but recommended: sign out so they don't sit logged-in with no access
+      try { await supabaseClient.auth.signOut(); } catch(e) {}
+      closeBillingModal();
+      window.location.href = "/"; // back to landing
+    });
+
+    // close modal if click outside
+    billingModal.addEventListener("click", (e) => {
+      if (e.target === billingModal) closeBillingModal();
+    });
+
+window.addEventListener("unhandledrejection", (e) => {
+  console.error("[unhandledrejection]", e.reason);
+});
+window.addEventListener("error", (e) => {
+  console.error("[window error]", e.message, e.error);
+});
+
+    continueToBillingBtn.addEventListener("click", async () => {
+      console.log("[Billing] click fired");
+console.log("[Billing] about to call startCheckoutFromLanding");
+setTimeout(() => console.log("[Billing] still running after 5s"), 5000);
+      continueToBillingBtn.disabled = true;
+      continueToBillingBtn.textContent = "Redirecting…";
+      billingMsg.textContent = "";
+
+      try {
+        await startCheckoutFromLanding();
+      } catch (e) {
+        console.error(e);
+        billingMsg.textContent = "Could not start billing. Check console.";
+        billingMsg.className = "modalMsg error";
+        continueToBillingBtn.disabled = false;
+        continueToBillingBtn.textContent = "Continue to billing";
+      }
+    });
+
+    function openLoginModal(mode = "login"){
+  setAuthMode(mode);
+  loginMsg.textContent = "";
+  loginMsg.className = "modalMsg";
+  loginModal.classList.add("show");
+  setTimeout(() => loginEmail.focus(), 50);
+}
+    function closeLoginModal(){
+      loginModal.classList.remove("show");
+    }
+
+    loginBtn?.addEventListener("click", openLoginModal);
+    loginCloseBtn.addEventListener("click", closeLoginModal);
+    loginCancelBtn.addEventListener("click", closeLoginModal);
+
+    // close modal if click outside
+    loginModal.addEventListener("click", (e) => {
+      if (e.target === loginModal) closeLoginModal();
+    });
+
+    // Enter-to-submit
+    [loginEmail, loginPassword].forEach(el => {
+      el.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") loginSubmitBtn.click();
+        if (e.key === "Escape") closeLoginModal();
+      });
+    });
+
+    loginSubmitBtn.addEventListener("click", async () => {
+      const email = (loginEmail.value || "").trim();
+      const password = loginPassword.value || "";
+
+      if (!email || !password) {
+        loginMsg.textContent = "Please enter your email and password.";
+        loginMsg.className = "modalMsg error";
+        return;
+      }
+
+      loginSubmitBtn.disabled = true;
+      loginSubmitBtn.textContent = "Logging in…";
+      loginMsg.textContent = "";
+
+      try {
+  if (authMode === "signup") {
+    // Create account + send confirmation email
+    const res = await supabaseClient.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: "https://zencardstudy.com/confirm.html"
+      }
+    });
+    console.log("[SIGNUP RESULT]", res);
+
+    if (res.error) {
+      loginMsg.textContent = res.error.message;
+      loginMsg.className = "modalMsg error";
+      return;
+    }
+
+    loginMsg.textContent = "Account created ✅ Check your email to confirm, then you'll be sent to Stripe. Once you start your trial, come back to this page to log in.";
+    loginMsg.className = "modalMsg ok";
+
+    // Optional safety: close modal so user doesn’t keep clicking
+    // closeLoginModal();
+
+    return; // IMPORTANT: do NOT start Stripe here; wait for confirmation link
+  }
+
+  // ===== LOGIN MODE (your existing behavior) =====
+  const res = await supabaseClient.auth.signInWithPassword({ email, password });
+  console.log("[LOGIN RESULT]", res);
+
+  if (res.error) {
+    loginMsg.textContent = res.error.message;
+    loginMsg.className = "modalMsg error";
+    return;
+  }
+
+  loginMsg.textContent = "Logged in ✅";
+  loginMsg.className = "modalMsg ok";
+  closeLoginModal();
+
+  const uid = res?.data?.user?.id;
+  const access = await checkUserAccess(uid);
+
+  if (access?.hasAccess === true || access?.hasAccess === "true") {
+    await refreshLandingGate();
+    return;
+  }
+
+  await startCheckoutFromLanding();
+} catch (e) {
+  console.error(e);
+  loginMsg.textContent = "Something went wrong. Check console.";
+  loginMsg.className = "modalMsg error";
+}
+    });
+
+    forgotPwBtn.addEventListener("click", async () => {
+      const email = (loginEmail.value || "").trim();
+      if (!email) {
+        loginMsg.textContent = "Enter your email above first, then click “Forgot password?”.";
+        loginMsg.className = "modalMsg error";
+        return;
+      }
+
+      try {
+        const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+          redirectTo: "https://zencardstudy.com/reset.html"
+        });
+        if (error) {
+          loginMsg.textContent = error.message || "Could not send reset email.";
+          loginMsg.className = "modalMsg error";
+          return;
+        }
+        loginMsg.textContent = "Password reset email sent ✅";
+        loginMsg.className = "modalMsg ok";
+      } catch (e) {
+        console.error(e);
+        loginMsg.textContent = "Reset failed. Check console.";
+        loginMsg.className = "modalMsg error";
+      }
+    });
+    
+async function startCheckoutFromLanding() {
+  console.log("[startCheckoutFromLanding] starting…");
+
+  const { data: sessionData, error: sessionErr } = await supabaseClient.auth.getSession();
+  if (sessionErr) console.warn("[getSession error]", sessionErr);
+
+  const token = sessionData?.session?.access_token;
+  console.log("[startCheckoutFromLanding] has token:", !!token);
+
+  if (!token) throw new Error("No session token found. Please log in again.");
+
+  const res = await fetch(
+    "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/create-checkout-session",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+        "apikey": SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({
+       success_url: "https://zencardstudy.com/?success=1&session_id={CHECKOUT_SESSION_ID}",
+cancel_url:  "https://zencardstudy.com/?canceled=1",
+      }),
+    }
+  );
+
+  const json = await res.json().catch(() => ({}));
+  console.log("[startCheckoutFromLanding] status:", res.status, json);
+
+  if (!res.ok) throw new Error(json.error || json.message || "Checkout failed");
+  if (!json.url) throw new Error("No checkout URL returned from Edge Function");
+
+  window.location.href = json.url; // ✅ redirect to Stripe
+}
+
+(async () => {
+  await refreshLandingGate();
+})();
+
+document.getElementById("startTrialTopBtn")
+  ?.addEventListener("click", () => window.startFreeTrial());
+
   </script>
+
 </body>
 </html>

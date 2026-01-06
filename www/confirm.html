@@ -1,0 +1,120 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ZenCards — Confirming…</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+</head>
+
+<body style="font-family:system-ui;background:#0b1220;color:#e5e7eb;padding:24px;">
+  <h2>Confirming your email…</h2>
+  <p id="msg">One moment.</p>
+
+  <script>
+    const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
+
+    const msgEl = document.getElementById("msg");
+    const setMsg = (t) => { msgEl.textContent = t; console.log("[confirm]", t); };
+
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: window.localStorage,
+  },
+});
+
+    function scrubUrl() {
+      history.replaceState({}, document.title, window.location.pathname + window.location.search);
+    }
+
+    async function createCheckoutAndRedirect(accessToken) {
+      setMsg("Email confirmed ✅ Creating checkout session…");
+
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/create-checkout-session`, {
+        method: "POST",
+        headers: {
+  "Content-Type": "application/json",
+  "Authorization": `Bearer ${accessToken}`,
+  "apikey": SUPABASE_ANON_KEY,
+},
+        body: JSON.stringify({
+           success_url: "https://zencardstudy.com/?success=1&session_id={CHECKOUT_SESSION_ID}",
+cancel_url: "https://zencardstudy.com/?canceled=1",
+        }),
+      });
+
+      const raw = await res.text();
+      let json = null;
+      try { json = JSON.parse(raw); } catch {}
+
+      if (!res.ok || !json?.url) {
+        console.error("Checkout error:", res.status, raw);
+        setMsg(`Checkout failed (${res.status}). ${raw.slice(0, 250)}`);
+        return;
+      }
+
+      setMsg("Redirecting to Stripe…");
+      window.location.href = json.url;
+    }
+
+    async function go() {
+      setMsg("Finalizing confirmation…");
+
+      const url = new URL(window.location.href);
+      const hashParams = new URLSearchParams(url.hash.replace(/^#/, ""));
+      const queryParams = url.searchParams;
+
+      // If Supabase returned an error in the hash, show it clearly
+      const err = hashParams.get("error");
+      if (err) {
+        const errDesc = hashParams.get("error_description") || "";
+        const errCode = hashParams.get("error_code") || "";
+        setMsg(`Confirmation error: ${err}${errCode ? " (" + errCode + ")" : ""}${errDesc ? " — " + errDesc : ""}`);
+        return;
+      }
+
+      // FLOW 1: implicit hash tokens
+      const access_token = hashParams.get("access_token");
+      if (access_token) {
+        // IMPORTANT: use token directly, do NOT await setSession
+        scrubUrl();
+        await createCheckoutAndRedirect(access_token);
+        return;
+      }
+
+      // FLOW 2: PKCE code
+      const code = queryParams.get("code");
+      if (code) {
+        setMsg("Finishing sign-in…");
+        const { error } = await sb.auth.exchangeCodeForSession(code);
+        if (error) {
+          console.error(error);
+          setMsg("exchangeCodeForSession error: " + (error.message || String(error)));
+          return;
+        }
+        scrubUrl();
+
+        const { data } = await sb.auth.getSession();
+        const token = data?.session?.access_token;
+        if (!token) {
+          setMsg("Verified, but no session token was created. Please log in.");
+          return;
+        }
+        await createCheckoutAndRedirect(token);
+        return;
+      }
+
+      setMsg("Missing tokens/code in confirmation link. Please request a new link.");
+    }
+
+    go().catch((e) => {
+      console.error(e);
+      setMsg("Something went wrong: " + (e?.message || String(e)));
+    });
+  </script>
+</body>
+</html>
