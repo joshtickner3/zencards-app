@@ -59,7 +59,7 @@
     /* ===== Top-left signed-in bar ===== */
 .topUserBar {
   position: fixed;
-  top: 14px;
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
   left: 14px;
   z-index: 12000;
 
@@ -100,6 +100,7 @@
     body{
   margin:0;
   padding:1rem;
+  padding-top: calc(var(--topBarClearance) + env(safe-area-inset-top, 0px));
   font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   background: radial-gradient(circle at top, var(--bg1) 0, var(--bg2) 55%);
   color: var(--text);
@@ -113,21 +114,13 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
-
-    /* App header + logo */
-    .appHeader{
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  gap:0;
-  margin-bottom:0.35rem;
-}
+   
 /* Logo header blending panel */
 .appHeader{
   display:flex;
   align-items:center;
   justify-content:center;
-  margin-bottom:0.35rem;
+  margin-bottom:0.12rem;
   padding: 10px 12px;
   border-radius: 16px;
 
@@ -179,8 +172,8 @@
       text-align: center;
       font-size: 0.95rem;
       color: #9ca3af;
-      margin-top: 0.15rem;
-      margin-bottom: 0.75rem;
+      margin-top: 0.05rem;
+      margin-bottom: 0.6rem;
     }
     .container {
       max-width: 900px;
@@ -456,7 +449,7 @@ input[type="number"]:focus{
 /* ===== app.html: make the top signed-in bar feel clean on small screens ===== */
 @media (max-width: 430px){
   .topUserBar{
-    top: 10px;
+  top: calc(env(safe-area-inset-top, 0px) + 10px);
     left: 10px;
     right: 10px;                 /* allows it to size nicely */
     max-width: none;             /* override max-width calc */
@@ -501,12 +494,6 @@ input[type="number"]:focus{
 }
 
 /* Push the main app content down so the fixed bar doesn't overlap */
-.appHeader,
-.appSubtitle,
-#mainMenu,
-#studySection{
-  margin-top: calc(var(--topBarClearance));
-}
 
   </style>
 </head>
