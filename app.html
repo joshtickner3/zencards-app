@@ -51,8 +51,8 @@
   --shadow: 0 18px 35px rgba(0,0,0,0.55), 0 0 0 1px rgba(15,23,42,0.7);
 }
 
-    .brandLogo {
-  height: 34px;          /* adjust size here */
+  .brandLogo{
+  height: clamp(56px, 7vw, 92px); /* grows on desktop, safe on small screens */
   width: auto;
   display: block;
 }
@@ -115,13 +115,13 @@
 }
 
     /* App header + logo */
-    .appHeader {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.6rem;
-      margin-bottom: 0.15rem;
-    }
+    .appHeader{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:0;
+  margin-bottom:0.35rem;
+}
     .logoMark {
       width: 32px;
       height: 32px;
@@ -443,8 +443,8 @@ input[type="number"]:focus{
 
    <div class="appHeader">
   <img src="zencards-logo.png" alt="ZenCards logo" class="brandLogo" />
-  <h1 class="appTitle">ZenCards</h1>
 </div>
+
     <p class="appSubtitle">Hands-free & silent spaced&nbsp;repetition flashcards</p>
 
     <!-- ========== MAIN SETTINGS / MENU ========== -->
