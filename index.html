@@ -635,6 +635,45 @@ a:hover{
 .nativeApp body{
   padding-top: env(safe-area-inset-top, 0px);
 }
+/* ===== App-only: reduce "cramped" feel on small portrait screens ===== */
+@media (max-width: 430px){
+  .nativeApp .userCounter{
+    padding: 0.42rem 0.6rem;
+    border-radius: 14px;              /* less huge pill */
+    max-width: calc(100vw - 28px);
+    gap: 0.45rem;
+  }
+
+  .nativeApp .userCounter .label{
+    display: none;                    /* keep it clean on portrait */
+  }
+
+  .nativeApp .userCounter .num{
+    font-size: 0.92rem;
+  }
+
+  .nativeApp .signedInBox{
+    min-width: 0;                     /* stop forcing 260px */
+    max-width: calc(100vw - 28px);
+    padding: 0.65rem 0.75rem;
+  }
+
+  .nativeApp .signedInBox .who{
+    font-size: 0.88rem;
+    margin-bottom: 0.45rem;
+  }
+
+  .nativeApp .signedInBox .actions{
+    gap: 0.4rem;
+  }
+
+  .nativeApp .signedInBox .btn.small,
+  .nativeApp .signedInBox .btn.secondary.small{
+    padding: 0.32rem 0.7rem;
+    font-size: 0.82rem;
+  }
+}
+
 
 
   </style>
