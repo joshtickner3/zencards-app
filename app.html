@@ -903,6 +903,7 @@ async function signOutFromApp() {
 }
 
 
+
 // ===== AUTH DOM REFERENCES =====
 const deckBadge = document.getElementById("deckBadge");
 // ===== AUTH UI refs =====
@@ -935,6 +936,107 @@ if (signOutBtn) {
     signOutFromApp();
   });
 }
+// ===================== BILLING (STRIPE PORTAL) =====================
+
+// Helper: returns a good redirect base for GitHub Pages + local
+function getBaseUrlForSameFolder() {
+  // app.html, reset.html, etc are in the same folder
+  return new URL(".", window.location.href).href; // ends with trailing slash
+}
+
+async function openStripeCustomerPortal() {
+  try {
+    // Make sure we have a session token to authorize the edge function
+    const { data: sessionData, error: sessErr } = await supabaseClient.auth.getSession();
+    if (sessErr) throw sessErr;
+
+    const session = sessionData?.session;
+    if (!session?.access_token) {
+      alert("No active session. Please log in again.");
+      window.location.replace("index.html");
+      return;
+    }
+
+    // Call your edge function: create-portal-link
+    const fnUrl = `${SUPABASE_URL}/functions/v1/create-portal-link`;
+
+    const res = await fetch(fnUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        // optional but useful: where Stripe should send them back after portal
+        return_url: getBaseUrlForSameFolder() + "app.html",
+      }),
+    });
+
+    const json = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      console.error("[PORTAL] Edge function error:", json);
+      alert("Could not open billing portal. Check console.");
+      return;
+    }
+
+    const url = json?.url;
+    if (!url) {
+      console.error("[PORTAL] No url returned:", json);
+      alert("Billing portal link not returned. Check console.");
+      return;
+    }
+
+    // Redirect to Stripe portal
+    window.location.assign(url);
+  } catch (e) {
+    console.error("[PORTAL] Failed:", e);
+    alert("Could not open billing portal. Check console.");
+  }
+}
+
+// Hook up the button
+if (manageBillingBtn) {
+  manageBillingBtn.addEventListener("click", openStripeCustomerPortal);
+}
+// ===================== RESET PASSWORD (EMAIL) =====================
+
+async function sendResetPasswordEmailFromApp() {
+  try {
+    // Use the logged-in user's email
+    const { data: userData, error: userErr } = await supabaseClient.auth.getUser();
+    if (userErr) throw userErr;
+
+    const email = userData?.user?.email;
+    if (!email) {
+      alert("No email found for this user. Please log in again.");
+      return;
+    }
+
+    // reset.html is in same folder as app.html
+    const redirectTo = new URL("reset.html", window.location.href).href;
+
+    const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+      redirectTo,
+    });
+
+    if (error) {
+      console.error("[RESET] resetPasswordForEmail error:", error);
+      alert("Reset email failed. Check console.");
+      return;
+    }
+
+    alert("Password reset email sent. Check your inbox (and spam).");
+  } catch (e) {
+    console.error("[RESET] Failed:", e);
+    alert("Reset email failed. Check console.");
+  }
+}
+
+if (resetPasswordLoggedInBtn) {
+  resetPasswordLoggedInBtn.addEventListener("click", sendResetPasswordEmailFromApp);
+}
+
 
     // ===================== DATA & STORAGE =====================
     let decks = [];
