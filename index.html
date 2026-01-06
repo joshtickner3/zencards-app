@@ -500,6 +500,37 @@
       cursor: pointer;
       padding: 0;
     }
+    /* ===== Terms of Service Modal ===== */
+.legalLink{
+  color:#cbd5e1;
+  text-decoration: underline;
+  cursor:pointer;
+}
+.legalModalBody{
+  margin-top: 0.75rem;
+  max-height: 55vh;
+  overflow: auto;
+  border: 1px solid #111827;
+  border-radius: 0.85rem;
+  padding: 0.85rem;
+  background: #0b1220;
+  color: var(--text);
+}
+
+.legalModalBody h4{
+  margin: 0 0 0.5rem 0;
+}
+
+.legalModalBody p,
+.legalModalBody li{
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.legalModalBody ul{
+  margin: 0.5rem 0 0 1.15rem;
+}
+
   </style>
 </head>
 
@@ -526,7 +557,7 @@
 
       <h1>Saving money and time as a student is easier than ever with ZenCards: The world's first study tool designed for fully hands and eyes-free studying on the go.</h1>
       <p>
-        Goal-oriented students like you have little time to spare when balancing studying with schoolwork and a job, <strong>until now</strong>. ZenCards allows you to study your flashcards completely hands-free <strong>without looking at your phone</strong>.
+        Goal-oriented students like you have little time to spare after balancing studying with schoolwork and a job, <strong>until now</strong>. ZenCards allows you to study your flashcards completely hands-free <strong>without looking at your phone</strong>.
         Review while doing everyday activities so you can turn unproductive "dead" time into high quality review time, freeing up your schedule for a full time job as a student so you can invest in your future upon graduation. 
       </p>
       <!-- ===== Student pain strip (NEW) ===== -->
@@ -589,7 +620,7 @@
       <div class="kpiRow">
         <div class="kpi">
           <p class="big">Roughly 3 hours/day</p>
-          <p class="small">Saved by converting downtime into review time.</p>
+          <p class="small">Of study time gained or saved by converting downtime into review time.</p>
         </div>
         <div class="kpi">
           <p class="big">≈ 33¢/day</p>
@@ -631,7 +662,7 @@
       <div class="fineprint">
         <strong>Billing:</strong> Your 3-day free trial starts when you create an account.
         You will be <strong>charged $9.99/month automatically</strong> at the end of the trial unless you cancel beforehand.
-        Cancel anytime from the “Manage billing” button after logging in to avoid being charged.
+        <strong></strong>Cancel anytime<strong></strong> from the “Manage billing” button after logging in to avoid being charged.
       </div>
     </div>
 
@@ -642,7 +673,7 @@
         <div class="feature">
           <h3>Save time</h3>
           <p>
-            The most significant source of unproductive time for students is time we all spend doing everyday activities, such as commuting, walking, exercising, eating, chores, waiting in lines, sitting in that one class you needed to take for your art requirement, etc. ZenCards turns that into productive study time so you don't need to dedicate your valuable hours solely to review. 
+            The most significant source of unproductive time for students is time we all spend doing everyday activities, such as commuting, walking, exercising, eating, chores, waiting in lines, sitting in that one class you needed to take for your art requirement, etc. ZenCards turns that into productive study time so you don't need to dedicate your valuable hours after class solely to review. 
         </div>
         <div class="feature">
           <h3>More freedom outside school</h3>
@@ -697,7 +728,7 @@
 
           <h3>2) Choose your study style</h3>
           <p class="muted" style="margin-bottom:0.35rem;">
-            ZenCards supports multiple hands-free behaviors through the use of text-to-speech and responds to spoken commands when you answer, as well as spaced repetition scheduling to prioritize information you don't currently know over things you have mastered. ZenCards uses your spoken difficulty ratings to determine when you will see your cards again.
+            ZenCards supports multiple hands-free behaviors through the use of text-to-speech and responds to spoken commands (STT)when you answer, as well as spaced repetition scheduling to prioritize information you don't currently know over things you have mastered. ZenCards uses your spoken difficulty ratings to determine when you will see your cards again.
           </p>
           <ul>
             <li><strong>Play answer after you speak</strong> (hands and eyes-free flow)</li>
@@ -751,7 +782,7 @@
         <div class="priceCard">
           <h3 style="margin-top:0.35rem;">Cancel anytime</h3>
           <p class="muted">
-            We keep cancellation simple. Use the manage/ cancel subscription button at the top of this screen or manage billing while on the studying screen to cancel any time. No hoops, no hard feelings.
+            We keep cancellation simple. Use the manage billing button while logged in on the studying screen to cancel any time. No hoops, no hard feelings.
           </p>
 
           <div class="fineprint">
@@ -827,7 +858,8 @@
       </details>
     </div>
     <!-- PRIVACY -->
-<div class="card privacyCard">
+<div class="card privacyCard" id="privacy">
+
   <h2>Privacy & Data Use</h2>
 
   <p><strong>Your privacy matters to us.</strong> ZenCards is designed to help you study more efficiently — not to collect or exploit your personal data.</p>
@@ -854,8 +886,10 @@
 
 
     <p class="footer">
-      © <span id="year"></span> ZenCards • <span class="muted">Study smarter. Live more.</span>
-    </p>
+  © <span id="year"></span> ZenCards • <span class="muted">Study smarter. Live more.</span>
+  <span class="muted"> • </span>
+  <span class="legalLink" id="openTermsLink">Terms of Service</span>
+</p>
   </div>
 
   <!-- ===== Login Modal (MOVED ABOVE SCRIPTS so JS can find it) ===== -->
@@ -912,6 +946,81 @@
     </div>
 
     <div class="modalMsg" id="billingMsg"></div>
+  </div>
+</div>
+<!-- ===== Terms of Service Modal ===== -->
+<div class="modalOverlay" id="termsModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="termsTitle">
+    <div class="modalHeader">
+      <div>
+        <h3 id="termsTitle">ZenCards Terms of Service</h3>
+        <div class="muted" style="font-size:0.9rem;">Last updated: January 2026</div>
+      </div>
+      <button class="modalClose" id="termsCloseBtn" type="button">✕</button>
+    </div>
+
+    <div class="legalModalBody">
+      <p class="muted">
+        By using ZenCards (“the Service”), you agree to these Terms. If you do not agree, do not use ZenCards.
+      </p>
+
+      <h4>1) What ZenCards is</h4>
+      <p class="muted">
+        ZenCards is a study tool that helps users review flashcards using hands-free audio and silent study modes.
+      </p>
+
+      <h4>2) Accounts (no sharing)</h4>
+      <ul>
+        <li>Each ZenCards account is for <strong>one individual user only</strong>.</li>
+        <li><strong>Colleges, universities, classrooms, study groups, clubs, or organizations may not share one account among multiple people.</strong></li>
+        <li>Each person must have their <strong>own account and subscription</strong>.</li>
+        <li>You are responsible for keeping your login credentials secure.</li>
+      </ul>
+
+      <h4>3) Subscriptions & billing</h4>
+      <p class="muted">
+        ZenCards may offer free trials and paid subscriptions. Billing and subscription management are handled by our payment provider (such as Stripe).
+      </p>
+
+      <h4>4) Acceptable use</h4>
+      <p class="muted">
+        You agree not to share your account, bypass subscriptions or limits, reverse engineer, copy, resell, or use ZenCards for unlawful purposes.
+      </p>
+
+      <h4>5) Your content</h4>
+      <p class="muted">
+        You own the flashcards and study content you create. You grant us permission to store and process it only to provide the Service.
+      </p>
+
+      <h4>6) Availability & changes</h4>
+      <p class="muted">
+        We may update, modify, or discontinue parts of ZenCards at any time. We do not guarantee uninterrupted service.
+      </p>
+
+      <h4>7) Disclaimer</h4>
+      <p class="muted">
+        ZenCards is provided “as is.” We do not guarantee academic outcomes.
+      </p>
+
+      <h4>8) Limitation of liability</h4>
+      <p class="muted">
+        To the maximum extent permitted by law, ZenCards is not liable for indirect or incidental damages arising from your use of the Service.
+      </p>
+
+      <h4>9) Termination</h4>
+      <p class="muted">
+        We may suspend or terminate accounts that violate these Terms, including account sharing by groups or institutions.
+      </p>
+
+      <h4>10) Contact</h4>
+      <p class="muted">
+        Questions? Email <strong>support@zencardsstudy.com</strong>
+      </p>
+    </div>
+
+    <div class="modalActions" style="margin-top: 1rem;">
+      <button class="btn secondary" id="termsOkBtn" type="button">Close</button>
+    </div>
   </div>
 </div>
 
@@ -1138,7 +1247,13 @@ function setAuthMode(mode) {
 
   if (mode === "signup") {
     titleEl.textContent = "Create account";
-    if (subtitleEl) subtitleEl.textContent = "Enter an email + password. We'll email you a confirmation link.";
+if (subtitleEl) {
+  subtitleEl.innerHTML =
+    `Enter an email + password. We'll email you a confirmation link. ` +
+    `In starting your free trial, you hereby acknowledge and agree to our ` +
+    `<a href="#terms" class="legalLink" id="tosInlineLink">Terms of Service</a> ` +
+    `and <a href="#privacy" class="legalLink">Privacy Policy</a>.`;
+}
     loginSubmitBtn.textContent = "Create account";
     forgotPwBtn.style.display = "none";
     if (toggleAuthModeBtn) toggleAuthModeBtn.textContent = "Already have an account? Log in";
@@ -1161,6 +1276,60 @@ toggleAuthModeBtn?.addEventListener("click", () => {
     const continueToBillingBtn = document.getElementById("continueToBillingBtn");
     const billingCancelBtn = document.getElementById("billingCancelBtn");
     const billingMsg = document.getElementById("billingMsg");
+    // ===== Terms modal logic =====
+const termsModal = document.getElementById("termsModal");
+const openTermsLink = document.getElementById("openTermsLink");
+const termsCloseBtn = document.getElementById("termsCloseBtn");
+const termsOkBtn = document.getElementById("termsOkBtn");
+
+function openTermsModal(){
+  termsModal.classList.add("show");
+}
+function closeTermsModal(){
+  termsModal.classList.remove("show");
+}
+
+// Make inline "Terms of Service" link open the modal (instead of jumping)
+document.addEventListener("click", (e) => {
+  const a = e.target.closest('a[href="#terms"]');
+  if (!a) return;
+
+  e.preventDefault();
+  openTermsModal();
+});
+// Smooth-scroll to Privacy when clicked from modal text
+document.addEventListener("click", (e) => {
+  const a = e.target.closest('a[href="#privacy"]');
+  if (!a) return;
+
+  e.preventDefault();
+
+  // Close login modal so it doesn't block the view
+  closeLoginModal();
+
+  // Smooth scroll to Privacy section
+  document
+    .getElementById("privacy")
+    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+
+openTermsLink?.addEventListener("click", openTermsModal);
+termsCloseBtn?.addEventListener("click", closeTermsModal);
+termsOkBtn?.addEventListener("click", closeTermsModal);
+
+// close if click outside
+termsModal?.addEventListener("click", (e) => {
+  if (e.target === termsModal) closeTermsModal();
+});
+
+// escape key closes if open
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && termsModal?.classList.contains("show")) {
+    closeTermsModal();
+  }
+});
+
 
     function openBillingModal(){
       billingMsg.textContent = "";
