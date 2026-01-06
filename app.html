@@ -361,75 +361,16 @@
       color: #9ca3af;
       margin-bottom: 0.35rem;
     }
-    #paywallPassword,
-#paywallSignUpBtn,
-#paywallLoggedInActions,
-#paywallMsg {
-  display: none !important;
-}
-/* Hide stray paywall "Password" label/text */
-label[for="paywallPassword"],
-#paywallPasswordLabel,
-#paywallLabelPassword,
-.paywallLabel {
-  display: none !important;
-}
 
   </style>
 </head>
 <body>
     <div>
-      <label for="paywallPassword">Password</label>
-      <input id="paywallPassword" type="password" placeholder="••••••••" />
-    </div>
-  </div>
-
-  <div class="row" style="margin-top:0.75rem;">
-    <button id="paywallSignUpBtn">Sign up</button>
-  </div>
-
-</div>
-
-<!-- Shown ONLY when user is logged in but not subscribed -->
-<div id="paywallLoggedInActions" class="hidden" style="margin-top:0.75rem;">
-  <p style="color:#9ca3af;margin-bottom:0.5rem;">
-    Your account isn’t active yet.
-  </p>
-  <button id="resumeCheckoutBtn">Continue to billing</button>
-  <button id="paywallLogoutBtn" class="secondary" style="margin-left:8px;">
-    Log out
-  </button>
-</div>
-
-    <p id="paywallMsg" style="color:#9ca3af;margin-top:10px;min-height:1.2em;"></p>
   </div>
 </div>
 
   <div class="container">
-        <!-- ========== AUTH / ACCOUNT ========== -->
-    <div id="authSection" class="card">
-      <h2>Account</h2>
-      <p id="authStatus" style="font-size:0.85rem;color:#9ca3af;margin-bottom:0.5rem;">
-        Not signed in. Please sign in to sync decks and cards across devices. Happy studying! ZenCards LLC
-</p>
-      <!-- Shown when logged OUT -->
-      <div id="authLoggedOut">
-        <div class="row">
-          <div>
-            <label for="authEmail">Email</label>
-            <input id="authEmail" type="text" placeholder="you@example.com" />
-          </div>
-          <div>
-            <label for="authPassword">Password</label>
-            <input id="authPassword" type="password" placeholder="••••••••" />
-          </div>
-        </div>
-        <div class="row" style="margin-top:0.5rem;">
-          <button id="signUpBtn">Sign Up</button>
-          <button id="logInBtn" class="secondary">Log In</button>
-          <button id="resetPasswordBtn" class="secondary small">Reset Password</button>
-        </div>
-      </div>
+  
 
       <!-- Shown when logged IN -->
       <div id="authLoggedIn" class="hidden">
@@ -925,195 +866,53 @@ window.supabaseClient = supabaseClient;
 window.setSyncLock = window.setSyncLock || function () {};
 window.lockUI = window.lockUI || function () {};
 
-// ===== AUTH RECOVERY: bypass hung getSession lock =====
-async function bootstrapSessionFromStorage() {
-  try {
-    const raw = localStorage.getItem("zencards-auth");
-    if (!raw) return null;
-
-    const parsed = JSON.parse(raw);
-    const access_token = parsed?.access_token;
-    const refresh_token = parsed?.refresh_token;
-
-    if (!access_token || !refresh_token) return null;
-
-    const { data, error } = await supabaseClient.auth.setSession({
-      access_token,
-      refresh_token,
-    });
-
-    if (error) {
-      console.warn("[bootstrapSessionFromStorage] setSession error:", error);
-      return null;
-    }
-
-    return data?.session ?? null;
-  } catch (e) {
-    console.warn("[bootstrapSessionFromStorage] failed:", e);
-    return null;
-  }
-}
-
-async function safeGetToken() {
-  // 1) Prefer token from onAuthStateChange if present
-  if (window.__zcAccessToken) return window.__zcAccessToken;
-
-  // 2) Try getUser (does not usually hang the same way)
-  const { data: u } = await supabaseClient.auth.getUser();
-  if (!u?.user) return null;
-
-  // 3) Try getSession quickly; if it hangs, recover from storage
-  try {
-    const s = await Promise.race([
-      supabaseClient.auth.getSession(),
-      new Promise((_, rej) => setTimeout(() => rej(new Error("getSession hung")), 1200)),
-    ]);
-    const token = s?.data?.session?.access_token || null;
-    if (token) return token;
-  } catch (_) {}
-
-  // 4) Recover by forcing setSession from localStorage
-  const boot = await bootstrapSessionFromStorage();
-  return boot?.access_token || null;
-}
-
-
-function shouldStartTrialFromUrl() {
-  return new URLSearchParams(window.location.search).get("startTrial") === "1";
-}
-let checkoutStarted = false;
-
-async function startTrialIfRequested() {
-   if (checkoutStarted) return;
-  if (!shouldStartTrialFromUrl()) return;
-
-const token = await safeGetToken();
-
-  if (!token) {
-    // Not logged in yet — do nothing; after login, onAuthStateChange will run and we’ll retry
-    return;
-  }
-
-checkoutStarted = true;
-  const res = await fetch(
-    "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/create-checkout-session",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        success_url: "https://zencardstudy.com/?success=1&session_id={CHECKOUT_SESSION_ID}",
-cancel_url: "https://zencardstudy.com/?canceled=1",
-
-      }),
-    }
-  );
-
-  const json = await res.json();
-  if (!res.ok) {
-    console.error("Checkout error:", json);
-    alert("Checkout failed. Check console.");
-    return;
-  }
-
-  window.location.href = json.url;
-}
-
-// Run once on page load
-startTrialIfRequested();
-
 let currentUser = null;
 let isSigningOut = false;
+async function signOutFromApp() {
+  if (isSigningOut) return;
+  isSigningOut = true;
+
+  try {
+    console.log("[LOGOUT] signing out...");
+
+    // Stop any study audio/listening
+    try { stopAllAudio(); } catch (_) {}
+
+    // Supabase sign out
+    await supabaseClient.auth.signOut();
+
+    // Clear ONLY your app’s local state (not everything)
+    localStorage.removeItem("srsDecks");
+    localStorage.removeItem("srsSchedule");
+
+    // Clear Supabase session storage key
+    localStorage.removeItem("zencards-auth");
+
+    currentUser = null;
+    hasLoadedRemote = false;
+    pendingSaveBeforeRemote = false;
+
+    console.log("[LOGOUT] done, redirecting to index.html");
+    window.location.replace("index.html");
+  } catch (e) {
+    console.error("[LOGOUT] failed:", e);
+    alert("Logout failed. Check console.");
+  } finally {
+    isSigningOut = false;
+  }
+}
+
 
 // ===== AUTH DOM REFERENCES =====
-const authEmailInput = document.getElementById("authEmail");
-const authPasswordInput = document.getElementById("authPassword");
-const resumeCheckoutBtn = document.getElementById("resumeCheckoutBtn");
-const paywallLogoutBtn = document.getElementById("paywallLogoutBtn");
-
-resumeCheckoutBtn?.addEventListener("click", async () => {
-  try {
-    lockUI("Redirecting…", { mode: "inactive" });
-
-    // Make sure session/token is fresh
-   try { await supabaseClient.auth.refreshSession(); } catch (_) {}
-const token = await safeGetToken();
-
-    if (!token) {
-      lockUI("Session missing. Please log out and log back in.", { mode: "inactive" });
-      return;
-    }
-
-    // Fetch with a timeout so you never hang forever
-    const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), 15000);
-
-    const res = await fetch(
-      "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/create-checkout-session",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          success_url: "https://zencardstudy.com/?success=1&session_id={CHECKOUT_SESSION_ID}",
-cancel_url: "https://zencardstudy.com/?canceled=1",
-        }),
-        signal: controller.signal,
-      }
-    );
-
-    clearTimeout(t);
-
-    const json = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      console.error("create-checkout-session failed:", res.status, json);
-      lockUI(`Stripe checkout failed: ${json?.error || res.status}`, { mode: "inactive" });
-      return;
-    }
-
-    if (!json?.url) {
-      console.error("Missing checkout url:", json);
-      lockUI("Stripe checkout failed: missing redirect URL.", { mode: "inactive" });
-      return;
-    }
-
-    window.location.assign(json.url);
-  } catch (e) {
-    console.error("Resume checkout error:", e);
-    lockUI(
-      e?.name === "AbortError"
-        ? "Checkout timed out. Try again."
-        : "Checkout error. Open console for details.",
-      { mode: "inactive" }
-    );
-  }
-});
-
-const signUpBtn = document.getElementById("signUpBtn");
-const signInBtn = document.getElementById("logInBtn");           // correct ID
-const signOutBtn = document.getElementById("logOutBtn"); 
-const manageBillingBtn = document.getElementById("manageBillingBtn");
-manageBillingBtn?.addEventListener("click", async () => {
-  if (!currentUser) {
-    alert("You must be logged in.");
-    return;
-  }
-
-  // Stripe Customer Portal link (you generate this once in Stripe)
-  window.location.href = "https://billing.stripe.com/p/login/4gMfZh7E9aX72wK0jI1VK00";
-});
-
-        // correct ID
-const resetPwBtn = document.getElementById("resetPasswordBtn");  // correct ID
-const resetPwLoggedInBtn = document.getElementById("resetPasswordLoggedInBtn");
-
-const authStatusSpan = document.getElementById("authStatus");
 const deckBadge = document.getElementById("deckBadge");
+// ===== AUTH UI refs =====
+const authLoggedIn = document.getElementById("authLoggedIn");
+const userEmailLabel = document.getElementById("userEmailLabel");
+const signOutBtn = document.getElementById("logOutBtn");
+
+// Optional buttons (keep if you use them)
+const manageBillingBtn = document.getElementById("manageBillingBtn");
+const resetPasswordLoggedInBtn = document.getElementById("resetPasswordLoggedInBtn");
 
 
 const studyAddCardBtn = document.getElementById("studyAddCardBtn");
@@ -1129,335 +928,13 @@ const openInstructionsBtn = document.getElementById("openInstructionsBtn");
 const instructionsModal = document.getElementById("instructionsModal");
 const instructionsCloseBtn = document.getElementById("instructionsCloseBtn");
 
-
-// ===== AUTH FUNCTIONS (SIGN UP / SIGN IN / SIGN OUT / RESET PASSWORD) =====
-async function signUpWithEmail() {
-  const email = authEmailInput.value.trim();
-  const password = authPasswordInput.value.trim();
-  if (!email || !password) {
-    setAuthStatus("Please enter an email and password.");
-    return;
-  }
-
-  const { data, error } = await supabaseClient.auth.signUp({
-  email,
-  password,
-  options: {
-   emailRedirectTo: "https://zencardstudy.com/confirm.html"
-  }
-});
-
-
-  if (error) {
-    console.error("Sign-up error:", error);
-    setAuthStatus("Sign-up error: " + error.message);
-    return;
-  }
-
-  setAuthStatus("Please check email for verification.");
-}
-
-async function signInWithEmail() {
-  const email = authEmailInput.value.trim();
-  const password = authPasswordInput.value.trim();
-  if (!email || !password) {
-    setAuthStatus("Please enter an email and password.");
-    return;
-  }
-
-  const { data, error } = await supabaseClient.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error) {
-    console.error("Log-in error:", error);
-    setAuthStatus("Log-in error: " + error.message);
-    return;
-  }
-  console.log("✅ LOGGED IN UUID:", data.user.id);
-console.log("✅ LOGGED IN EMAIL:", data.user.email);
-
-  currentUser = data.user;
-  setAuthStatus("Logged in as: " + currentUser.email);
-  updateAuthButtons();
-  await loadStateFromSupabase();
-  refreshDeckSelect();
-  refreshCardsList();
-}
-
-async function signOutFromApp() {
-  isSigningOut = true;
-
-  // ✅ ALWAYS redirect, even if Supabase signOut hangs/fails.
-  // We'll attempt signOut, but we won't wait forever.
-
-  const PROJECT_REF = "elpfcnnrripftxoqeckv"; // your Supabase ref from the URL
-
-  try {
-    // Best effort: try to sign out, but timeout quickly
-    await Promise.race([
-      supabaseClient.auth.signOut(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("signOut timeout")), 2500))
-    ]).catch((e) => {
-      console.warn("Non-fatal signOut issue:", e?.message || e);
-    });
-  } catch (e) {
-    console.warn("Non-fatal signOut exception:", e?.message || e);
-  }
-
-  try {
-    // ✅ Hard-clear local Supabase session token so you are truly logged out in this browser
-    localStorage.removeItem(`sb-${PROJECT_REF}-auth-token`);
-    // (Optional safety: sometimes there are older keys)
-    localStorage.removeItem(`sb-${PROJECT_REF}-auth-token-code-verifier`);
-  } catch (_) {}
-
-  // Reset app state/UI
-  currentUser = null;
-  updateAuthButtons();
-  setAuthStatus("Signed out.");
-
-  isSigningOut = false;
-
-  // ✅ ALWAYS go back to landing
-  window.location.assign("https://zencardstudy.com/");
-}
-   
-async function sendPasswordReset() {
-  const email = authEmailInput.value.trim();
-  if (!email) {
-    setAuthStatus("Enter your email to reset password.");
-    return;
-  }
- 
-  const { data, error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-  redirectTo: "https://zencardstudy.com/reset.html"
-});
-
-  if (error) {
-    console.error("Reset password error:", error);
-    setAuthStatus("Reset error: " + error.message);
-    return;
-  }
-
-  setAuthStatus("Password reset email sent.");
-}
-
 // ===== BUTTON EVENT HOOKS =====
-if (signUpBtn) {
-  signUpBtn.addEventListener("click", () => {
-    signUpWithEmail();
-  });
-}
-
-if (signInBtn) {
-  signInBtn.addEventListener("click", () => {
-    signInWithEmail();
-  });
-}
 
 if (signOutBtn) {
   signOutBtn.addEventListener("click", () => {
     signOutFromApp();
   });
 }
-if (paywallLogoutBtn) {
-  paywallLogoutBtn.addEventListener("click", () => {
-    signOutFromApp();
-  });
-}
-
-
-if (resetPwBtn) {
-  resetPwBtn.addEventListener("click", () => {
-    sendPasswordReset();
-  });
-}
-if (resetPwLoggedInBtn) {
-  resetPwLoggedInBtn.addEventListener("click", async () => {
-    if (!currentUser?.email) {
-      setAuthStatus("No user email found.");
-      return;
-    }
-
-    const { error } =
-      await supabaseClient.auth.resetPasswordForEmail(
-        currentUser.email,
-        {
-          redirectTo: "https://zencardstudy.com/reset.html",
-        }
-      );
-
-    if (error) {
-      setAuthStatus("Reset failed: " + error.message);
-    } else {
-      setAuthStatus("Password reset email sent.");
-    }
-  });
-}
-
-
-function setAuthStatus(message) {
-  if (authStatusSpan) authStatusSpan.textContent = message;
-}
-
-function updateAuthButtons() {
-  if (!currentUser) {
-    // Logged OUT state
-    if (signOutBtn) signOutBtn.disabled = true;
-
-    // Hide logged-in UI
-    const loggedIn = document.getElementById("authLoggedIn");
-    const loggedOut = document.getElementById("authLoggedOut");
-    if (loggedIn) loggedIn.classList.add("hidden");
-    if (loggedOut) loggedOut.classList.remove("hidden");
-
-    setAuthStatus("Not signed in.");
-  } else {
-    // Logged IN state
-    if (signOutBtn) signOutBtn.disabled = false;
-
-    // Update label “Signed in as …”
-    const emailLabel = document.getElementById("userEmailLabel");
-    if (emailLabel) emailLabel.textContent = currentUser.email;
-
-    // Show correct UI blocks
-    const loggedIn = document.getElementById("authLoggedIn");
-    const loggedOut = document.getElementById("authLoggedOut");
-    if (loggedIn) loggedIn.classList.remove("hidden");
-    if (loggedOut) loggedOut.classList.add("hidden");
-
-    setAuthStatus("Signed in as: " + currentUser.email);
-  }
-}
-
-async function getMySubscriptionStatus() {
-  const { data: userData } = await supabaseClient.auth.getUser();
-const userId = userData?.user?.id;
-
-  if (!userId) {
-    console.warn("No session user in getMySubscriptionStatus()");
-    return null;
-  }
-
-  const { data, error } = await supabaseClient
-    .from("subscriptions")
-    .select("status, price_id, stripe_subscription_id, current_period_end, updated_at")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (error) {
-    console.error("Subscription query error:", error);
-    return null;
-  }
-
-  console.log("Subscription row:", data);
-  return data?.status ?? null;
-}
-async function checkAccessViaEdge() {
-  const token = await safeGetToken();
-  if (!token) return { hasAccess: false, status: "logged_out" };
-
-  const res = await fetch(
-    "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/has-access",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
-
-  const json = await res.json().catch(() => ({}));
-  return json;
-}
-
-async function enforceAccessOrRedirect() {
-  // If the session system is wedged, this tries to recover it once
-  await bootstrapSessionFromStorage();
-
-  // Must have a user
-  const { data: userData } = await supabaseClient.auth.getUser();
-  const user = userData?.user;
-
-  if (!user) {
-    window.location.replace("https://zencardstudy.com/");
-    return false;
-  }
-
-  // Verify access
-  let access;
-  try {
-    access = await checkAccessViaEdge();
-  } catch (e) {
-    console.error("checkAccessViaEdge failed:", e);
-    window.location.replace("https://zencardstudy.com/");
-    return false;
-  }
-
-  if (!access?.hasAccess) {
-    window.location.replace("https://zencardstudy.com/");
-    return false;
-  }
-
-  // Allowed
-  currentUser = user;   // ✅ now defined
-  updateAuthButtons();
-  return true;
-}
-
-// ✅ Run gate on first load
-window.addEventListener("DOMContentLoaded", async () => {
-  setSyncLock(true);   
-  console.log("✅ DOMContentLoaded fired; UI locked");
-         // ✅ lock right away
-const ok = await enforceAccessOrRedirect();
-if (!ok) {
-  hasLoadedRemote = true;   // so your app doesn't get stuck forever
-  setSyncLock(false);
-  return;
-}
-
-
-  loadFromStorage();
-  refreshDeckSelect();
-  refreshCardsList();
-
-  await loadStateFromSupabase(); // ✅ unlock happens in finally below
-  refreshDeckSelect();
-  refreshCardsList();
-});
-
-
-supabaseClient.auth.onAuthStateChange(async (event, session) => {
-  // Prevent weird UI flashes during an intentional sign-out
-  if (isSigningOut) return;
-  
-  window.__zcAccessToken = session?.access_token || null;
-
-  // Keep currentUser in sync
-  currentUser = session?.user ?? null;
-
-  updateAuthButtons();
-  // ✅ Always enforce paywall after auth changes
-const ok = await enforceAccessOrRedirect();
-if (!ok) return;
-
-  // Optional: if you already do these, keep them
-  if (currentUser) {
-    await loadStateFromSupabase();
-    refreshDeckSelect();
-    refreshCardsList();
-
-    // ✅ THE IMPORTANT LINE:
-    // If the URL has ?startTrial=1, this will now run RIGHT AFTER LOGIN too.
-    await startTrialIfRequested();
-  } else {
-    // logged out state — you can keep whatever you currently do here
-  }
-});
 
     // ===================== DATA & STORAGE =====================
     let decks = [];
@@ -1526,6 +1003,11 @@ let saveQueued = false;
 let pendingSaveBeforeRemote = false;
 
 async function queueSaveToSupabase() {
+  if (!currentUser) {
+  pendingSaveBeforeRemote = true;
+  console.warn("[QUEUE] No currentUser yet; deferring save");
+  return;
+}
   console.log("[QUEUE] queueSaveToSupabase() hit", {
     hasLoadedRemote,
     saveInFlight,
@@ -1742,7 +1224,46 @@ return;                        // ✅ still safe because finally runs
     }
   }
 }
-loadStateFromSupabase().catch(e => console.error("❌ loadStateFromSupabase crashed on boot:", e));
+initAppSession().catch(e => console.error("❌ initAppSession crashed:", e));
+async function initAppSession() {
+  console.log("[BOOT] initAppSession()");
+
+  // 1) Check session first (fast)
+  const { data: sessionData, error: sessErr } = await supabaseClient.auth.getSession();
+  const session = sessionData?.session || null;
+
+  console.log("[BOOT] getSession()", {
+    hasSession: !!session,
+    sessErr: sessErr ? { message: sessErr.message, name: sessErr.name } : null
+  });
+
+  // 2) If no session → go back to landing/login page
+  if (!session) {
+    console.warn("[BOOT] No session. Redirecting to index.html");
+    window.location.replace("index.html");
+    return;
+  }
+
+  // 3) Set currentUser + show UI
+  currentUser = session.user;
+
+  if (userEmailLabel) userEmailLabel.textContent = currentUser.email || "";
+  if (authLoggedIn) authLoggedIn.classList.remove("hidden");
+
+  // 4) Load local immediately so app feels instant
+  loadFromStorage();
+  refreshDeckSelect();
+  refreshCardsList();
+
+  // 5) Load remote once (this will set hasLoadedRemote=true in finally)
+  await loadStateFromSupabase();
+
+  // 6) After remote load, re-render (remote may overwrite local)
+  refreshDeckSelect();
+  refreshCardsList();
+
+  console.log("[BOOT] done", { hasLoadedRemote, userId: currentUser?.id });
+}
 
     function scheduleKey(deckId, cardId) {
       return `${deckId}_${cardId}`;
