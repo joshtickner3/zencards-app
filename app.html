@@ -27,6 +27,39 @@
   src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
 </script>
   <style>
+    /* ===== Top-left signed-in bar ===== */
+.topUserBar {
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 12000;
+
+  background: rgba(2, 6, 23, 0.86);
+  border: 1px solid #1f2937;
+  border-radius: 14px;
+  padding: 10px 12px;
+
+  box-shadow: 0 18px 35px rgba(0,0,0,0.55);
+  max-width: calc(100% - 28px);
+}
+
+.topUserBar .signedInLine {
+  margin: 0 0 6px 0;
+  font-size: 0.95rem;
+  color: #e5e7eb;
+}
+
+.topUserBar .btnRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.topUserBar button {
+  margin: 0; /* important: override your default button margin */
+}
+
     /* Hide Sign Up button on app.html (users sign up on landing) */
 #signUpBtn {
   display: none !important;
@@ -41,6 +74,7 @@
       color: #e5e7eb;
       margin: 0;
       padding: 1rem;
+      body { padding-top: 3.2rem; }
       line-height: 1.5;
     }
     h1, h2, h3 {
@@ -369,18 +403,17 @@
   </div>
 </div>
 
-  <div class="container">
-  
+  <!-- Top-left signed-in bar -->
+<div id="authLoggedIn" class="topUserBar hidden">
+  <p class="signedInLine">
+    Signed in as <strong id="userEmailLabel"></strong>
+  </p>
 
-      <!-- Shown when logged IN -->
-      <div id="authLoggedIn" class="hidden">
-        <p style="margin-bottom:0.5rem;">
-          Signed in as <strong id="userEmailLabel"></strong>
-        </p>
-        <button id="logOutBtn" class="secondary small">Log Out</button>
-        <button id="manageBillingBtn">Manage Billing</button>
-      </div>
-    </div>
+  <div class="btnRow">
+    <button id="logOutBtn" class="secondary small">Log Out</button>
+    <button id="manageBillingBtn" class="small">Manage Billing</button>
+  </div>
+</div>
 
     <div class="appHeader">
       <div class="logoMark">Z</div>
