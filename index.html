@@ -11,6 +11,37 @@
   width: auto;
   display:block;
 }
+/* ===== Top-left signed-in box (matches app.html style) ===== */
+.signedInBox{
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 12000;
+  background: rgba(2,6,23,0.86);
+  border: 1px solid #111827;
+  border-radius: 14px;
+  padding: 0.75rem 0.85rem;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  min-width: 260px;
+  display: none; /* shown only when logged in */
+}
+
+.signedInBox .who{
+  color: #e5e7eb;
+  font-weight: 800;
+  font-size: 0.92rem;
+  margin-bottom: 0.5rem;
+  word-break: break-word;
+}
+
+.signedInBox .actions{
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 
     /* ===== Top-right user counter ===== */
 .userCounter{
@@ -602,6 +633,15 @@ a:hover{
   <span class="label">Monthly users taking control of their schedule</span>
   <span class="num" id="monthlyUsersCount">0</span>
 </div>
+<!-- ===== Top-left signed-in box ===== -->
+<div class="signedInBox" id="signedInBox" aria-label="Signed-in status">
+  <div class="who" id="signedInWho">Signed in as …</div>
+  <div class="actions">
+    <button class="btn secondary small" id="signedOutLogoutBtn" type="button">Log out</button>
+    <button class="btn small" id="signedInManageBillingBtn" type="button">Manage Billing</button>
+  </div>
+</div>
+
 
   <div class="container">
 
@@ -1117,6 +1157,12 @@ const lpWhoami = document.getElementById("lpWhoami");
 const lpStatus = document.getElementById("lpStatus");
 const lpGoBtn = document.getElementById("lpGoBtn");
 const lpLogoutBtn = document.getElementById("lpLogoutBtn");
+// ===== Top-left signed-in box UI =====
+const signedInBox = document.getElementById("signedInBox");
+const signedInWho = document.getElementById("signedInWho");
+const signedOutLogoutBtn = document.getElementById("signedOutLogoutBtn");
+const signedInManageBillingBtn = document.getElementById("signedInManageBillingBtn");
+
 
 function setLpGoButton(unlocked) {
   if (unlocked) {
@@ -1193,6 +1239,81 @@ async function refreshLandingGate() {
 
   setLpGoButton(!!access?.hasAccess);
 }
+function setSignedInBoxVisible(visible){
+  if (!signedInBox) return;
+  signedInBox.style.display = visible ? "block" : "none";
+}
+
+async function refreshSignedInBox(){
+  const { data: sessionData } = await supabaseClient.auth.getSession();
+  const session = sessionData?.session || null;
+
+  if (!session) {
+    setSignedInBoxVisible(false);
+    return;
+  }
+
+  // Safe to call getUser after session exists
+  const { data: userData } = await supabaseClient.auth.getUser();
+  const user = userData?.user || session.user;
+
+  signedInWho.textContent = `Signed in as ${user?.email || user?.id || ""}`;
+  setSignedInBoxVisible(true);
+}
+
+// Log out
+signedOutLogoutBtn?.addEventListener("click", async () => {
+  await supabaseClient.auth.signOut();
+  await refreshLandingGate();      // your existing gate UI
+  await refreshSignedInBox();
+});
+
+// Manage Billing (Stripe portal)
+signedInManageBillingBtn?.addEventListener("click", async () => {
+  // If they aren't logged in, just open login
+  const { data } = await supabaseClient.auth.getSession();
+  const token = data?.session?.access_token;
+  if (!token) {
+    openLoginModal("login");
+    return;
+  }
+
+  signedInManageBillingBtn.disabled = true;
+  signedInManageBillingBtn.textContent = "Opening…";
+
+  try {
+    // IMPORTANT: replace this URL with your REAL portal function URL
+    // If your app.html uses a different endpoint for billing portal,
+    // copy that exact fetch call here.
+    const resp = await fetch(
+      "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/create-portal-link",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+          "apikey": SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          return_url: "https://zencardstudy.com/"
+        }),
+      }
+    );
+
+    const json = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(json.error || json.message || "Portal failed");
+    if (!json.url) throw new Error("No portal URL returned");
+
+    window.location.href = json.url;
+  } catch (e) {
+    console.error(e);
+    alert("Could not open billing portal. Check console.");
+  } finally {
+    signedInManageBillingBtn.disabled = false;
+    signedInManageBillingBtn.textContent = "Manage Billing";
+  }
+});
+
 
 lpGoBtn?.addEventListener("click", async () => {
   // safety re-check on click
@@ -1214,6 +1335,7 @@ lpLogoutBtn?.addEventListener("click", async () => {
 // Keep UI in sync when auth changes
 supabaseClient.auth.onAuthStateChange(() => {
   refreshLandingGate();
+  refreshSignedInBox();
 });
 
 // Initial draw
