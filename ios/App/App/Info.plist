@@ -29,6 +29,12 @@
 	<string>ZenCards needs access to your microphone for hands-free study</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>ZenCards uses speech recognition to understand your voice commands</string>
+	<key>Privacy - Bluetooth Always Usage Description
+Privacy - Bluetooth Always Usage Description
+Privacy- Bluetooth Always Usage Description</key>
+	<string>ZenCards uses Bluetooth audio devices such as AirPods, headphones, and CarPlay for hands-free studying.
+ZenCards uses Bluetooth audio devices such as AirPods, headphones, and CarPlay for hands-free studying.
+ZenCards uses Bluetooth audio devices such as airpods, headphones, and Carplay for hands-free studying. </string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
