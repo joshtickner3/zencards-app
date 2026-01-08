@@ -51,26 +51,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     private func configureAudioSession() {
         let session = AVAudioSession.sharedInstance()
         do {
-            try session.setCategory(
-                .playback,
-                mode: .spokenAudio,
-                options: [.allowBluetoothA2DP, .duckOthers]
-            )
-
-            try session.setActive(true, options: .notifyOthersOnDeactivation)
+            // Simple, “safe” background-playback config
+            try session.setCategory(.playback, options: [.mixWithOthers])
+            try session.setActive(true)
             print("✅ Background audio session configured")
         } catch {
             print("❌ Audio session error: \(error)")
         }
-    }
-
-    // Keep the audio session configured when we go to background / foreground.
-    func applicationDidEnterBackground(_ application: UIApplication) {
-        configureAudioSession()
-    }
-
-    func applicationDidBecomeActive(_ application: UIApplication) {
-        configureAudioSession()
     }
 
     // MARK: - URL / Deep Link Handling (Capacitor)
