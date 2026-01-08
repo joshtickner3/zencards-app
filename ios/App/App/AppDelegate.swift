@@ -14,47 +14,69 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
 
-        // Configure audio so WebView / TTS can keep playing in the background
+        // Configure audio so we are allowed to play in the background
         configureAudioSession()
 
-        // Ask for microphone permission
-        AVAudioSession.sharedInstance().requestRecordPermission { granted in
-            print("Microphone permission granted? \(granted)")
-        }
-
-        // Ask for speech-recognition permission
-        SFSpeechRecognizer.requestAuthorization { status in
-            print("Speech recognition authorization: \(status.rawValue)")
-        }
+        // Ask for mic + speech permissions
+        requestPermissions()
 
         // ✅ Enable pinch-zoom in the Capacitor WKWebView (iOS app)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            if let bridgeVC = self.window?.rootViewController as? CAPBridgeViewController,
-               let webView = bridgeVC.webView {
-                webView.scrollView.isScrollEnabled = true
-                webView.scrollView.pinchGestureRecognizer?.isEnabled = true
-            }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+            guard
+                let bridgeVC = self?.window?.rootViewController as? CAPBridgeViewController,
+                let webView = bridgeVC.webView
+            else { return }
+
+            webView.scrollView.isScrollEnabled = true
+            webView.scrollView.pinchGestureRecognizer?.isEnabled = true
         }
 
         return true
     }
 
+    // MARK: - Permissions
+
+    private func requestPermissions() {
+        AVAudioSession.sharedInstance().requestRecordPermission { granted in
+            print("Microphone permission granted? \(granted)")
+        }
+
+        SFSpeechRecognizer.requestAuthorization { status in
+            print("Speech recognition authorization: \(status.rawValue)")
+        }
+    }
+
     // MARK: - Audio Session
+
     private func configureAudioSession() {
         let session = AVAudioSession.sharedInstance()
         do {
             try session.setCategory(
-                .playback,
+                .playback,                  // ✅ tells iOS we're a playback / spoken-audio app
                 mode: .spokenAudio,
-                options: [.allowBluetoothA2DP]
+                options: [
+                    .allowBluetooth,
+                    .allowBluetoothA2DP,
+                    .duckOthers              // lower other audio instead of stopping it
+                ]
             )
-            try session.setActive(true)
-            print("✅ Global audio session set")
+
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
+            print("✅ Background audio session configured")
         } catch {
             print("❌ Audio session error: \(error)")
         }
     }
 
+    // Keep the audio session configured when we go to background / foreground.
+    // (If something ever deactivates it, we re-assert our category.)
+    func applicationDidEnterBackground(_ application: UIApplication) {
+        configureAudioSession()
+    }
+
+    func applicationDidBecomeActive(_ application: UIApplication) {
+        configureAudioSession()
+    }
 
     // MARK: - URL / Deep Link Handling (Capacitor)
     func application(
