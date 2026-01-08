@@ -2259,14 +2259,23 @@ function getDeckPhaseCounts(deck) {
     // ===================== TTS & STT =====================
     const statusDiv = document.getElementById("status");
     // Prefer native iOS TTS when running inside the Capacitor app
-const nativeTts =
-  window.Capacitor &&
-  window.Capacitor.Plugins &&
-  window.Capacitor.Plugins.NativeTTS
-    ? window.Capacitor.Plugins.NativeTTS
-    : null;
+// Prefer native iOS TTS when running inside the Capacitor app
+let nativeTts = null;
+
+if (window.Capacitor && window.Capacitor.Plugins) {
+  const p = window.Capacitor.Plugins;
+
+  // Try a few likely plugin IDs so we don't mismatch the Swift name
+  nativeTts =
+    p.NativeTTS ||
+    p.NativeTts ||
+    p.NativeTTSPlugin ||
+    null;
+}
 
 const isNativeApp = !!nativeTts;
+console.log("[BOOT] isNativeApp =", isNativeApp, "nativeTts =", nativeTts);
+
 
 // ========== RENDER HELPERS FOR IMAGES + MATH ==========
 
@@ -2581,8 +2590,9 @@ function speak(text, onEnd) {
     }
   }
 
-  // If we’re inside the iOS app and NativeTTS is available, use that first.
+   // If we’re inside the iOS app and NativeTTS is available, use that first.
   if (nativeTts) {
+    console.log("[TTS] Using NATIVE plugin TTS");
     speakGeneration++;
     const myGeneration = speakGeneration;
 
@@ -2591,8 +2601,8 @@ function speak(text, onEnd) {
 
     nativeTts
       .speak({
-        text,          // your Swift plugin should read this string
-        rate: ttsRate, // pass through your current rate
+        text,
+        rate: ttsRate,
         volume: ttsVolume,
       })
       .then(() => {
@@ -2602,7 +2612,7 @@ function speak(text, onEnd) {
         if (onEnd) onEnd();
       })
       .catch((err) => {
-        console.error("NativeTTS error, falling back to web TTS:", err);
+        console.error("[TTS] NativeTTS error, falling back to web TTS:", err);
         // Fallback to browser TTS if native fails
         speakWithWebTts(text, onEnd);
       });
@@ -2610,6 +2620,7 @@ function speak(text, onEnd) {
     return;
   }
 
+  console.log("[TTS] Using WEB speechSynthesis fallback");
   // Otherwise (web / simulator without plugin): use browser TTS
   speakWithWebTts(text, onEnd);
 }
