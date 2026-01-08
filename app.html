@@ -2258,6 +2258,16 @@ function getDeckPhaseCounts(deck) {
 
     // ===================== TTS & STT =====================
     const statusDiv = document.getElementById("status");
+    // Prefer native iOS TTS when running inside the Capacitor app
+const nativeTts =
+  window.Capacitor &&
+  window.Capacitor.Plugins &&
+  window.Capacitor.Plugins.NativeTTS
+    ? window.Capacitor.Plugins.NativeTTS
+    : null;
+
+const isNativeApp = !!nativeTts;
+
 // ========== RENDER HELPERS FOR IMAGES + MATH ==========
 
 // Takes card text (which may contain HTML/LaTeX) and renders it into an element.
@@ -2481,45 +2491,56 @@ if (answerDelayAfterSpeechSecInput) {
 
     // Helper: stop all audio + listening
     function stopAllAudio() {
-       speakGeneration++;
-       clearAnswerAfterSpeechDelay();
-      if (window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
-      isSpeaking = false;
+  // Bump generation so any in-flight TTS callbacks ignore their finish
+  speakGeneration++;
+  clearAnswerAfterSpeechDelay();
 
-      // Stop native plugin listener if we're using it
-      if (nativeVoicePlugin) {
-        try {
-          nativeVoicePlugin.stop();
-        } catch (e) {
-          console.error("Error stopping native voice plugin:", e);
-        }
-        nativeVoiceActiveCallback = null;
-      }
-
-      // Stop browser Web SpeechRecognition if used
-      if (recognition) {
-        try {
-          // make sure auto-restart doesn't fire while we're intentionally stopping
-          keepListening = false;
-          recognition.onresult = null;
-          recognition.onerror = null;
-          recognition.onend = null;
-          recognition.stop();
-        } catch (e) {
-          console.error("Error stopping recognition:", e);
-        }
-      }
+  // 🔊 Stop native iOS TTS (if present)
+  if (nativeTts) {
+    try {
+      nativeTts.stop();
+    } catch (e) {
+      console.error("Error stopping NativeTTS:", e);
     }
-
-  function speak(text, onEnd) {
-  if (!window.speechSynthesis) {
-    setStatus("Text-to-speech not supported in this browser.");
-    if (onEnd) onEnd();
-    return;
   }
 
+  // 🔊 Stop browser TTS
+  if (window.speechSynthesis) {
+    try {
+      window.speechSynthesis.cancel();
+    } catch (e) {
+      console.error("Error cancelling browser speech:", e);
+    }
+  }
+
+  isSpeaking = false;
+
+  // Stop native voice plugin (speech recognition)
+  if (nativeVoicePlugin) {
+    try {
+      nativeVoicePlugin.stop();
+    } catch (e) {
+      console.error("Error stopping native voice plugin:", e);
+    }
+    nativeVoiceActiveCallback = null;
+  }
+
+  // Stop browser Web SpeechRecognition
+  if (recognition) {
+    try {
+      keepListening = false;
+      recognition.onresult = null;
+      recognition.onerror = null;
+      recognition.onend = null;
+      recognition.stop();
+    } catch (e) {
+      console.error("Error stopping recognition:", e);
+    }
+  }
+}
+
+  // Wrapper: choose NativeTTS (iOS app) or browser TTS (web)
+function speak(text, onEnd) {
   // Always sync with the UI controls right before speaking,
   // so intro + cards all use the exact same volume & rate.
   if (ttsRateInput) {
@@ -2540,7 +2561,10 @@ if (answerDelayAfterSpeechSecInput) {
     try {
       nativeVoicePlugin.stop();
     } catch (e) {
-      console.error("Error stopping native voice plugin before speaking:", e);
+      console.error(
+        "Error stopping native voice plugin before speaking:",
+        e
+      );
     }
     nativeVoiceActiveCallback = null;
   }
@@ -2557,6 +2581,47 @@ if (answerDelayAfterSpeechSecInput) {
     }
   }
 
+  // If we’re inside the iOS app and NativeTTS is available, use that first.
+  if (nativeTts) {
+    speakGeneration++;
+    const myGeneration = speakGeneration;
+
+    isSpeaking = true;
+    setStatus("Speaking...");
+
+    nativeTts
+      .speak({
+        text,          // your Swift plugin should read this string
+        rate: ttsRate, // pass through your current rate
+        volume: ttsVolume,
+      })
+      .then(() => {
+        if (myGeneration !== speakGeneration) return;
+        isSpeaking = false;
+        setStatus("");
+        if (onEnd) onEnd();
+      })
+      .catch((err) => {
+        console.error("NativeTTS error, falling back to web TTS:", err);
+        // Fallback to browser TTS if native fails
+        speakWithWebTts(text, onEnd);
+      });
+
+    return;
+  }
+
+  // Otherwise (web / simulator without plugin): use browser TTS
+  speakWithWebTts(text, onEnd);
+}
+
+// Pure browser TTS (this is basically your old speak() body)
+function speakWithWebTts(text, onEnd) {
+  if (!window.speechSynthesis) {
+    setStatus("Text-to-speech not supported in this browser.");
+    if (onEnd) onEnd();
+    return;
+  }
+
   // 🧹 Clear any queued / half-finished utterances so we get a clean read.
   try {
     window.speechSynthesis.cancel();
@@ -2571,8 +2636,8 @@ if (answerDelayAfterSpeechSecInput) {
   const utt = new SpeechSynthesisUtterance(text);
 
   // Use the *same* volume & rate for intro, questions, and answers.
-  utt.rate   = ttsRate || 1.0;
-  utt.volume = (typeof ttsVolume === "number") ? ttsVolume : 1.0;
+  utt.rate = ttsRate || 1.0;
+  utt.volume = typeof ttsVolume === "number" ? ttsVolume : 1.0;
 
   utt.onstart = () => {
     if (myGeneration !== speakGeneration) return;
