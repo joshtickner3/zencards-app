@@ -8,7 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
-		3B05C9482F1028E5000CC4BC /* 1-second-of-silence 2.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 3B05C9472F1028E5000CC4BC /* 1-second-of-silence 2.mp3 */; };
+		3B05C9482F1028E5000CC4BC /* 1-second-of-silence-2.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 3B05C9472F1028E5000CC4BC /* 1-second-of-silence-2.mp3 */; };
 		3B7D02162EDE009400FF1514 /* VoiceCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B7D02152EDE009400FF1514 /* VoiceCommands.swift */; };
 		3B7D02192EDE04A500FF1514 /* VoiceCommandsPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = 3B7D02182EDE04A500FF1514 /* VoiceCommandsPlugin.m */; };
 		3B7D021B2EE4C54500FF1514 /* AudioRemotecontroller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B7D021A2EE4C53100FF1514 /* AudioRemotecontroller.swift */; };
@@ -26,7 +26,7 @@
 
 /* Begin PBXFileReference section */
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
-		3B05C9472F1028E5000CC4BC /* 1-second-of-silence 2.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "1-second-of-silence 2.mp3"; sourceTree = "<group>"; };
+		3B05C9472F1028E5000CC4BC /* 1-second-of-silence-2.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "1-second-of-silence-2.mp3"; sourceTree = "<group>"; };
 		3B06C3CD2EDD4B8200262198 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		3B7D02152EDE009400FF1514 /* VoiceCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCommands.swift; sourceTree = "<group>"; };
 		3B7D02172EDE04A500FF1514 /* App-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "App-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -89,7 +89,7 @@
 		504EC3061FED79650016851F /* App */ = {
 			isa = PBXGroup;
 			children = (
-				3B05C9472F1028E5000CC4BC /* 1-second-of-silence 2.mp3 */,
+				3B05C9472F1028E5000CC4BC /* 1-second-of-silence-2.mp3 */,
 				3B7D021A2EE4C53100FF1514 /* AudioRemotecontroller.swift */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
@@ -186,7 +186,7 @@
 				50B271D11FEDC1A000F3C39B /* public in Resources */,
 				504EC30F1FED79650016851F /* Assets.xcassets in Resources */,
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
-				3B05C9482F1028E5000CC4BC /* 1-second-of-silence 2.mp3 in Resources */,
+				3B05C9482F1028E5000CC4BC /* 1-second-of-silence-2.mp3 in Resources */,
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
 				2FAD9763203C412B000D30F8 /* config.xml in Resources */,
 			);
