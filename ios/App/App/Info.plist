@@ -36,6 +36,7 @@ ZenCards uses Bluetooth audio devices such as airpods, headphones, and Carplay f
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>App plays audio or streams audio using Airplay</string>
+		<string>audio</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
