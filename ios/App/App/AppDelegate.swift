@@ -14,13 +14,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
 
-        // Configure audio so we are allowed to play in the background
+        // Configure audio so we’re allowed to play in the background
         configureAudioSession()
 
         // Ask for mic + speech permissions
         requestPermissions()
 
-        // ✅ Enable pinch-zoom in the Capacitor WKWebView (iOS app)
+        // Enable pinch-zoom in the Capacitor WKWebView (iOS app)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
             guard
                 let bridgeVC = self?.window?.rootViewController as? CAPBridgeViewController,
@@ -52,13 +52,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         let session = AVAudioSession.sharedInstance()
         do {
             try session.setCategory(
-                .playback,                  // ✅ tells iOS we're a playback / spoken-audio app
+                .playback,
                 mode: .spokenAudio,
-                options: [
-                    .allowBluetooth,
-                    .allowBluetoothA2DP,
-                    .duckOthers              // lower other audio instead of stopping it
-                ]
+                options: [.allowBluetoothA2DP, .duckOthers]
             )
 
             try session.setActive(true, options: .notifyOthersOnDeactivation)
@@ -69,7 +65,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     // Keep the audio session configured when we go to background / foreground.
-    // (If something ever deactivates it, we re-assert our category.)
     func applicationDidEnterBackground(_ application: UIApplication) {
         configureAudioSession()
     }
@@ -79,15 +74,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     // MARK: - URL / Deep Link Handling (Capacitor)
+
     func application(
         _ app: UIApplication,
         open url: URL,
         options: [UIApplication.OpenURLOptionsKey : Any] = [:]
     ) -> Bool {
-        return ApplicationDelegateProxy.shared.application(
-            app,
-            open: url,
-            options: options
-        )
+        return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
     }
 }
