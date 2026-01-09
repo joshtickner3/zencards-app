@@ -12,6 +12,17 @@
   <!-- MathJax for rendering LaTeX equations in cards -->
    <script>
     console.log("APP VERSION:", "2026-01-04 10:33am");
+    const isNativeIOS =
+  window.Capacitor &&
+  typeof window.Capacitor.getPlatform === 'function' &&
+  window.Capacitor.getPlatform() === 'ios' &&
+  window.Capacitor.Plugins &&
+  !!window.Capacitor.Plugins.NativeAudioPlayer;
+
+const NativeAudioPlayer = isNativeIOS
+  ? window.Capacitor.Plugins.NativeAudioPlayer
+  : null;
+
 
     
   window.MathJax = {
@@ -1006,6 +1017,161 @@ const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
     storageKey: "zencards-auth",
   },
 });
+
+const TTS_FUNCTION_URL =
+  "https://elpfcnnrripftxoqeckv.functions.supabase.co/tts-generate";
+
+// Simple in-memory cache so we don't call TTS twice
+const cardAudioCache = {}; // key: cardId-side-voice-speed → url
+
+async function getOrGenerateAudio(card, side) {
+  const voice = "female_1";    // tweak as needed
+  const speed = 1.0;
+
+  const key = `${card.id}-${side}-${voice}-${speed}`;
+  if (cardAudioCache[key]) return cardAudioCache[key];
+
+  const resp = await fetch(TTS_FUNCTION_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      cardId: card.id,
+      side,
+      text: side === "question" ? card.question : card.answer,
+      voice,
+      speed,
+    }),
+  });
+
+  const data = await resp.json();
+
+  if (!resp.ok) {
+    console.error("TTS error", data);
+    throw new Error("TTS failed");
+  }
+
+  cardAudioCache[key] = data.audio_url;
+  return data.audio_url;
+}
+async function playWithNativeAudioPlayer(cards) {
+  if (!isNativeIOS) {
+    console.warn("NativeAudioPlayer not available; falling back to web TTS");
+    return playWithWebTTS(cards);
+  }
+
+  // Build initial batch (e.g., first 10 cards)
+  const BATCH_SIZE = 10;
+  const initialCards = cards.slice(0, BATCH_SIZE);
+
+  const urls = [];
+  for (const card of initialCards) {
+    const qUrl = await getOrGenerateAudio(card, "question");
+    const aUrl = await getOrGenerateAudio(card, "answer");
+    urls.push(qUrl, aUrl);
+  }
+
+  await NativeAudioPlayer.setQueue({ urls });
+  await NativeAudioPlayer.play();
+
+  // Set up listeners once
+  setupNativeAudioListeners(cards);
+}
+
+// Single entry point: decides native iOS vs normal web behavior
+async function startDeckPlayback(cards) {
+  if (isNativeIOS) {
+    // iOS app → use native audio queue (background-capable)
+    await playWithNativeAudioPlayer(cards);
+  } else {
+    // Website / simulator → keep your existing behavior
+    await playWithWebTTS(cards);
+  }
+}
+
+let currentAudioIndex = 0; // 0 = first question audio in queue
+let currentCardIndex = 0;  // 0 = first card
+let lastNextTapTime = 0;
+let tapCount = 0;
+
+async function maybePrefetchMore(cards) {
+  if (!isNativeIOS) return;
+
+  const PREFETCH_AHEAD = 4; // when fewer than 4 cards remain, fetch more
+
+  const cardsRemaining = cards.length - currentCardIndex - 1;
+  if (cardsRemaining > PREFETCH_AHEAD) return;
+
+  const start = currentCardIndex + 1;
+  const end = Math.min(cards.length, start + 8);
+  const nextBatch = cards.slice(start, end);
+
+  const urls = [];
+  for (const card of nextBatch) {
+    const qUrl = await getOrGenerateAudio(card, "question");
+    const aUrl = await getOrGenerateAudio(card, "answer");
+    urls.push(qUrl, aUrl);
+  }
+
+  if (urls.length > 0) {
+    await NativeAudioPlayer.enqueue({ urls });
+  }
+}
+
+
+function setupNativeAudioListeners(cards) {
+  if (!isNativeIOS) return;
+
+  NativeAudioPlayer.addListener("trackEnded", (info) => {
+    currentAudioIndex = info.index || (currentAudioIndex + 1);
+
+    // Every card has 2 audio tracks: question (even) and answer (odd)
+    const cardIndex = Math.floor(currentAudioIndex / 2);
+    const isAnswer = currentAudioIndex % 2 === 1;
+
+    if (isAnswer) {
+      // Just finished answer → now we rate & move to next card
+      currentCardIndex = cardIndex;
+      maybePrefetchMore(cards);
+    }
+  });
+
+  NativeAudioPlayer.addListener("remoteCommand", (info) => {
+    const type = info.type;
+    if (type === "next") {
+      handleNextTapAsRating(cards);
+    }
+    // "play" and "pause" can be handled if you want to sync UI
+  });
+}
+
+function handleNextTapAsRating(cards) {
+  const now = Date.now();
+  const delta = now - lastNextTapTime;
+
+  if (delta < 700) {
+    tapCount += 1;
+  } else {
+    tapCount = 1;
+  }
+
+  lastNextTapTime = now;
+
+  setTimeout(() => {
+    if (tapCount === 1) {
+      rateCurrentCard(cards[currentCardIndex], "good"); // 1 tap
+    } else if (tapCount >= 2) {
+      rateCurrentCard(cards[currentCardIndex], "easy"); // 2 taps
+    }
+    tapCount = 0;
+  }, 500);
+}
+
+// You already have SRS logic; just hook into it:
+function rateCurrentCard(card, rating) {
+  // Your existing code: update SRS schedule, save to Supabase, etc.
+}
+
+
 
 window.supabaseClient = supabaseClient;
 window.setSyncLock = window.setSyncLock || function () {};
@@ -4663,15 +4829,26 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
       voiceUI.classList.remove("hidden");
       silentUI.classList.add("hidden");
 
-      showStudySection("voice");
-      const intro = autoGoodMode
-        ? describeAutoIntro()
-        : "Starting hands free study session. I will read a question, then the answer, then ask how hard it was.";
-      setStudyState(StudyState.IDLE);
-      speak(intro, () => {
-        runVoiceLoop();
-      });
-    });
+      
+  showStudySection("voice");
+  const intro = autoGoodMode
+    ? describeAutoIntro()
+    : "Starting hands free study session. I will read a question, then the answer, then ask how hard it was.";
+  setStudyState(StudyState.IDLE);
+
+  // 🔹 Build the card list for this session (same logic runVoiceLoop uses)
+  const cardsForSession = getDueCardsForDeck(currentDeckId, false, true);
+
+  speak(intro, () => {
+    // 🔹 On native iOS → use background-capable queue
+    if (isNativeIOS) {
+      startDeckPlayback(cardsForSession);
+    } else {
+      // 🔹 On web / simulator → keep existing behavior
+      runVoiceLoop();
+    }
+  });
+});
     // <<< END MODIFIED HANDLER <<<
 
     if (studyInstructionsBtn) {
