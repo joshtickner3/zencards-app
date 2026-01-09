@@ -12,18 +12,6 @@
   <!-- MathJax for rendering LaTeX equations in cards -->
    <script>
     console.log("APP VERSION:", "2026-01-04 10:33am");
-    const isNativeIOS =
-  window.Capacitor &&
-  typeof window.Capacitor.getPlatform === 'function' &&
-  window.Capacitor.getPlatform() === 'ios' &&
-  window.Capacitor.Plugins &&
-  !!window.Capacitor.Plugins.NativeAudioPlayer;
-
-const NativeAudioPlayer = isNativeIOS
-  ? window.Capacitor.Plugins.NativeAudioPlayer
-  : null;
-
-
     
   window.MathJax = {
     startup: {
@@ -1053,6 +1041,26 @@ async function getOrGenerateAudio(card, side) {
   cardAudioCache[key] = data.audio_url;
   return data.audio_url;
 }
+
+// ---- NativeAudioPlayer plugin detection (for background audio) ----
+let NativeAudioPlayer = null;
+let isNativeIOS = false;
+
+if (window.Capacitor && window.Capacitor.Plugins) {
+  NativeAudioPlayer = window.Capacitor.Plugins.NativeAudioPlayer || null;
+
+  // If running inside the native app and the plugin exists, treat as iOS
+  if (
+    typeof window.Capacitor.isNativePlatform === "function" &&
+    NativeAudioPlayer
+  ) {
+    isNativeIOS = window.Capacitor.isNativePlatform();
+  } else {
+    // fallback heuristic: if plugin exists at all, treat as native iOS
+    isNativeIOS = !!NativeAudioPlayer;
+  }
+}
+
 async function playWithNativeAudioPlayer(cards) {
   if (!isNativeIOS) {
     console.warn("NativeAudioPlayer not available; falling back to web TTS");
@@ -2677,6 +2685,16 @@ if (answerDelayAfterSpeechSecInput) {
     } catch (e) {
       console.error("Error stopping NativeTTS:", e);
     }
+  }
+   if (isNativeIOS && NativeAudioPlayer) {
+    try {
+      NativeAudioPlayer.stop();   // or pause(), depending on your plugin
+    } catch (e) {
+      console.error("Error stopping NativeAudioPlayer:", e);
+    }
+    // Optional: reset indices so a new session starts fresh
+    currentAudioIndex = 0;
+    currentCardIndex = 0;
   }
 
   // 🔊 Stop browser TTS
