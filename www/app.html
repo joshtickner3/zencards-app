@@ -763,6 +763,10 @@ input[type="number"]:focus{
           <button id="startVoiceBtn">Start Hands-Free Study</button>
           <button id="startSilentBtn" class="secondary">Start Silent Study</button>
         </div>
+        <button id="debugNativeQueueBtn" class="secondary small" type="button">
+  Debug Native Queue
+</button>
+
 
         <button id="openInstructionsBtn" class="secondary small" type="button">
   Instructions / Voice Commands
@@ -1060,10 +1064,26 @@ if (window.Capacitor && window.Capacitor.Plugins) {
     isNativeIOS = !!NativeAudioPlayer;
   }
 }
+console.log(
+  "[NativeAudio] detection => isNativeIOS =",
+  isNativeIOS,
+  "NativeAudioPlayer present =",
+  !!NativeAudioPlayer
+);
+
 
 async function playWithNativeAudioPlayer(cards) {
-  if (!isNativeIOS) {
-    console.warn("NativeAudioPlayer not available; falling back to web TTS");
+  console.log(
+    "[NativeAudio] playWithNativeAudioPlayer called. isNativeIOS =",
+    isNativeIOS,
+    "cards.length =",
+    cards ? cards.length : 0
+  );
+
+  if (!isNativeIOS || !NativeAudioPlayer) {
+    console.warn(
+      "[NativeAudio] NativeAudioPlayer not available; falling back to web TTS"
+    );
     return playWithWebTTS(cards);
   }
 
@@ -1077,6 +1097,11 @@ async function playWithNativeAudioPlayer(cards) {
     const aUrl = await getOrGenerateAudio(card, "answer");
     urls.push(qUrl, aUrl);
   }
+
+  console.log(
+    "[NativeAudio] Initial queue URLs count =",
+    urls.length
+  );
 
   await NativeAudioPlayer.setQueue({ urls });
   await NativeAudioPlayer.play();
@@ -1127,14 +1152,23 @@ async function maybePrefetchMore(cards) {
 
 
 function setupNativeAudioListeners(cards) {
-  if (!isNativeIOS) return;
+  if (!isNativeIOS || !NativeAudioPlayer) return;
+
+  console.log("[NativeAudio] Setting up listeners");
 
   NativeAudioPlayer.addListener("trackEnded", (info) => {
-    currentAudioIndex = info.index || (currentAudioIndex + 1);
+    currentAudioIndex = info.index ?? (currentAudioIndex + 1);
 
     // Every card has 2 audio tracks: question (even) and answer (odd)
     const cardIndex = Math.floor(currentAudioIndex / 2);
     const isAnswer = currentAudioIndex % 2 === 1;
+
+    console.log(
+      "[NativeAudio] trackEnded:",
+      "index =", currentAudioIndex,
+      "cardIndex =", cardIndex,
+      "isAnswer =", isAnswer
+    );
 
     if (isAnswer) {
       // Just finished answer → now we rate & move to next card
@@ -1145,6 +1179,8 @@ function setupNativeAudioListeners(cards) {
 
   NativeAudioPlayer.addListener("remoteCommand", (info) => {
     const type = info.type;
+    console.log("[NativeAudio] remoteCommand:", type);
+
     if (type === "next") {
       handleNextTapAsRating(cards);
     }
@@ -3034,6 +3070,8 @@ const autoEnterStudyAheadCheckbox = document.getElementById("autoEnterStudyAhead
 const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
     const startVoiceBtn = document.getElementById("startVoiceBtn");
     const startSilentBtn = document.getElementById("startSilentBtn");
+    const debugNativeQueueBtn = document.getElementById("debugNativeQueueBtn");
+
 
     const silentUI = document.getElementById("silentUI");
     const silentQuestion = document.getElementById("silentQuestion");
@@ -4901,7 +4939,39 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
     hasLoadedRemote = false;
   }
 })();
+if (debugNativeQueueBtn) {
+  debugNativeQueueBtn.addEventListener("click", async () => {
+    if (!selectedDeckId) {
+      alert("Please select a deck first.");
+      return;
+    }
 
+    const allowAhead = true;
+    const includeOverdue = true;
+    const cards = getDueCardsForDeck(selectedDeckId, allowAhead, includeOverdue);
+
+    if (!cards || cards.length === 0) {
+      alert("No cards available in this deck.");
+      return;
+    }
+
+    const sessionCards = cards.slice(0, 10);
+
+    console.log("[DEBUG] Debug Native Queue button clicked", {
+      isNativeIOS,
+      NativeAudioPlayerPresent: !!NativeAudioPlayer,
+      totalCards: cards.length,
+      sessionCards: sessionCards.length,
+    });
+
+    try {
+      await startDeckPlayback(sessionCards);
+    } catch (e) {
+      console.error("[DEBUG] startDeckPlayback failed:", e);
+      alert("startDeckPlayback failed – see console for details.");
+    }
+  });
+}
 
   </script>
 </body>
