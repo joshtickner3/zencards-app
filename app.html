@@ -4941,7 +4941,6 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
 })();
 if (debugNativeQueueBtn) {
   debugNativeQueueBtn.addEventListener("click", async () => {
-    if (!selectedDeckId) {
     // 1) Make sure we’re actually running inside the native iOS app
     if (!isNativeIOS || !NativeAudioPlayer) {
       alert(
@@ -5005,7 +5004,6 @@ if (debugNativeQueueBtn) {
     }
   });
 }
-
 
   </script>
 </body>
