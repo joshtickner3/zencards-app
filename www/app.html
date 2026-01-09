@@ -4976,33 +4976,34 @@ if (debugNativeQueueBtn) {
 
     const sessionCards = deck.cards.slice(0, Math.min(10, deck.cards.length));
 
+     try {
+    await startDeckPlayback(sessionCards);
+    alert("✅ startDeckPlayback() finished without throwing.");
+  } catch (e) {
+    console.error("[DEBUG] startDeckPlayback failed:", e);
+
+    let msg = "";
     try {
-      alert(
-        "Debug Native Queue:\n\n" +
-        `isNativeIOS = ${isNativeIOS}\n` +
-        `NativeAudioPlayer present = ${!!NativeAudioPlayer}\n` +
-        `Deck = ${deck.name}\n` +
-        `Cards in batch = ${sessionCards.length}\n\n` +
-        "If audio doesn't start, you'll see another alert with the error."
-      );
-
-      await startDeckPlayback(sessionCards);
-    } catch (e) {
-      let msg = "";
-      if (e && typeof e === "object") {
-        msg = e.message || JSON.stringify(e);
+      if (!e) {
+        msg = "No error object (e is null/undefined)";
+      } else if (typeof e === "string") {
+        msg = e;
+      } else if (e.message) {
+        msg = e.message;
       } else {
-        msg = String(e);
+        msg = JSON.stringify(e);
       }
-
-      alert(
-        "startDeckPlayback failed.\n\n" +
-        `Error: ${msg}\n\n` +
-        "If you can, also open Safari's Web Inspector on the device/simulator\n" +
-        "to see console logs from app.html."
-      );
+    } catch (jsonErr) {
+      msg = "Could not stringify error";
     }
-  });
+
+    alert(
+      "startDeckPlayback failed.\n\n" +
+      "Raw type: " + (e ? typeof e : "null") + "\n\n" +
+      "Details: " + msg
+    );
+  }
+});
 }
 
   </script>
