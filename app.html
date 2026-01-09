@@ -4942,36 +4942,70 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
 if (debugNativeQueueBtn) {
   debugNativeQueueBtn.addEventListener("click", async () => {
     if (!selectedDeckId) {
-      alert("Please select a deck first.");
+    // 1) Make sure we’re actually running inside the native iOS app
+    if (!isNativeIOS || !NativeAudioPlayer) {
+      alert(
+        "NativeAudioPlayer not available.\n\n" +
+        "This debug button is only meaningful in the iOS app build " +
+        "(Capacitor WebView). If you're testing in a normal browser, " +
+        "it will just fall back to web TTS."
+      );
+      // Still try web TTS so you can see *something* happen
+      const deckId = selectedDeckId || getLastDeckId();
+      const deck = deckId ? getDeckById(deckId) : null;
+      if (!deck || !deck.cards || deck.cards.length === 0) {
+        alert("No cards in the current deck.");
+        return;
+      }
+      const webCards = deck.cards.slice(0, Math.min(10, deck.cards.length));
+      await playWithWebTTS(webCards);
       return;
     }
 
-    const allowAhead = true;
-    const includeOverdue = true;
-    const cards = getDueCardsForDeck(selectedDeckId, allowAhead, includeOverdue);
+    // 2) Use the CURRENTLY SELECTED DECK, not a nonexistent `cards` array
+    const deckId = selectedDeckId || getLastDeckId();
+    const deck = deckId ? getDeckById(deckId) : null;
 
-    if (!cards || cards.length === 0) {
-      alert("No cards available in this deck.");
+    if (!deck) {
+      alert("Select a deck first so I know which cards to play.");
+      return;
+    }
+    if (!deck.cards || deck.cards.length === 0) {
+      alert(`Deck "${deck.name}" has no cards yet.`);
       return;
     }
 
-    const sessionCards = cards.slice(0, 10);
-
-    console.log("[DEBUG] Debug Native Queue button clicked", {
-      isNativeIOS,
-      NativeAudioPlayerPresent: !!NativeAudioPlayer,
-      totalCards: cards.length,
-      sessionCards: sessionCards.length,
-    });
+    const sessionCards = deck.cards.slice(0, Math.min(10, deck.cards.length));
 
     try {
+      alert(
+        "Debug Native Queue:\n\n" +
+        `isNativeIOS = ${isNativeIOS}\n` +
+        `NativeAudioPlayer present = ${!!NativeAudioPlayer}\n` +
+        `Deck = ${deck.name}\n` +
+        `Cards in batch = ${sessionCards.length}\n\n` +
+        "If audio doesn't start, you'll see another alert with the error."
+      );
+
       await startDeckPlayback(sessionCards);
     } catch (e) {
-      console.error("[DEBUG] startDeckPlayback failed:", e);
-      alert("startDeckPlayback failed – see console for details.");
+      let msg = "";
+      if (e && typeof e === "object") {
+        msg = e.message || JSON.stringify(e);
+      } else {
+        msg = String(e);
+      }
+
+      alert(
+        "startDeckPlayback failed.\n\n" +
+        `Error: ${msg}\n\n` +
+        "If you can, also open Safari's Web Inspector on the device/simulator\n" +
+        "to see console logs from app.html."
+      );
     }
   });
 }
+
 
   </script>
 </body>
