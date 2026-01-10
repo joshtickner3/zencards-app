@@ -1047,8 +1047,27 @@ async function getOrGenerateAudio(card, side) {
 }
 
 // ---- NativeAudioPlayer plugin detection (for background audio) ----
-let NativeAudioPlayer = null;
+// === Native iOS / plugin detection ===
 let isNativeIOS = false;
+let NativeAudioPlayer = null;
+
+function detectNativeEnvironment() {
+  const cap = window.Capacitor;
+  const plugins = cap && cap.Plugins;
+
+  NativeAudioPlayer = plugins && plugins.NativeAudioPlayer ? plugins.NativeAudioPlayer : null;
+  isNativeIOS = !!NativeAudioPlayer;
+
+  console.log("[DEBUG] Native environment detection:", {
+    capPresent: !!cap,
+    hasPlugins: !!plugins,
+    hasNativeAudioPlayer: !!NativeAudioPlayer,
+    isNativeIOS,
+  });
+}
+
+// Call this once during startup (e.g. at the top of init())
+detectNativeEnvironment();
 
 if (window.Capacitor && window.Capacitor.Plugins) {
   NativeAudioPlayer = window.Capacitor.Plugins.NativeAudioPlayer || null;
@@ -4939,6 +4958,19 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
     hasLoadedRemote = false;
   }
 })();
+
+// Temporary stub so the debug button doesn't crash when we're not native
+async function playWithWebTTS(cards) {
+  console.log("[DEBUG] playWithWebTTS stub called", {
+    count: Array.isArray(cards) ? cards.length : 0,
+  });
+  alert(
+    "playWithWebTTS stub called.\n\n" +
+    "This means the NativeAudioPlayer plugin is NOT visible yet " +
+    "so the debug button is falling back to 'web TTS' mode."
+  );
+}
+
 if (debugNativeQueueBtn) {
   debugNativeQueueBtn.addEventListener("click", async () => {
     // 1) Make sure we’re actually running inside the native iOS app
