@@ -1015,6 +1015,52 @@ const TTS_FUNCTION_URL =
 
 // Simple in-memory cache so we don't call TTS twice
 const cardAudioCache = {}; // key: cardId-side-voice-speed → url
+// --- Make sure our native plugins are registered on the JS side ---
+// ---- Native plugins / environment wiring ----
+let isNativeIOS = false;
+let NativeAudioPlayer = null;
+
+function setupNativePlugins() {
+  const cap = window.Capacitor;
+
+  if (!cap || typeof cap.registerPlugin !== "function") {
+    console.warn("[NativeEnv] Capacitor not ready yet");
+    isNativeIOS = false;
+    NativeAudioPlayer = null;
+    return;
+  }
+
+  // Ensure Plugins object exists
+  cap.Plugins = cap.Plugins || {};
+
+  // VoiceCommands native plugin
+  if (!cap.Plugins.VoiceCommands) {
+    cap.Plugins.VoiceCommands = cap.registerPlugin("VoiceCommands");
+    console.log("[Plugins] Registered VoiceCommands plugin");
+  }
+
+  // NativeAudioPlayer native plugin
+  if (!cap.Plugins.NativeAudioPlayer) {
+    cap.Plugins.NativeAudioPlayer = cap.registerPlugin("NativeAudioPlayer");
+    console.log("[Plugins] Registered NativeAudioPlayer plugin");
+  }
+
+  NativeAudioPlayer = cap.Plugins.NativeAudioPlayer || null;
+
+  isNativeIOS =
+    !!NativeAudioPlayer &&
+    typeof cap.isNativePlatform === "function" &&
+    cap.isNativePlatform() &&
+    typeof cap.getPlatform === "function" &&
+    cap.getPlatform() === "ios";
+
+  console.log("[NativeEnv] setup complete", {
+    plugins: Object.keys(cap.Plugins || {}),
+    isNativeIOS,
+    hasNativeAudioPlayer: !!NativeAudioPlayer,
+  });
+}
+
 
 async function getOrGenerateAudio(card, side) {
   const voice = "female_1";    // tweak as needed
@@ -1048,26 +1094,6 @@ async function getOrGenerateAudio(card, side) {
 
 // ---- NativeAudioPlayer plugin detection (for background audio) ----
 // === Native iOS / plugin detection ===
-let isNativeIOS = false;
-let NativeAudioPlayer = null;
-
-function detectNativeEnvironment() {
-  const cap = window.Capacitor;
-  const plugins = cap && cap.Plugins;
-
-  NativeAudioPlayer = plugins && plugins.NativeAudioPlayer ? plugins.NativeAudioPlayer : null;
-  isNativeIOS = !!NativeAudioPlayer;
-
-  console.log("[DEBUG] Native environment detection:", {
-    capPresent: !!cap,
-    hasPlugins: !!plugins,
-    hasNativeAudioPlayer: !!NativeAudioPlayer,
-    isNativeIOS,
-  });
-}
-
-// Call this once during startup (e.g. at the top of init())
-detectNativeEnvironment();
 
 async function playWithNativeAudioPlayer(cards) {
   console.log(
@@ -4912,6 +4938,7 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
 
  (async function init() {
   loadFromStorage();
+    setupNativePlugins();
 
   try {
     const { data: { session }, error } = await supabaseClient.auth.getSession();

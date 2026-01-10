@@ -4,8 +4,9 @@ import AVFoundation
 import Speech
 import MediaPlayer
 
-@objc(VoiceCommands)
-public class VoiceCommands: CAPPlugin {
+@objc(VoiceCommandsPlugin)
+public class VoiceCommandsPlugin: CAPPlugin {
+
 
     private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
     private let audioEngine = AVAudioEngine()
