@@ -1069,28 +1069,6 @@ function detectNativeEnvironment() {
 // Call this once during startup (e.g. at the top of init())
 detectNativeEnvironment();
 
-if (window.Capacitor && window.Capacitor.Plugins) {
-  NativeAudioPlayer = window.Capacitor.Plugins.NativeAudioPlayer || null;
-
-  // If running inside the native app and the plugin exists, treat as iOS
-  if (
-    typeof window.Capacitor.isNativePlatform === "function" &&
-    NativeAudioPlayer
-  ) {
-    isNativeIOS = window.Capacitor.isNativePlatform();
-  } else {
-    // fallback heuristic: if plugin exists at all, treat as native iOS
-    isNativeIOS = !!NativeAudioPlayer;
-  }
-}
-console.log(
-  "[NativeAudio] detection => isNativeIOS =",
-  isNativeIOS,
-  "NativeAudioPlayer present =",
-  !!NativeAudioPlayer
-);
-
-
 async function playWithNativeAudioPlayer(cards) {
   console.log(
     "[NativeAudio] playWithNativeAudioPlayer called. isNativeIOS =",
