@@ -31,6 +31,7 @@
 		3B05C9472F1028E5000CC4BC /* 1-second-of-silence-2.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "1-second-of-silence-2.mp3"; sourceTree = "<group>"; };
 		3B05C9492F104120000CC4BC /* NativeAudioPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAudioPlayer.swift; sourceTree = "<group>"; };
 		3B05C94B2F1042FC000CC4BC /* NativeAudioPlayerPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = NativeAudioPlayerPlugin.m; sourceTree = "<group>"; };
+		3B05C94E2F12C711000CC4BC /* NativeAudioPlayerPlugin.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NativeAudioPlayerPlugin.h; sourceTree = "<group>"; };
 		3B06C3CD2EDD4B8200262198 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		3B7D02152EDE009400FF1514 /* VoiceCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCommands.swift; sourceTree = "<group>"; };
 		3B7D02172EDE04A500FF1514 /* App-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "App-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -112,6 +113,7 @@
 				3B7D021F2EE8BDE400FF1514 /* NativeTTSPlugin.m */,
 				3B05C9492F104120000CC4BC /* NativeAudioPlayer.swift */,
 				3B05C94B2F1042FC000CC4BC /* NativeAudioPlayerPlugin.m */,
+				3B05C94E2F12C711000CC4BC /* NativeAudioPlayerPlugin.h */,
 			);
 			path = App;
 			sourceTree = "<group>";

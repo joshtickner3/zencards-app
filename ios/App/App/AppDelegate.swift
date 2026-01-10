@@ -21,6 +21,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         requestPermissions()
 
         // Enable pinch-zoom in the Capacitor WKWebView (iOS app)
+        // Enable pinch-zoom...
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
             guard
                 let bridgeVC = self?.window?.rootViewController as? CAPBridgeViewController,
@@ -33,6 +34,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
         return true
     }
+
 
     // MARK: - Permissions
 
