@@ -1023,55 +1023,49 @@ let NativeAudioPlayer = null;
 
 function setupNativePlugins() {
   const cap = window.Capacitor;
-
   if (!cap || !cap.Plugins) {
-    console.warn("[NativeEnv] Capacitor not ready yet (no Plugins object)");
+    console.warn("[NativeEnv] Capacitor not ready yet (no Capacitor or Plugins object)");
     isNativeIOS = false;
     NativeAudioPlayer = null;
     return;
   }
 
-  // Prefer any plugin proxies that the native runtime already registered
-  const hasRegister = typeof cap.registerPlugin === "function";
+  const plugins = cap.Plugins;
 
-  // ----- VoiceCommands -----
-  if (!cap.Plugins.VoiceCommands) {
-    if (hasRegister) {
-      cap.Plugins.VoiceCommands = cap.registerPlugin("VoiceCommands");
-      console.log("[Plugins] Registered VoiceCommands via registerPlugin()");
-    } else {
-      console.log(
-        "[Plugins] VoiceCommands plugin not found and registerPlugin() missing"
-      );
-    }
+  // --- VoiceCommands native plugin ---
+  let vc = plugins.VoiceCommands;
+  if (!vc && typeof cap.registerPlugin === "function") {
+    vc = cap.registerPlugin("VoiceCommands");
+    plugins.VoiceCommands = vc;
+    console.log("[Plugins] Registered VoiceCommands via registerPlugin()");
+  } else if (vc) {
+    console.log("[Plugins] Found native VoiceCommands plugin");
   } else {
-    console.log("[Plugins] Found existing VoiceCommands plugin proxy");
+    console.warn("[Plugins] VoiceCommands plugin missing in native bridge");
   }
 
-  // ----- NativeAudioPlayer -----
-  if (!cap.Plugins.NativeAudioPlayer) {
-    if (hasRegister) {
-      cap.Plugins.NativeAudioPlayer = cap.registerPlugin("NativeAudioPlayer");
-      console.log("[Plugins] Registered NativeAudioPlayer via registerPlugin()");
-    } else {
-      console.log(
-        "[Plugins] NativeAudioPlayer plugin not found and registerPlugin() missing"
-      );
-    }
+  // --- NativeAudioPlayer native plugin ---
+  let nap = plugins.NativeAudioPlayer;
+  if (!nap && typeof cap.registerPlugin === "function") {
+    nap = cap.registerPlugin("NativeAudioPlayer");
+    plugins.NativeAudioPlayer = nap;
+    console.log("[Plugins] Registered NativeAudioPlayer via registerPlugin()");
+  } else if (nap) {
+    console.log("[Plugins] Found native NativeAudioPlayer plugin");
   } else {
-    console.log("[Plugins] Found existing NativeAudioPlayer plugin proxy");
+    console.warn("[Plugins] NativeAudioPlayer plugin missing in native bridge");
   }
 
-  NativeAudioPlayer = cap.Plugins.NativeAudioPlayer || null;
+  NativeAudioPlayer = nap || null;
 
-  // Are we actually inside the iOS native app?
   isNativeIOS =
     !!NativeAudioPlayer &&
-    typeof cap.getPlatform === "function" &&
-    cap.getPlatform() === "ios";
+    typeof cap.isNativePlatform === "function" &&
+    cap.isNativePlatform() &&
+    (typeof cap.getPlatform !== "function" || cap.getPlatform() === "ios");
 
   console.log("[NativeEnv] setup complete", {
-    plugins: Object.keys(cap.Plugins || {}),
+    plugins: Object.keys(plugins || {}),
     isNativeIOS,
     hasNativeAudioPlayer: !!NativeAudioPlayer,
   });
