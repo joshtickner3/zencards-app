@@ -10,6 +10,7 @@
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		3B05C9482F1028E5000CC4BC /* 1-second-of-silence-2.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 3B05C9472F1028E5000CC4BC /* 1-second-of-silence-2.mp3 */; };
 		3B05C94A2F104121000CC4BC /* NativeAudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B05C9492F104120000CC4BC /* NativeAudioPlayer.swift */; };
+		3B05C9502F141719000CC4BC /* PluginViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B05C94F2F141719000CC4BC /* PluginViewController.swift */; };
 		3B7D02162EDE009400FF1514 /* VoiceCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B7D02152EDE009400FF1514 /* VoiceCommands.swift */; };
 		3B7D021B2EE4C54500FF1514 /* AudioRemotecontroller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B7D021A2EE4C53100FF1514 /* AudioRemotecontroller.swift */; };
 		3B7D021D2EE8BD3E00FF1514 /* NativeTTS.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B7D021C2EE8BD3E00FF1514 /* NativeTTS.swift */; };
@@ -30,6 +31,7 @@
 		3B05C9492F104120000CC4BC /* NativeAudioPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAudioPlayer.swift; sourceTree = "<group>"; };
 		3B05C94B2F1042FC000CC4BC /* NativeAudioPlayerPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = NativeAudioPlayerPlugin.m; sourceTree = "<group>"; };
 		3B05C94E2F12C711000CC4BC /* NativeAudioPlayerPlugin.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NativeAudioPlayerPlugin.h; sourceTree = "<group>"; };
+		3B05C94F2F141719000CC4BC /* PluginViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginViewController.swift; sourceTree = "<group>"; };
 		3B06C3CD2EDD4B8200262198 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		3B7D02152EDE009400FF1514 /* VoiceCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCommands.swift; sourceTree = "<group>"; };
 		3B7D02172EDE04A500FF1514 /* App-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "App-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -112,6 +114,7 @@
 				3B05C9492F104120000CC4BC /* NativeAudioPlayer.swift */,
 				3B05C94B2F1042FC000CC4BC /* NativeAudioPlayerPlugin.m */,
 				3B05C94E2F12C711000CC4BC /* NativeAudioPlayerPlugin.h */,
+				3B05C94F2F141719000CC4BC /* PluginViewController.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -244,6 +247,7 @@
 				3B05C94A2F104121000CC4BC /* NativeAudioPlayer.swift in Sources */,
 				3B7D021B2EE4C54500FF1514 /* AudioRemotecontroller.swift in Sources */,
 				3B7D02262EF07EDB00FF1514 /* ZenAudioNotifications.swift in Sources */,
+				3B05C9502F141719000CC4BC /* PluginViewController.swift in Sources */,
 				3B7D02202EE8BDE400FF1514 /* NativeTTSPlugin.m in Sources */,
 				3B7D02162EDE009400FF1514 /* VoiceCommands.swift in Sources */,
 				3B7D021D2EE8BD3E00FF1514 /* NativeTTS.swift in Sources */,
