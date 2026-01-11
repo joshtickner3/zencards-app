@@ -1017,40 +1017,56 @@ const TTS_FUNCTION_URL =
 const cardAudioCache = {}; // key: cardId-side-voice-speed → url
 // --- Make sure our native plugins are registered on the JS side ---
 // ---- Native plugins / environment wiring ----
+// ---- Native plugins / environment wiring ----
 let isNativeIOS = false;
 let NativeAudioPlayer = null;
 
 function setupNativePlugins() {
   const cap = window.Capacitor;
 
-  if (!cap || typeof cap.registerPlugin !== "function") {
-    console.warn("[NativeEnv] Capacitor not ready yet");
+  if (!cap || !cap.Plugins) {
+    console.warn("[NativeEnv] Capacitor not ready yet (no Plugins object)");
     isNativeIOS = false;
     NativeAudioPlayer = null;
     return;
   }
 
-  // Ensure Plugins object exists
-  cap.Plugins = cap.Plugins || {};
+  // Prefer any plugin proxies that the native runtime already registered
+  const hasRegister = typeof cap.registerPlugin === "function";
 
-  // VoiceCommands native plugin
+  // ----- VoiceCommands -----
   if (!cap.Plugins.VoiceCommands) {
-    cap.Plugins.VoiceCommands = cap.registerPlugin("VoiceCommands");
-    console.log("[Plugins] Registered VoiceCommands plugin");
+    if (hasRegister) {
+      cap.Plugins.VoiceCommands = cap.registerPlugin("VoiceCommands");
+      console.log("[Plugins] Registered VoiceCommands via registerPlugin()");
+    } else {
+      console.log(
+        "[Plugins] VoiceCommands plugin not found and registerPlugin() missing"
+      );
+    }
+  } else {
+    console.log("[Plugins] Found existing VoiceCommands plugin proxy");
   }
 
-  // NativeAudioPlayer native plugin
+  // ----- NativeAudioPlayer -----
   if (!cap.Plugins.NativeAudioPlayer) {
-    cap.Plugins.NativeAudioPlayer = cap.registerPlugin("NativeAudioPlayer");
-    console.log("[Plugins] Registered NativeAudioPlayer plugin");
+    if (hasRegister) {
+      cap.Plugins.NativeAudioPlayer = cap.registerPlugin("NativeAudioPlayer");
+      console.log("[Plugins] Registered NativeAudioPlayer via registerPlugin()");
+    } else {
+      console.log(
+        "[Plugins] NativeAudioPlayer plugin not found and registerPlugin() missing"
+      );
+    }
+  } else {
+    console.log("[Plugins] Found existing NativeAudioPlayer plugin proxy");
   }
 
   NativeAudioPlayer = cap.Plugins.NativeAudioPlayer || null;
 
+  // Are we actually inside the iOS native app?
   isNativeIOS =
     !!NativeAudioPlayer &&
-    typeof cap.isNativePlatform === "function" &&
-    cap.isNativePlatform() &&
     typeof cap.getPlatform === "function" &&
     cap.getPlatform() === "ios";
 
@@ -1061,8 +1077,9 @@ function setupNativePlugins() {
   });
 }
 
-setupNativePlugins();                 // run once at boot
-window.setupNativePlugins = setupNativePlugins; //
+// run once at boot
+setupNativePlugins();
+window.setupNativePlugins = setupNativePlugins;
 
 async function getOrGenerateAudio(card, side) {
   const voice = "female_1";    // tweak as needed
