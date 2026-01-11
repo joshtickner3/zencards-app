@@ -19,6 +19,7 @@ public class VoiceCommandsPlugin: CAPPlugin {
 
     public override func load() {
         super.load()
+        print("✅ VoiceCommandsPlugin loaded into Capacitor bridge")
 
         NotificationCenter.default.addObserver(self,
                                                selector: #selector(onTTSWillSpeak),

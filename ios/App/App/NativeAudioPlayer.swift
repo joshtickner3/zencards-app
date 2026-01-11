@@ -11,6 +11,7 @@ public class NativeAudioPlayerPlugin: CAPPlugin {
 
     public override func load() {
         super.load()
+        print("✅ NativeAudioPlayerPlugin loaded into Capacitor bridge")
         configureAudioSession()
         setupRemoteCommandCenter()
         NotificationCenter.default.addObserver(
