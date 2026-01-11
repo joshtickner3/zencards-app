@@ -3,8 +3,21 @@ import Capacitor
 import AVFoundation
 import MediaPlayer
 
-@objc(NativeAudioPlayer)
-public class NativeAudioPlayer: CAPPlugin {
+
+@objc(NativeAudioPlayerPlugin)
+public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
+
+    // Capacitor 7 bridge metadata
+    public let identifier = "NativeAudioPlayerPlugin"
+    public let jsName = "NativeAudioPlayer"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "setQueue",   returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "enqueue",    returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "play",       returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "pause",      returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "skipToNext", returnType: CAPPluginReturnPromise)
+    ]
+
 
     private var player = AVQueuePlayer()
     private var currentIndex: Int = 0

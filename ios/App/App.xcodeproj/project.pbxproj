@@ -10,9 +10,7 @@
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		3B05C9482F1028E5000CC4BC /* 1-second-of-silence-2.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 3B05C9472F1028E5000CC4BC /* 1-second-of-silence-2.mp3 */; };
 		3B05C94A2F104121000CC4BC /* NativeAudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B05C9492F104120000CC4BC /* NativeAudioPlayer.swift */; };
-		3B05C94C2F1042FC000CC4BC /* NativeAudioPlayerPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = 3B05C94B2F1042FC000CC4BC /* NativeAudioPlayerPlugin.m */; };
 		3B7D02162EDE009400FF1514 /* VoiceCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B7D02152EDE009400FF1514 /* VoiceCommands.swift */; };
-		3B7D02192EDE04A500FF1514 /* VoiceCommandsPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = 3B7D02182EDE04A500FF1514 /* VoiceCommandsPlugin.m */; };
 		3B7D021B2EE4C54500FF1514 /* AudioRemotecontroller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B7D021A2EE4C53100FF1514 /* AudioRemotecontroller.swift */; };
 		3B7D021D2EE8BD3E00FF1514 /* NativeTTS.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B7D021C2EE8BD3E00FF1514 /* NativeTTS.swift */; };
 		3B7D02202EE8BDE400FF1514 /* NativeTTSPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = 3B7D021F2EE8BDE400FF1514 /* NativeTTSPlugin.m */; };
@@ -248,8 +246,6 @@
 				3B7D02262EF07EDB00FF1514 /* ZenAudioNotifications.swift in Sources */,
 				3B7D02202EE8BDE400FF1514 /* NativeTTSPlugin.m in Sources */,
 				3B7D02162EDE009400FF1514 /* VoiceCommands.swift in Sources */,
-				3B05C94C2F1042FC000CC4BC /* NativeAudioPlayerPlugin.m in Sources */,
-				3B7D02192EDE04A500FF1514 /* VoiceCommandsPlugin.m in Sources */,
 				3B7D021D2EE8BD3E00FF1514 /* NativeTTS.swift in Sources */,
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 			);

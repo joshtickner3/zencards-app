@@ -4,10 +4,18 @@ import AVFoundation
 import Speech
 import MediaPlayer
 
-@objc(VoiceCommands)
-public class VoiceCommands: CAPPlugin {
+@objc(VoiceCommandsPlugin)
+public class VoiceCommandsPlugin: CAPPlugin, CAPBridgedPlugin {
 
-
+    // Capacitor 7 bridge metadata
+    public let identifier = "VoiceCommandsPlugin"
+    public let jsName = "VoiceCommands"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "start",       returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stop",        returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "isAvailable", returnType: CAPPluginReturnPromise)
+    ]
+    
     private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
     private let audioEngine = AVAudioEngine()
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
