@@ -3,8 +3,8 @@ import Capacitor
 import AVFoundation
 import MediaPlayer
 
-@objc(NativeAudioPlayerPlugin)
-public class NativeAudioPlayerPlugin: CAPPlugin {
+@objc(NativeAudioPlayer)
+public class NativeAudioPlayer: CAPPlugin {
 
     private var player = AVQueuePlayer()
     private var currentIndex: Int = 0
