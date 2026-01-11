@@ -1061,6 +1061,8 @@ function setupNativePlugins() {
   });
 }
 
+setupNativePlugins();                 // run once at boot
+window.setupNativePlugins = setupNativePlugins; //
 
 async function getOrGenerateAudio(card, side) {
   const voice = "female_1";    // tweak as needed
@@ -1677,6 +1679,7 @@ function restoreLastDeckSelection() {
 
 async function initAppSession() {
   console.log("[BOOT] initAppSession()");
+    setupNativePlugins();
 
   // 1) Check session first (fast)
   const { data: sessionData, error: sessErr } = await supabaseClient.auth.getSession();
@@ -2543,31 +2546,38 @@ let speakGeneration = 0;
 
 
     // ===== Native iOS VoiceCommands plugin (Capacitor) =====
-    let nativeVoicePlugin = null;
-    let nativeVoiceActiveCallback = null;
-    let usingNativeVoice = false;
+    // ===== Native iOS VoiceCommands plugin (Capacitor) =====
+let nativeVoicePlugin = null;
+let nativeVoiceActiveCallback = null;
+let usingNativeVoice = false;
 
-    if (
-      window.Capacitor &&
-      window.Capacitor.Plugins &&
-      window.Capacitor.Plugins.VoiceCommands
-    ) {
-      nativeVoicePlugin = window.Capacitor.Plugins.VoiceCommands;
-      usingNativeVoice = true;
-      console.log("Using native iOS VoiceCommands plugin");
+function initNativeVoicePlugin() {
+  if (!window.Capacitor || !window.Capacitor.Plugins) return;
+  if (!window.Capacitor.Plugins.VoiceCommands) return;
 
-      nativeVoicePlugin.addListener("speechResult", (data) => {
-        const text = (data && data.text) || "";
-        const isFinal = !!(data && data.isFinal);
-        if (!text) return;
+  // Already wired once
+  if (nativeVoicePlugin) return;
 
-        if (isFinal && nativeVoiceActiveCallback) {
-          const cb = nativeVoiceActiveCallback;
-          nativeVoiceActiveCallback = null;
-          cb(text);
-        }
-      });
+  nativeVoicePlugin = window.Capacitor.Plugins.VoiceCommands;
+  usingNativeVoice = true;
+  console.log("Using native iOS VoiceCommands plugin");
+
+  nativeVoicePlugin.addListener("speechResult", (data) => {
+    const text = (data && data.text) || "";
+    const isFinal = !!(data && data.isFinal);
+    if (!text) return;
+
+    if (isFinal && nativeVoiceActiveCallback) {
+      const cb = nativeVoiceActiveCallback;
+      nativeVoiceActiveCallback = null;
+      cb(text);
     }
+  });
+}
+
+// optional: expose for console testing
+window.initNativeVoicePlugin = initNativeVoicePlugin;
+
 
     // ===== Browser Web SpeechRecognition fallback =====
     const SpeechRecognition =
@@ -4939,6 +4949,7 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
  (async function init() {
   loadFromStorage();
     setupNativePlugins();
+     initNativeVoicePlugin();
 
   try {
     const { data: { session }, error } = await supabaseClient.auth.getSession();
