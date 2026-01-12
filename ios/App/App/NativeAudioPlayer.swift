@@ -16,9 +16,11 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "play",       returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "pause",      returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "skipToNext", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stop",       returnType: CAPPluginReturnPromise),
         // simple debug method to prove the bridge works
         CAPPluginMethod(name: "debugPing",  returnType: CAPPluginReturnPromise)
     ]
+
 
     // MARK: - State
 
@@ -49,7 +51,8 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
             // .playback is required for background audio
             try session.setCategory(.playback, mode: .spokenAudio, options: [
                 .allowBluetooth,
-                .allowBluetoothA2DP
+                .allowBluetoothA2DP,
+                .defaultToSpeaker
             ])
             try session.setActive(true)
             print("✅ [NativeAudioPlayer] AVAudioSession configured (.playback / .spokenAudio)")
@@ -249,4 +252,23 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
             call.resolve()
         }
     }
+
+    @objc func stop(_ call: CAPPluginCall) {
+        print("⏹ [NativeAudioPlayer] stop() called from JS")
+
+        DispatchQueue.main.async {
+            guard let player = self.player else {
+                print("⚠️ [NativeAudioPlayer] stop called but player is nil")
+                call.resolve()
+                return
+            }
+
+            player.pause()
+            player.removeAllItems()
+            self.currentIndex = 0
+            print("✅ [NativeAudioPlayer] player stopped and queue cleared")
+            call.resolve()
+        }
+    }
 }
+
