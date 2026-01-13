@@ -1072,13 +1072,25 @@ async function getOrGenerateAudio(card, side) {
   if (cardAudioCache[key]) return cardAudioCache[key];
 
   try {
+    // 🔐 Get the current Supabase session so we can send a real auth token
+    const { data: sessionData } = await supabaseClient.auth.getSession();
+    const session = sessionData?.session || null;
+    const accessToken = session?.access_token || null;
+
+    const headers = {
+      "Content-Type": "application/json",
+      apikey: SUPABASE_ANON_KEY,
+    };
+
+    // Most Supabase edge functions that check auth want this:
+    // Authorization: Bearer <access_token>
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
+    }
+
     const resp = await fetch(TTS_FUNCTION_URL, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        // sending anon key is usually a good idea for Supabase edge funcs
-        apikey: SUPABASE_ANON_KEY,
-      },
+      headers,
       body: JSON.stringify({
         cardId: card.id,
         side,
@@ -1100,14 +1112,14 @@ async function getOrGenerateAudio(card, side) {
         status: resp.status,
         data,
       });
-      return null; // <– important: caller will fallback
+      return null; // caller will fall back
     }
 
     cardAudioCache[key] = data.audio_url;
     return data.audio_url;
   } catch (err) {
     console.error("[TTS] fetch to tts-generate failed:", err);
-    return null; // <– important: caller will fallback
+    return null; // caller will fall back
   }
 }
 
@@ -1179,11 +1191,12 @@ async function playWithNativeAudioPlayer(cards) {
     cards ? cards.length : 0
   );
 
+  // If plugin isn't actually available, bail out and let caller fall back
   if (!isNativeIOS || !NativeAudioPlayer) {
     console.warn(
-      "[NativeAudio] NativeAudioPlayer not available; falling back to web TTS"
+      "[NativeAudio] NativeAudioPlayer not available; cannot use background queue."
     );
-    return playWithWebTTS(cards);
+    return false;
   }
 
   // Build initial batch (e.g., first 10 cards)
@@ -1195,22 +1208,19 @@ async function playWithNativeAudioPlayer(cards) {
     const qUrl = await getOrGenerateAudio(card, "question");
     const aUrl = await getOrGenerateAudio(card, "answer");
 
-    // ✅ Only push non-null URLs to the queue
+    // Only push non-null URLs to the queue
     if (qUrl) urls.push(qUrl);
     if (aUrl) urls.push(aUrl);
   }
 
-  console.log(
-    "[NativeAudio] Initial queue URLs count =",
-    urls.length
-  );
+  console.log("[NativeAudio] Initial queue URLs count =", urls.length);
 
-  // ✅ If TTS completely failed, fall back to normal (non-background) behavior
+  // If TTS completely failed, let caller fall back to normal voice loop
   if (!urls.length) {
     console.error(
-      "[NativeAudio] No MP3 URLs available for initial batch; falling back to web TTS."
+      "[NativeAudio] No MP3 URLs available for initial batch; cannot start background queue."
     );
-    return playWithWebTTS(cards);
+    return false;
   }
 
   // Optional: clear any old queue
@@ -1222,21 +1232,38 @@ async function playWithNativeAudioPlayer(cards) {
     }
   }
 
-  await NativeAudioPlayer.setQueue({ urls });
-  await NativeAudioPlayer.play();
+  try {
+    await NativeAudioPlayer.setQueue({ urls });
+    await NativeAudioPlayer.play();
 
-  // Set up listeners once
-  setupNativeAudioListeners(cards);
+    // Set up listeners once per session
+    setupNativeAudioListeners(cards);
+
+    return true; // ✅ background audio started
+  } catch (e) {
+    console.error("[NativeAudio] Failed to start playback:", e);
+    return false;
+  }
 }
 
 // Single entry point: decides native iOS vs normal web behavior
+// Single entry point: decides native iOS vs normal web behavior
 async function startDeckPlayback(cards) {
-  if (isNativeIOS) {
-    // iOS app → use native audio queue (background-capable)
-    await playWithNativeAudioPlayer(cards);
-  } else {
-    // Website / simulator → keep your existing behavior
-    await playWithWebTTS(cards);
+  // On the web / simulator, always use the normal flow
+  if (!isNativeIOS || !NativeAudioPlayer) {
+    console.log("[NativeAudio] Not native iOS – using normal runVoiceLoop()");
+    runVoiceLoop();
+    return;
+  }
+
+  // Native iOS path: try background queue first
+  const ok = await playWithNativeAudioPlayer(cards);
+
+  if (!ok) {
+    console.warn(
+      "[NativeAudio] Background queue not available; falling back to normal runVoiceLoop()."
+    );
+    runVoiceLoop();
   }
 }
 
@@ -5070,13 +5097,6 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
     hasLoadedRemote = false;
   }
 })();
-
-// Temporary stub so the debug button doesn't crash when we're not native
-async function playWithWebTTS(cards) {
-  console.log("[DEBUG] playWithWebTTS stub called", {
-    count: Array.isArray(cards) ? cards.length : 0,
-  });
-}
 
 if (debugNativeQueueBtn) {
   debugNativeQueueBtn.addEventListener("click", async () => {
