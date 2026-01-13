@@ -1082,28 +1082,46 @@ async function getOrGenerateAudio(card, side) {
   const key = `${card.id}-${side}-${voice}-${speed}`;
   if (cardAudioCache[key]) return cardAudioCache[key];
 
-  const resp = await fetch(TTS_FUNCTION_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      cardId: card.id,
-      side,
-      text: side === "question" ? card.question : card.answer,
-      voice,
-      speed,
-    }),
-  });
+  try {
+    const resp = await fetch(TTS_FUNCTION_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        // sending anon key is usually a good idea for Supabase edge funcs
+        apikey: SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({
+        cardId: card.id,
+        side,
+        text: side === "question" ? card.question : card.answer,
+        voice,
+        speed,
+      }),
+    });
 
-  const data = await resp.json();
+    let data = null;
+    try {
+      data = await resp.json();
+    } catch (e) {
+      console.error("[TTS] Could not parse JSON response:", e);
+    }
 
-  if (!resp.ok) {
-    console.error("TTS error", data);
-    throw new Error("TTS failed");
+    if (!resp.ok || !data || !data.audio_url) {
+      console.error("[TTS] Bad response from tts-generate:", {
+        status: resp.status,
+        data,
+      });
+      return null; // <– important: caller will fallback
+    }
+
+    cardAudioCache[key] = data.audio_url;
+    return data.audio_url;
+  } catch (err) {
+    console.error("[TTS] fetch to tts-generate failed:", err);
+    return null; // <– important: caller will fallback
   }
-
-  cardAudioCache[key] = data.audio_url;
-  return data.audio_url;
 }
+
 async function playCardSideAudio(card, side, onEnd) {
   const plainText = getPlainTextFromCard(
     side === "question" ? card.question : card.answer
@@ -1118,6 +1136,10 @@ async function playCardSideAudio(card, side, onEnd) {
       });
 
       const url = await getOrGenerateAudio(card, side);
+      if (!url) {
+        throw new Error("No audio_url from TTS function");
+      }
+
       console.log("[NativeAudio] MP3 URL =", url);
 
       // Clear any previous queue
@@ -1128,24 +1150,31 @@ async function playCardSideAudio(card, side, onEnd) {
       await NativeAudioPlayer.setQueue({ urls: [url] });
 
       let ended = false;
-      const sub = NativeAudioPlayer.addListener("trackEnded", () => {
-        if (ended) return;
-        ended = true;
-        if (sub && typeof sub.remove === "function") {
-          sub.remove();
-        }
-        if (onEnd) onEnd();
-      });
+      const sub =
+        typeof NativeAudioPlayer.addListener === "function"
+          ? NativeAudioPlayer.addListener("trackEnded", () => {
+              if (ended) return;
+              ended = true;
+              if (sub && typeof sub.remove === "function") {
+                sub.remove();
+              }
+              if (onEnd) onEnd();
+            })
+          : null;
 
       await NativeAudioPlayer.play();
-      return;
+      return; // ✅ success path exits here
     } catch (err) {
       console.error("[NativeAudio] Failed, falling back to TTS:", err);
       // fall through to TTS below
     }
   }
 
-  // Fallback: your existing TTS pipeline (web or NativeTTS)
+  // 🌐 Fallback: your existing TTS pipeline (web or NativeTTS)
+  console.log("[NativeAudio] Using fallback speak() for", {
+    side,
+    cardId: card.id,
+  });
   speak(plainText, onEnd);
 }
 
@@ -4312,7 +4341,6 @@ function speakAnswerThenAskDifficulty() {
     });
   });
 }
-
 
     // NEW: Study-ahead answer window – gives you time to say "repeat answer" or "main menu"
     function startStudyAheadAnswerWindow(restartOnly) {
