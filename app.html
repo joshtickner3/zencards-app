@@ -1010,8 +1010,7 @@ const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
   },
 });
 
-const TTS_FUNCTION_URL =
-  "https://elpfcnnrripftxoqeckv.functions.supabase.co/tts-generate";
+const TTS_FUNCTION_URL = "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/tts-generate";
 
 // Simple in-memory cache so we don't call TTS twice
 const cardAudioCache = {}; // key: cardId-side-voice-speed → url
@@ -1205,13 +1204,33 @@ async function playWithNativeAudioPlayer(cards) {
   for (const card of initialCards) {
     const qUrl = await getOrGenerateAudio(card, "question");
     const aUrl = await getOrGenerateAudio(card, "answer");
-    urls.push(qUrl, aUrl);
+
+    // ✅ Only push non-null URLs to the queue
+    if (qUrl) urls.push(qUrl);
+    if (aUrl) urls.push(aUrl);
   }
 
   console.log(
     "[NativeAudio] Initial queue URLs count =",
     urls.length
   );
+
+  // ✅ If TTS completely failed, fall back to normal (non-background) behavior
+  if (!urls.length) {
+    console.error(
+      "[NativeAudio] No MP3 URLs available for initial batch; falling back to web TTS."
+    );
+    return playWithWebTTS(cards);
+  }
+
+  // Optional: clear any old queue
+  if (typeof NativeAudioPlayer.stop === "function") {
+    try {
+      await NativeAudioPlayer.stop();
+    } catch (e) {
+      console.warn("[NativeAudio] stop() before setQueue failed:", e);
+    }
+  }
 
   await NativeAudioPlayer.setQueue({ urls });
   await NativeAudioPlayer.play();
@@ -1252,11 +1271,14 @@ async function maybePrefetchMore(cards) {
   for (const card of nextBatch) {
     const qUrl = await getOrGenerateAudio(card, "question");
     const aUrl = await getOrGenerateAudio(card, "answer");
-    urls.push(qUrl, aUrl);
+    if (qUrl) urls.push(qUrl);
+    if (aUrl) urls.push(aUrl);
   }
 
   if (urls.length > 0) {
     await NativeAudioPlayer.enqueue({ urls });
+  } else {
+    console.warn("[NativeAudio] No URLs to enqueue in prefetch batch.");
   }
 }
 
@@ -4575,34 +4597,38 @@ if (!noScheduleChanges && !autoGoodMode && voiceRatingButtons) {
 }
 
       hasSpokenCurrentQuestion = true;
-      setStudyState(StudyState.SHOWING_QUESTION);
+setStudyState(StudyState.SHOWING_QUESTION);
 
-      speak(getPlainTextFromCard(currentCard.question), () => {
-        if (isPaused) return;
-        if (answerMode === "delay") {
-          const delay = Math.max(
-            1,
-            Math.min(60, Math.floor(answerDelayMs / 1000))
-          );
-          // In auto mode we do NOT start listening here,
-          // so the mic isn't open while you're silently thinking.
-          if (!autoGoodMode) {
-            // start listening so "repeat question" etc. work before the answer
-            listenForCommand(handleVoiceTranscript);
-          }
-          setStudyState(StudyState.WAITING_FOR_ANSWER);
-          questionDelayTimerId = setTimeout(() => {
-            if (!isPaused) {
-              speakAnswerThenAskDifficulty();
-            }
-          }, delay * 1000);
-        } else {
-          awaitingAnswerSignal = true;
-          setStudyState(StudyState.WAITING_FOR_ANSWER);
-          setStatus("Listening for your answer...");
-          listenForCommand(handleVoiceTranscript);
-        }
-      });
+// 🔊 Use the same MP3-capable helper for the question
+playCardSideAudio(currentCard, "question", () => {
+  if (isPaused) return;
+
+  if (answerMode === "delay") {
+    const delay = Math.max(
+      1,
+      Math.min(60, Math.floor(answerDelayMs / 1000))
+    );
+
+    // In auto mode we do NOT start listening here,
+    // so the mic isn't open while you're silently thinking.
+    if (!autoGoodMode) {
+      // start listening so "repeat question" etc. work before the answer
+      listenForCommand(handleVoiceTranscript);
+    }
+
+    setStudyState(StudyState.WAITING_FOR_ANSWER);
+    questionDelayTimerId = setTimeout(() => {
+      if (!isPaused) {
+        speakAnswerThenAskDifficulty();
+      }
+    }, delay * 1000);
+  } else {
+    awaitingAnswerSignal = true;
+    setStudyState(StudyState.WAITING_FOR_ANSWER);
+    setStatus("Listening for your answer...");
+    listenForCommand(handleVoiceTranscript);
+  }
+});
     }
 
     // ===================== SILENT MODE =====================

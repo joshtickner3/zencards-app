@@ -164,34 +164,44 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
         }
 
         print("🎧 [NativeAudioPlayer] setQueue() called with \(urls.count) urls")
+        urls.forEach { print("   ↳ queue URL: \($0)") }
 
         DispatchQueue.main.async {
             self.currentIndex = 0
 
-            // 🔊 TEMP: Always use bundled test-tone.mp3 instead of remote URL
-            guard let url = Bundle.main.url(forResource: "test-tone", withExtension: "mp3") else {
-                print("❌ [NativeAudioPlayer] Could not find bundled test-tone.mp3")
-                call.reject("Bundled test audio not found")
+            // Build AVPlayerItems from the REAL URLs we got from JS
+            let items: [AVPlayerItem] = urls.compactMap { urlString in
+                guard let url = URL(string: urlString) else {
+                    print("⚠️ [NativeAudioPlayer] Invalid URL in setQueue: \(urlString)")
+                    return nil
+                }
+                return AVPlayerItem(url: url)
+            }
+
+            guard !items.isEmpty else {
+                print("❌ [NativeAudioPlayer] setQueue: no valid URLs after parsing")
+                call.reject("No valid URLs in queue")
                 return
             }
 
-            print("   ↳ using bundled URL: \(url)")
-            let item = AVPlayerItem(url: url)
+            let player = AVQueuePlayer(items: items)
+            player.actionAtItemEnd = .advance
+            player.automaticallyWaitsToMinimizeStalling = false
 
-            self.player = AVQueuePlayer(items: [item])
-            self.player?.actionAtItemEnd = .advance
-            self.player?.automaticallyWaitsToMinimizeStalling = false
-            
-            // NEW: Tell iOS what's playing so Control Center shows a tile
-            let infoCenter = MPNowPlayingInfoCenter.default()
-            infoCenter.nowPlayingInfo = [
-                MPMediaItemPropertyTitle: "ZenCards Test Audio",
-                MPNowPlayingInfoPropertyIsLiveStream: false,
-                MPMediaItemPropertyPlaybackDuration: CMTimeGetSeconds(item.asset.duration),
-                MPNowPlayingInfoPropertyElapsedPlaybackTime: 0
-            ]
+            self.player = player
 
-            print("✅ [NativeAudioPlayer] Queue created with 1 bundled AVPlayerItem")
+            // Optional: set Now Playing info for Control Center tile
+            if let first = items.first {
+                let infoCenter = MPNowPlayingInfoCenter.default()
+                let duration = CMTimeGetSeconds(first.asset.duration)
+                infoCenter.nowPlayingInfo = [
+                    MPMediaItemPropertyTitle: "ZenCards Audio",
+                    MPMediaItemPropertyPlaybackDuration: duration,
+                    MPNowPlayingInfoPropertyElapsedPlaybackTime: 0
+                ]
+            }
+
+            print("✅ [NativeAudioPlayer] Queue created with \(items.count) AVPlayerItems")
             call.resolve()
         }
     }
