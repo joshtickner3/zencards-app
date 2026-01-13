@@ -45,21 +45,30 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
 
     // MARK: - Audio Session
 
+    // MARK: - Audio Session
+
     private func configureAudioSession() {
         let session = AVAudioSession.sharedInstance()
         do {
-            // .playback is required for background audio
-            try session.setCategory(.playback, mode: .spokenAudio, options: [
-                .allowBluetooth,
-                .allowBluetoothA2DP,
-                .defaultToSpeaker
-            ])
+            print("🎧 [NativeAudioPlayer] configureAudioSession() called")
+
+            // Minimal, safe playback configuration
+            try session.setCategory(.playback, mode: .default, options: [])
             try session.setActive(true)
-            print("✅ [NativeAudioPlayer] AVAudioSession configured (.playback / .spokenAudio)")
+
+            print("✅ [NativeAudioPlayer] AVAudioSession configured")
+            print("   category=\(session.category.rawValue), mode=\(session.mode.rawValue)")
+
+            let route = session.currentRoute
+            print("🔊 [NativeAudioPlayer] Current output route: \(route)")
+            for output in route.outputs {
+                print("   ↳ portType=\(output.portType.rawValue), name=\(output.portName)")
+            }
         } catch {
             print("❌ [NativeAudioPlayer] AudioSession error: \(error)")
         }
     }
+
 
     // MARK: - Remote controls
 
@@ -159,26 +168,30 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
         DispatchQueue.main.async {
             self.currentIndex = 0
 
-            let items: [AVPlayerItem] = urls.compactMap { urlString in
-                guard let url = URL(string: urlString) else {
-                    print("⚠️ [NativeAudioPlayer] Invalid URL string: \(urlString)")
-                    return nil
-                }
-                print("   ↳ adding URL to queue: \(url.absoluteString)")
-                return AVPlayerItem(url: url)
-            }
-
-            if items.isEmpty {
-                print("❌ [NativeAudioPlayer] No valid URLs could be created")
-                call.reject("No valid URLs in queue")
+            // 🔊 TEMP: Always use bundled test-tone.mp3 instead of remote URL
+            guard let url = Bundle.main.url(forResource: "test-tone", withExtension: "mp3") else {
+                print("❌ [NativeAudioPlayer] Could not find bundled test-tone.mp3")
+                call.reject("Bundled test audio not found")
                 return
             }
 
-            self.player = AVQueuePlayer(items: items)
+            print("   ↳ using bundled URL: \(url)")
+            let item = AVPlayerItem(url: url)
+
+            self.player = AVQueuePlayer(items: [item])
             self.player?.actionAtItemEnd = .advance
             self.player?.automaticallyWaitsToMinimizeStalling = false
+            
+            // NEW: Tell iOS what's playing so Control Center shows a tile
+            let infoCenter = MPNowPlayingInfoCenter.default()
+            infoCenter.nowPlayingInfo = [
+                MPMediaItemPropertyTitle: "ZenCards Test Audio",
+                MPNowPlayingInfoPropertyIsLiveStream: false,
+                MPMediaItemPropertyPlaybackDuration: CMTimeGetSeconds(item.asset.duration),
+                MPNowPlayingInfoPropertyElapsedPlaybackTime: 0
+            ]
 
-            print("✅ [NativeAudioPlayer] Queue created with \(items.count) AVPlayerItem(s)")
+            print("✅ [NativeAudioPlayer] Queue created with 1 bundled AVPlayerItem")
             call.resolve()
         }
     }
@@ -215,6 +228,8 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func play(_ call: CAPPluginCall) {
         print("▶️ [NativeAudioPlayer] play() called from JS")
+        
+        configureAudioSession()
 
         DispatchQueue.main.async {
             guard let player = self.player else {
@@ -228,7 +243,7 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
             } catch {
                 print("⚠️ [NativeAudioPlayer] Could not re-activate audio session: \(error)")
             }
-
+            player.volume = 1.0
             player.play()
             print("✅ [NativeAudioPlayer] player.play() – rate now: \(player.rate)")
             call.resolve()

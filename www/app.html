@@ -1104,6 +1104,51 @@ async function getOrGenerateAudio(card, side) {
   cardAudioCache[key] = data.audio_url;
   return data.audio_url;
 }
+async function playCardSideAudio(card, side, onEnd) {
+  const plainText = getPlainTextFromCard(
+    side === "question" ? card.question : card.answer
+  );
+
+  // iOS native path: use MP3 + NativeAudioPlayer
+  if (isNativeIOS && NativeAudioPlayer) {
+    try {
+      console.log("[NativeAudio] playCardSideAudio:", {
+        side,
+        cardId: card.id,
+      });
+
+      const url = await getOrGenerateAudio(card, side);
+      console.log("[NativeAudio] MP3 URL =", url);
+
+      // Clear any previous queue
+      if (typeof NativeAudioPlayer.stop === "function") {
+        await NativeAudioPlayer.stop();
+      }
+
+      await NativeAudioPlayer.setQueue({ urls: [url] });
+
+      let ended = false;
+      const sub = NativeAudioPlayer.addListener("trackEnded", () => {
+        if (ended) return;
+        ended = true;
+        if (sub && typeof sub.remove === "function") {
+          sub.remove();
+        }
+        if (onEnd) onEnd();
+      });
+
+      await NativeAudioPlayer.play();
+      return;
+    } catch (err) {
+      console.error("[NativeAudio] Failed, falling back to TTS:", err);
+      // fall through to TTS below
+    }
+  }
+
+  // Fallback: your existing TTS pipeline (web or NativeTTS)
+  speak(plainText, onEnd);
+}
+
 
 // ---- NativeAudioPlayer plugin detection (for background audio) ----
 // === Native iOS / plugin detection ===
@@ -3711,30 +3756,29 @@ function speakAndGoToMainMenu() {
       setStudyState(StudyState.SHOWING_QUESTION);
 
       hasSpokenCurrentQuestion = true;
-        speak(getPlainTextFromCard(currentCard.question), () => {
-    if (isPaused) return;
-    if (answerMode === "delay") {
-      const delay = Math.max(
-        1,
-        Math.min(60, Math.floor(answerDelayMs / 1000))
-      );
+playCardSideAudio(currentCard, "question", () => {
+  if (isPaused) return;
 
-      // ✅ Only tracking that we’re waiting for the answer delay
-      setStudyState(StudyState.WAITING_FOR_ANSWER);
-      questionDelayTimerId = setTimeout(() => {
-        if (!isPaused) {
-          // Here we speak the answer *then* open the mic for rating / pause / menu
-          speakAnswerThenAskDifficulty();
-        }
-      }, delay * 1000);
-    } else {
-      // Voice answer mode stays the same
-      awaitingAnswerSignal = true;
-      setStudyState(StudyState.WAITING_FOR_ANSWER);
-      setStatus("Listening for your answer...");
-      listenForCommand(handleVoiceTranscript);
-    }
-  });
+  if (answerMode === "delay") {
+    const delay = Math.max(
+      1,
+      Math.min(60, Math.floor(answerDelayMs / 1000))
+    );
+
+    setStudyState(StudyState.WAITING_FOR_ANSWER);
+    questionDelayTimerId = setTimeout(() => {
+      if (!isPaused) {
+        speakAnswerThenAskDifficulty();
+      }
+    }, delay * 1000);
+  } else {
+    // Voice answer mode stays the same
+    awaitingAnswerSignal = true;
+    setStudyState(StudyState.WAITING_FOR_ANSWER);
+    setStatus("Listening for your answer...");
+    listenForCommand(handleVoiceTranscript);
+  }
+});
     }
 
     function handleNextCardSkip() {
@@ -4202,76 +4246,73 @@ if (awaitingAnswerSignal && currentMode === "voice") {
           return "mark each card as good";
       }
     }
+function speakAnswerThenAskDifficulty() {
+  if (!currentCard) return;
 
-    function speakAnswerThenAskDifficulty() {
-      if (!currentCard) return;
+  hasSpokenCurrentAnswer = true;
+  setStudyState(StudyState.SHOWING_ANSWER);
 
-      if (voiceAnswer) {
-        voiceAnswer.classList.remove("hidden");
-      }
-      
-      hasSpokenCurrentAnswer = true;
-      setStudyState(StudyState.SHOWING_ANSWER);
-      const plainAnswer = getPlainTextFromCard(currentCard.answer);
-speak("Answer: " + plainAnswer, () => {
-        // STUDY-AHEAD HANDS-FREE: always respect the study-ahead gap and never schedule
-        if (noScheduleChanges && studyAheadSession) {
-          startStudyAheadAnswerWindow(false);
-          return;
-        }
+  if (voiceAnswer) {
+    voiceAnswer.classList.remove("hidden");
+  }
+  setCardContent(voiceAnswerText, currentCard.answer);
 
-        // Automatic mode for pure hands-free, no commands
-        if (autoGoodMode) {
-          // Only schedule in normal mode; never schedule in noScheduleChanges/study-ahead
-          if (!noScheduleChanges) {
-            if (autoModeBehavior === "tomorrow") {
-              applyTomorrowScheduling(currentDeckId, currentCard.id);
-            } else {
-              const behaviorRating = autoModeBehavior || "good";
-              const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, behaviorRating);
-              if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
-                queueCardForAgain(currentDeckId, currentCard);
-              }
-            }
-          }
-          // Just advance to the next card
-          setStudyState(StudyState.IDLE);
-          runVoiceLoop();
-          return;
-        }
+  // 🔊 NEW: use background-capable audio helper instead of speak(...)
+  playCardSideAudio(currentCard, "answer", () => {
+    if (isPaused) return;
 
-        if (noScheduleChanges && !studyAheadSession) {
-          // This case shouldn't normally happen, but keep safety behavior
-          if (!studyAheadPromptedOnceVoice) {
-            studyAheadPromptedOnceVoice = true;
-            speak("Say main menu to go to the main menu.", () => {
-              runVoiceLoop();
-            });
-          } else {
-            runVoiceLoop();
-          }
-          return;
-        }
-
-        const detailed =
-          !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
-        hasSpokenInstructionsOnce = true;
-        const promptText = detailed
-          ? "How was that? Say again, hard, good, or easy. You can also say next, repeat question, or repeat answer."
-          : "How was that?";
-           // Show tap-to-rate buttons in normal voice mode (not auto mode / study-ahead)
-        // Buttons are already visible; enable them now that the answer is being shown
-if (!noScheduleChanges && !autoGoodMode && voiceRatingButtons) {
-  voiceRatingButtons.classList.remove("hidden");
-  setVoiceRatingButtonsEnabled(true);
-}
-        awaitingDifficulty = true;
-        setStudyState(StudyState.WAITING_FOR_RATING);
-        speak(promptText, () => {
-          listenForCommand(handleVoiceTranscript);
-        });
-      });
+    // ===== STUDY-AHEAD HANDS-FREE: always respect the study-ahead gap and never ask for rating =====
+    if (noScheduleChanges && studyAheadSession) {
+      startStudyAheadAnswerWindow(false);
+      return;
     }
+
+    // ===== Automatic mode for pure hands-free, no commands =====
+    if (autoGoodMode) {
+      // Only schedule in normal mode; never schedule in noScheduleChanges mode
+      if (!noScheduleChanges) {
+        const behaviorRating = autoModeBehavior || "good";
+
+        if (autoModeBehavior === "tomorrow") {
+          applyTomorrowScheduling(currentDeckId, currentCard.id);
+        } else {
+          const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, behaviorRating);
+          if (
+            nextState &&
+            nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES
+          ) {
+            queueCardForAgain(currentDeckId, currentCard);
+          }
+        }
+      }
+
+      // Just advance to the next card
+      setStudyState(StudyState.IDLE);
+      runVoiceLoop();
+      return;
+    }
+
+    // ===== Normal hands-free flow: show rating buttons, prompt again/hard/good/easy, then listen =====
+    awaitingDifficulty = true;
+    if (voiceRatingButtons) {
+      voiceRatingButtons.classList.remove("hidden");
+    }
+
+    const detailed = !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
+    hasSpokenInstructionsOnce = true;
+
+    const promptText = detailed
+      ? "How was that? Say again, hard, good, or easy."
+      : "How was that?";
+
+    speak(promptText, () => {
+      if (!isPaused) {
+        listenForCommand(handleVoiceTranscript);
+      }
+    });
+  });
+}
+
 
     // NEW: Study-ahead answer window – gives you time to say "repeat answer" or "main menu"
     function startStudyAheadAnswerWindow(restartOnly) {
