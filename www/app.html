@@ -1017,57 +1017,47 @@ const cardAudioCache = {}; // key: cardId-side-voice-speed → url
 // --- Make sure our native plugins are registered on the JS side ---
 // ---- Native plugins / environment wiring ----
 // ---- Native plugins / environment wiring ----
+// --- Make sure our native plugins are registered on the JS side ---
+// ---- Native plugins / environment wiring ----
 let isNativeIOS = false;
 let NativeAudioPlayer = null;
 
 function setupNativePlugins() {
-  const cap = window.Capacitor;
-  if (!cap || !cap.Plugins) {
-    console.warn("[NativeEnv] Capacitor not ready yet (no Capacitor or Plugins object)");
+  try {
+    const cap = window.Capacitor;
+
+    if (!cap || typeof cap.getPlatform !== "function") {
+      console.log("[NativeEnv] Capacitor not ready yet or getPlatform missing");
+      isNativeIOS = false;
+      NativeAudioPlayer = null;
+      return;
+    }
+
+    const platform = cap.getPlatform();          // "ios", "android", "web", etc.
+    const plugins = cap.Plugins || {};
+
+    console.log("[NativeEnv] platform =", platform);
+    console.log("[NativeEnv] plugins available =", Object.keys(plugins));
+
+    // The Swift plugin uses jsName = "NativeAudioPlayer"
+    NativeAudioPlayer = plugins.NativeAudioPlayer || null;
+
+    console.log("[NativeEnv] NativeAudioPlayer =", NativeAudioPlayer);
+
+    // We only consider ourselves "native iOS" when:
+    //  - platform is "ios"
+    //  - and the plugin object actually exists
+    isNativeIOS = platform === "ios" && !!NativeAudioPlayer;
+
+    console.log("[NativeEnv] setup complete", {
+      isNativeIOS,
+      hasNativeAudioPlayer: !!NativeAudioPlayer,
+    });
+  } catch (err) {
+    console.error("[NativeEnv] setupNativePlugins failed:", err);
     isNativeIOS = false;
     NativeAudioPlayer = null;
-    return;
   }
-
-  const plugins = cap.Plugins;
-
-  // --- VoiceCommands native plugin ---
-  let vc = plugins.VoiceCommands;
-  if (!vc && typeof cap.registerPlugin === "function") {
-    vc = cap.registerPlugin("VoiceCommands");
-    plugins.VoiceCommands = vc;
-    console.log("[Plugins] Registered VoiceCommands via registerPlugin()");
-  } else if (vc) {
-    console.log("[Plugins] Found native VoiceCommands plugin");
-  } else {
-    console.warn("[Plugins] VoiceCommands plugin missing in native bridge");
-  }
-
-  // --- NativeAudioPlayer native plugin ---
-  let nap = plugins.NativeAudioPlayer;
-  if (!nap && typeof cap.registerPlugin === "function") {
-    nap = cap.registerPlugin("NativeAudioPlayer");
-    plugins.NativeAudioPlayer = nap;
-    console.log("[Plugins] Registered NativeAudioPlayer via registerPlugin()");
-  } else if (nap) {
-    console.log("[Plugins] Found native NativeAudioPlayer plugin");
-  } else {
-    console.warn("[Plugins] NativeAudioPlayer plugin missing in native bridge");
-  }
-
-  NativeAudioPlayer = nap || null;
-
-  isNativeIOS =
-    !!NativeAudioPlayer &&
-    typeof cap.isNativePlatform === "function" &&
-    cap.isNativePlatform() &&
-    (typeof cap.getPlatform !== "function" || cap.getPlatform() === "ios");
-
-  console.log("[NativeEnv] setup complete", {
-    plugins: Object.keys(plugins || {}),
-    isNativeIOS,
-    hasNativeAudioPlayer: !!NativeAudioPlayer,
-  });
 }
 
 // run once at boot
@@ -5086,11 +5076,6 @@ async function playWithWebTTS(cards) {
   console.log("[DEBUG] playWithWebTTS stub called", {
     count: Array.isArray(cards) ? cards.length : 0,
   });
-  alert(
-    "playWithWebTTS stub called.\n\n" +
-    "This means the NativeAudioPlayer plugin is NOT visible yet " +
-    "so the debug button is falling back to 'web TTS' mode."
-  );
 }
 
 if (debugNativeQueueBtn) {
