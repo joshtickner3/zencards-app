@@ -28,12 +28,11 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
     private var currentIndex: Int = 0
 
     // MARK: - Lifecycle
-
     public override func load() {
         super.load()
         print("🎧 [NativeAudioPlayer] load() – plugin constructed and added to bridge")
 
-        configureAudioSession()
+        // Do NOT change the global audio session here.
         setupRemoteCommandCenter()
         registerPlayerObservers()
     }
@@ -42,33 +41,6 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
         NotificationCenter.default.removeObserver(self)
         print("🧹 [NativeAudioPlayer] deinit – observers removed")
     }
-
-    // MARK: - Audio Session
-
-    // MARK: - Audio Session
-
-    private func configureAudioSession() {
-        let session = AVAudioSession.sharedInstance()
-        do {
-            print("🎧 [NativeAudioPlayer] configureAudioSession() called")
-
-            // Minimal, safe playback configuration
-            try session.setCategory(.playback, mode: .default, options: [])
-            try session.setActive(true)
-
-            print("✅ [NativeAudioPlayer] AVAudioSession configured")
-            print("   category=\(session.category.rawValue), mode=\(session.mode.rawValue)")
-
-            let route = session.currentRoute
-            print("🔊 [NativeAudioPlayer] Current output route: \(route)")
-            for output in route.outputs {
-                print("   ↳ portType=\(output.portType.rawValue), name=\(output.portName)")
-            }
-        } catch {
-            print("❌ [NativeAudioPlayer] AudioSession error: \(error)")
-        }
-    }
-
 
     // MARK: - Remote controls
 
@@ -240,8 +212,6 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func play(_ call: CAPPluginCall) {
         print("▶️ [NativeAudioPlayer] play() called from JS")
-        
-        configureAudioSession()
 
         DispatchQueue.main.async {
             guard let player = self.player else {
@@ -250,11 +220,13 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
 
+            // Just make sure the existing session is active; do NOT change category/mode.
             do {
                 try AVAudioSession.sharedInstance().setActive(true)
             } catch {
                 print("⚠️ [NativeAudioPlayer] Could not re-activate audio session: \(error)")
             }
+
             player.volume = 1.0
             player.play()
             print("✅ [NativeAudioPlayer] player.play() – rate now: \(player.rate)")
