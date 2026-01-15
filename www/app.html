@@ -1063,33 +1063,49 @@ setupNativePlugins();
 window.setupNativePlugins = setupNativePlugins;
 
 async function getOrGenerateAudio(card, side) {
-  const voice = "alloy"; // OpenAI TTS voice
+  const voice = "alloy";   // OpenAI TTS voice
   const speed = 1.0;
 
   const key = `${card.id}-${side}-${voice}-${speed}`;
   if (cardAudioCache[key]) return cardAudioCache[key];
 
-  try {
-    // Call the edge function via Supabase client so it handles auth for us
-    const { data, error } = await supabaseClient.functions.invoke(
-      "tts-generate",
-      {
-        body: {
-          cardId: card.id,
-          side,
-          text: side === "question" ? card.question : card.answer,
-          voice,
-          speed,
-        },
-      }
-    );
+  // Call the edge function directly via HTTPS instead of supabase.functions.invoke
+  const functionUrl =
+    "https://elpfcnnrripftxoqeckv.functions.supabase.co/tts-generate";
 
-    if (error) {
-      console.error("[TTS] tts-generate error:", error);
+  const payload = {
+    cardId: card.id,
+    side,
+    text: side === "question" ? card.question : card.answer,
+    voice,
+    speed,
+  };
+
+  try {
+    const resp = await fetch(functionUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        // anon key is what the browser should send
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => "");
+      console.error(
+        "[TTS] HTTP error from tts-generate:",
+        resp.status,
+        errText
+      );
       return null;
     }
 
-    const audioUrl = data?.audio_url;
+    const data = await resp.json().catch(() => null);
+    const audioUrl = data && data.audio_url;
+
     if (!audioUrl) {
       console.error("[TTS] tts-generate returned no audio_url:", data);
       return null;
@@ -1098,7 +1114,7 @@ async function getOrGenerateAudio(card, side) {
     cardAudioCache[key] = audioUrl;
     return audioUrl;
   } catch (err) {
-    console.error("[TTS] invoke tts-generate failed:", err);
+    console.error("[TTS] fetch to tts-generate failed:", err);
     return null;
   }
 }
