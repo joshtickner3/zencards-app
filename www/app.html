@@ -1010,8 +1010,6 @@ const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
   },
 });
 
-const TTS_FUNCTION_URL = "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/tts-generate";
-
 // Simple in-memory cache so we don't call TTS twice
 const cardAudioCache = {}; // key: cardId-side-voice-speed → url
 // --- Make sure our native plugins are registered on the JS side ---
@@ -1065,61 +1063,43 @@ setupNativePlugins();
 window.setupNativePlugins = setupNativePlugins;
 
 async function getOrGenerateAudio(card, side) {
-  const voice = "alloy";    // tweak as needed
+  const voice = "alloy"; // OpenAI TTS voice
   const speed = 1.0;
 
   const key = `${card.id}-${side}-${voice}-${speed}`;
   if (cardAudioCache[key]) return cardAudioCache[key];
 
   try {
-    // 🔐 Get the current Supabase session so we can send a real auth token
-    const { data: sessionData } = await supabaseClient.auth.getSession();
-    const session = sessionData?.session || null;
-    const accessToken = session?.access_token || null;
+    // Call the edge function via Supabase client so it handles auth for us
+    const { data, error } = await supabaseClient.functions.invoke(
+      "tts-generate",
+      {
+        body: {
+          cardId: card.id,
+          side,
+          text: side === "question" ? card.question : card.answer,
+          voice,
+          speed,
+        },
+      }
+    );
 
-    const headers = {
-      "Content-Type": "application/json",
-      apikey: SUPABASE_ANON_KEY,
-    };
-
-    // Most Supabase edge functions that check auth want this:
-    // Authorization: Bearer <access_token>
-    if (accessToken) {
-      headers.Authorization = `Bearer ${accessToken}`;
+    if (error) {
+      console.error("[TTS] tts-generate error:", error);
+      return null;
     }
 
-    const resp = await fetch(TTS_FUNCTION_URL, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        cardId: card.id,
-        side,
-        text: side === "question" ? card.question : card.answer,
-        voice,
-        speed,
-      }),
-    });
-
-    let data = null;
-    try {
-      data = await resp.json();
-    } catch (e) {
-      console.error("[TTS] Could not parse JSON response:", e);
+    const audioUrl = data?.audio_url;
+    if (!audioUrl) {
+      console.error("[TTS] tts-generate returned no audio_url:", data);
+      return null;
     }
 
-    if (!resp.ok || !data || !data.audio_url) {
-      console.error("[TTS] Bad response from tts-generate:", {
-        status: resp.status,
-        data,
-      });
-      return null; // caller will fall back
-    }
-
-    cardAudioCache[key] = data.audio_url;
-    return data.audio_url;
+    cardAudioCache[key] = audioUrl;
+    return audioUrl;
   } catch (err) {
-    console.error("[TTS] fetch to tts-generate failed:", err);
-    return null; // caller will fall back
+    console.error("[TTS] invoke tts-generate failed:", err);
+    return null;
   }
 }
 
@@ -1164,10 +1144,10 @@ async function playCardSideAudio(card, side, onEnd) {
           : null;
 
       await NativeAudioPlayer.play();
-      return; // ✅ success path exits here
+      return; // ✅ success path
     } catch (err) {
       console.error("[NativeAudio] Failed, falling back to TTS:", err);
-      // fall through to TTS below
+      // fall through
     }
   }
 
@@ -4970,93 +4950,110 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
     }
 
     // >>> MODIFIED: add async + inline mic permission request here <<<
-    startVoiceBtn.addEventListener("click", async () => {
-      saveLastMode("voice");
-if (selectedDeckId) saveLastDeckId(selectedDeckId);
-      // 🔊 Browser-only: Request microphone permission first (required in Safari/etc).
-      // If we're using the native iOS plugin, it handles mic/speech permissions natively.
-      if (!nativeVoicePlugin && !autoGoodMode && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          // Stop tracks immediately; we just needed the permission prompt
-          if (stream && stream.getTracks) {
-            stream.getTracks().forEach(track => track.stop());
-          }
-          console.log("Microphone permission requested.");
-        } catch (err) {
-          console.error("Microphone permission error:", err);
-          alert(
-            "Microphone access is required for hands-free study in the browser. " +
-            "Please enable it in your browser's site settings and try again."
-          );
-          return; // Stop if user denied
-        }
+    // >>> REPLACE your existing startVoiceBtn handler with this whole block <<<
+startVoiceBtn.addEventListener("click", async () => {
+  saveLastMode("voice");
+  if (selectedDeckId) saveLastDeckId(selectedDeckId);
+
+  // 🔊 Browser-only: request mic perm if we need STT here
+  if (
+    !nativeVoicePlugin &&              // not using native iOS STT plugin
+    !autoGoodMode &&                   // we actually need voice commands
+    navigator.mediaDevices &&
+    navigator.mediaDevices.getUserMedia
+  ) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (stream && stream.getTracks) {
+        stream.getTracks().forEach((t) => t.stop());
       }
+      console.log("Microphone permission requested.");
+    } catch (err) {
+      console.error("Microphone permission error:", err);
+      alert(
+        "Microphone access is required for hands-free study in the browser. " +
+        "Please enable it in your browser's site settings and try again."
+      );
+      return;
+    }
+  }
 
-      currentDeckId = selectedDeckId;
-      if (!currentDeckId) return;
-      autoModeBehavior = autoRatingSelect.value || "good";
-      autoGoodMode = !!autoGoodToggle.checked;
-      autoEnterStudyAhead = !!autoEnterStudyAheadCheckbox.checked;
-loopStudyAhead = !!loopStudyAheadCheckbox.checked;
+  currentDeckId = selectedDeckId;
+  if (!currentDeckId) return;
 
-      // If there is NO native plugin and NO browser STT, and we are not in auto mode,
-      // then we can't do voice commands.
-      if (!nativeVoicePlugin && !speechSupported && !autoGoodMode) {
-        alert("Speech recognition not supported in this environment.");
-        return;
-      }
+  // Auto mode + options
+  autoModeBehavior = autoRatingSelect.value || "good";
+  autoGoodMode = !!autoGoodToggle.checked;
+  autoEnterStudyAhead = !!autoEnterStudyAheadCheckbox.checked;
+  loopStudyAhead = !!loopStudyAheadCheckbox.checked;
 
-      skipInstructionsAfterFirst = !!skipInstructionsAfterFirstCheckbox.checked;
-      hasSpokenInstructionsOnce = false;
-      // Start in normal "due today" mode; study-ahead is only entered after completion
-      studyAheadSession = false;
-      noScheduleChanges = false;
-      studyAheadPromptedOnceVoice = false;
-      reviewQueue = [];
-      aheadQueue = [];
-      aheadQueueIndex = 0;
-      clearStudyAheadGapTimer();
-      clearQuestionDelayTimer();
-      hasSpokenCurrentQuestion = false;
-      hasSpokenCurrentAnswer = false;
+  // If there is NO native plugin and NO browser STT, and we are not in auto mode,
+  // then we can't do voice commands.
+  if (!nativeVoicePlugin && !speechSupported && !autoGoodMode) {
+    alert("Speech recognition not supported in this environment.");
+    return;
+  }
 
-      // If auto mode is on, we force delay mode (no STT needed)
-      if (autoGoodMode) {
-        answerMode = "delay";
-      } else {
-        answerMode = answerModeVoiceRadio.checked ? "voice" : "delay";
-      }
+  skipInstructionsAfterFirst = !!skipInstructionsAfterFirstCheckbox.checked;
+  hasSpokenInstructionsOnce = false;
 
-      const secs = parseInt(answerDelaySecondsInput.value, 10);
-      answerDelayMs = isNaN(secs)
-        ? 4000
-        : Math.max(1, Math.min(60, secs)) * 1000;
+  // Start in normal “due today” mode; study-ahead only after completion
+  studyAheadSession = false;
+  noScheduleChanges = false;
+  studyAheadPromptedOnceVoice = false;
+  reviewQueue = [];
+  aheadQueue = [];
+  aheadQueueIndex = 0;
+  clearStudyAheadGapTimer();
+  clearQuestionDelayTimer();
+  hasSpokenCurrentQuestion = false;
+  hasSpokenCurrentAnswer = false;
 
-      const gapSecs = parseInt(studyAheadGapSecondsInput.value, 10);
-      studyAheadGapMs = isNaN(gapSecs)
-        ? 4000
-        : Math.max(1, Math.min(60, gapSecs)) * 1000;
+  // If auto mode is on, force delay mode (no STT needed)
+  if (autoGoodMode) {
+    answerMode = "delay";
+  } else {
+    answerMode = answerModeVoiceRadio.checked ? "voice" : "delay";
+  }
 
-      voiceUI.classList.remove("hidden");
-      silentUI.classList.add("hidden");
+  const secs = parseInt(answerDelaySecondsInput.value, 10);
+  answerDelayMs = isNaN(secs)
+    ? 4000
+    : Math.max(1, Math.min(60, secs)) * 1000;
 
-      
+  const gapSecs = parseInt(studyAheadGapSecondsInput.value, 10);
+  studyAheadGapMs = isNaN(gapSecs)
+    ? 4000
+    : Math.max(1, Math.min(60, gapSecs)) * 1000;
+
+  // Switch UI into voice mode
+  voiceUI.classList.remove("hidden");
+  silentUI.classList.add("hidden");
   showStudySection("voice");
+  setStudyState(StudyState.IDLE);
+
   const intro = autoGoodMode
     ? describeAutoIntro()
     : "Starting hands free study session. I will read a question, then the answer, then ask how hard it was.";
-  setStudyState(StudyState.IDLE);
 
-  // 🔹 Build the card list for this session (same logic runVoiceLoop uses)
+  // 🔹 Build the card list for this session (same due-logic as runVoiceLoop)
   const cardsForSession = getDueCardsForDeck(currentDeckId, false, true);
 
+  if (!cardsForSession.length) {
+    // No cards due: keep behavior nice for both web + native
+    speak("This deck has no cards due right now.", () => {
+      showMainMenu();
+    });
+    return;
+  }
+
+  // Intro → then branch: native iOS (background) vs web
   speak(intro, () => {
-    // 🔹 On native iOS → use background-capable queue
-    if (isNativeIOS) {
+    if (isNativeIOS && NativeAudioPlayer) {
+      // ✅ Native iOS: use background-capable MP3 queue
       startDeckPlayback(cardsForSession);
     } else {
-      // 🔹 On web / simulator → keep existing behavior
+      // 🌐 Web / simulator: keep old voice loop behavior
       runVoiceLoop();
     }
   });

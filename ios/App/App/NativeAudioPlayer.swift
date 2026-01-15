@@ -169,39 +169,41 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
         DispatchQueue.main.async {
             self.currentIndex = 0
 
-            // Build AVPlayerItems from the REAL URLs we got from JS
-            let items: [AVPlayerItem] = urls.compactMap { urlString in
-                guard let url = URL(string: urlString) else {
-                    print("⚠️ [NativeAudioPlayer] Invalid URL in setQueue: \(urlString)")
-                    return nil
+            var items: [AVPlayerItem] = []
+
+            for urlString in urls {
+                if let u = URL(string: urlString) {
+                    print("   ↳ enqueue URL: \(u)")
+                    items.append(AVPlayerItem(url: u))
+                } else {
+                    print("⚠️ [NativeAudioPlayer] Bad URL in setQueue: \(urlString)")
                 }
-                return AVPlayerItem(url: url)
             }
 
             guard !items.isEmpty else {
-                print("❌ [NativeAudioPlayer] setQueue: no valid URLs after parsing")
-                call.reject("No valid URLs in queue")
+                print("❌ [NativeAudioPlayer] No valid URLs after parsing")
+                call.reject("No valid URLs to play")
                 return
             }
 
             let player = AVQueuePlayer(items: items)
             player.actionAtItemEnd = .advance
             player.automaticallyWaitsToMinimizeStalling = false
-
             self.player = player
 
-            // Optional: set Now Playing info for Control Center tile
+            // Now Playing info (for Control Center tile)
             if let first = items.first {
                 let infoCenter = MPNowPlayingInfoCenter.default()
                 let duration = CMTimeGetSeconds(first.asset.duration)
                 infoCenter.nowPlayingInfo = [
-                    MPMediaItemPropertyTitle: "ZenCards Audio",
+                    MPMediaItemPropertyTitle: "ZenCards Study Session",
+                    MPNowPlayingInfoPropertyIsLiveStream: false,
                     MPMediaItemPropertyPlaybackDuration: duration,
                     MPNowPlayingInfoPropertyElapsedPlaybackTime: 0
                 ]
             }
 
-            print("✅ [NativeAudioPlayer] Queue created with \(items.count) AVPlayerItems")
+            print("✅ [NativeAudioPlayer] Queue created with \(items.count) AVPlayerItem(s)")
             call.resolve()
         }
     }
