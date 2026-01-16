@@ -1084,6 +1084,7 @@ async function getOrGenerateAudio(card, side) {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
+    apikey: SUPABASE_ANON_KEY,   // <-- add this back
   },
   body: JSON.stringify(payload),
 });
