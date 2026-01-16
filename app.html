@@ -1084,7 +1084,7 @@ async function getOrGenerateAudio(card, side) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        apikey: SUPABASE_ANON_KEY,
+        // ⬇️ IMPORTANT: leave apikey OUT, only use Authorization
         Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
       },
       body: JSON.stringify(payload),
@@ -1101,7 +1101,7 @@ async function getOrGenerateAudio(card, side) {
     let data;
     try {
       data = JSON.parse(text);
-    } catch {
+    } catch (e) {
       console.error("[TTS] Could not parse JSON from tts-generate:", text);
       return null;
     }
@@ -1115,7 +1115,7 @@ async function getOrGenerateAudio(card, side) {
     cardAudioCache[key] = audioUrl;
     return audioUrl;
   } catch (err) {
-    console.error("[TTS] tts-generate fetch threw:", err);
+    console.error("[TTS] fetch to tts-generate threw:", err);
     return null;
   }
 }
