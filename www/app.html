@@ -1080,15 +1080,13 @@ async function getOrGenerateAudio(card, side) {
   const url = `${SUPABASE_URL}/functions/v1/tts-generate`;
 
   try {
-    const resp = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        // ⬇️ IMPORTANT: leave apikey OUT, only use Authorization
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-      body: JSON.stringify(payload),
-    });
+   const resp = await fetch(url, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify(payload),
+});
 
     const text = await resp.text();
     console.log("[TTS] HTTP", resp.status, text);
