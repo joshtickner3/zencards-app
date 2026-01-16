@@ -1063,15 +1063,11 @@ setupNativePlugins();
 window.setupNativePlugins = setupNativePlugins;
 
 async function getOrGenerateAudio(card, side) {
-  const voice = "alloy";   // OpenAI TTS voice
+  const voice = "alloy";
   const speed = 1.0;
 
   const key = `${card.id}-${side}-${voice}-${speed}`;
   if (cardAudioCache[key]) return cardAudioCache[key];
-
-  // Call the edge function directly via HTTPS instead of supabase.functions.invoke
-  const functionUrl =
-    "https://elpfcnnrripftxoqeckv.functions.supabase.co/tts-generate";
 
   const payload = {
     cardId: card.id,
@@ -1081,40 +1077,45 @@ async function getOrGenerateAudio(card, side) {
     speed,
   };
 
+  const url = `${SUPABASE_URL}/functions/v1/tts-generate`;
+
   try {
-    const resp = await fetch(functionUrl, {
+    const resp = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        // anon key is what the browser should send
         apikey: SUPABASE_ANON_KEY,
         Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
       },
       body: JSON.stringify(payload),
     });
 
+    const text = await resp.text();
+    console.log("[TTS] HTTP", resp.status, text);
+
     if (!resp.ok) {
-      const errText = await resp.text().catch(() => "");
-      console.error(
-        "[TTS] HTTP error from tts-generate:",
-        resp.status,
-        errText
-      );
+      console.error("[TTS] tts-generate HTTP error:", resp.status);
       return null;
     }
 
-    const data = await resp.json().catch(() => null);
-    const audioUrl = data && data.audio_url;
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      console.error("[TTS] Could not parse JSON from tts-generate:", text);
+      return null;
+    }
 
+    const audioUrl = data && data.audio_url;
     if (!audioUrl) {
-      console.error("[TTS] tts-generate returned no audio_url:", data);
+      console.error("[TTS] tts-generate response missing audio_url:", data);
       return null;
     }
 
     cardAudioCache[key] = audioUrl;
     return audioUrl;
   } catch (err) {
-    console.error("[TTS] fetch to tts-generate failed:", err);
+    console.error("[TTS] tts-generate fetch threw:", err);
     return null;
   }
 }
