@@ -1000,8 +1000,8 @@ input[type="number"]:focus{
 const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
     const { createClient } = window.supabase;
-    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
+     window.supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
@@ -1063,11 +1063,15 @@ setupNativePlugins();
 window.setupNativePlugins = setupNativePlugins;
 
 async function getOrGenerateAudio(card, side) {
-  const voice = "alloy";
+  const voice = "alloy"; // default OpenAI voice
   const speed = 1.0;
 
+  // Simple in-memory cache: cardId-side-voice-speed → URL
   const key = `${card.id}-${side}-${voice}-${speed}`;
-  if (cardAudioCache[key]) return cardAudioCache[key];
+  if (cardAudioCache[key]) {
+    console.log("[TTS] cache hit for key", key);
+    return cardAudioCache[key];
+  }
 
   const payload = {
     cardId: card.id,
@@ -1077,31 +1081,17 @@ async function getOrGenerateAudio(card, side) {
     speed,
   };
 
-  const url = `${SUPABASE_URL}/functions/v1/tts-generate`;
+  console.log("[TTS] calling tts-generate with payload:", payload);
 
   try {
-   const resp = await fetch(url, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    apikey: SUPABASE_ANON_KEY,   // <-- add this back
-  },
-  body: JSON.stringify(payload),
-});
+    const { data, error } = await supabaseClient.functions.invoke("tts-generate", {
+      body: payload,
+    });
 
-    const text = await resp.text();
-    console.log("[TTS] HTTP", resp.status, text);
+    console.log("[TTS] tts-generate result:", { data, error });
 
-    if (!resp.ok) {
-      console.error("[TTS] tts-generate HTTP error:", resp.status);
-      return null;
-    }
-
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch (e) {
-      console.error("[TTS] Could not parse JSON from tts-generate:", text);
+    if (error) {
+      console.error("[TTS] tts-generate error:", error);
       return null;
     }
 
@@ -1114,7 +1104,7 @@ async function getOrGenerateAudio(card, side) {
     cardAudioCache[key] = audioUrl;
     return audioUrl;
   } catch (err) {
-    console.error("[TTS] fetch to tts-generate threw:", err);
+    console.error("[TTS] invoke tts-generate threw:", err);
     return null;
   }
 }
