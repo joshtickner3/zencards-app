@@ -1086,25 +1086,33 @@ async function getOrGenerateAudio(card, side) {
 
   console.log("[TTS] payload to tts-generate:", payload);
 
-  const { data, error } = await supabaseClient.functions.invoke("tts-generate", {
-    body: payload,
-  });
+  try {
+    const { data, error } = await window.supabaseClient.functions.invoke(
+      "tts-generate",
+      { body: payload }
+    );
 
-  if (error) {
-    console.error("[TTS] supabase functions.invoke error:", error);
+    console.log("[TTS] invoke result:", { data, error });
+
+    if (error) {
+      console.error("[TTS] supabase functions.invoke error:", error);
+      return null;
+    }
+
+    if (!data || !data.audio_url) {
+      console.error("[TTS] tts-generate missing audio_url:", data);
+      return null;
+    }
+
+    const url = data.audio_url;
+    console.log("[TTS] got audio_url from tts-generate:", url);
+
+    cardAudioCache[key] = url;
+    return url;
+  } catch (err) {
+    console.error("[TTS] invoke threw:", err);
     return null;
   }
-
-  if (!data || !data.audio_url) {
-    console.error("[TTS] tts-generate missing audio_url:", data);
-    return null;
-  }
-
-  const url = data.audio_url;
-  console.log("[TTS] got audio_url from tts-generate:", url);
-
-  cardAudioCache[key] = url;
-  return url;
 }
 
 async function playCardSideAudio(card, side, onEnd) {
@@ -1341,9 +1349,6 @@ function rateCurrentCard(card, rating) {
   // Your existing code: update SRS schedule, save to Supabase, etc.
 }
 
-
-
-window.supabaseClient = supabaseClient;
 window.setSyncLock = window.setSyncLock || function () {};
 window.lockUI = window.lockUI || function () {};
 
