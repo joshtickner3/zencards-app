@@ -13,10 +13,10 @@ const supabase = createClient(supabaseUrl, serviceKey);
 // CORS
 // ─────────────────────────────
 const corsHeaders: Record<string, string> = {
-  // you can temporarily change this to "*" while testing if needed
   "Access-Control-Allow-Origin": "https://zencardstudy.com",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "authorization, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, apikey, content-type, x-client-info",
 };
 
 // ─────────────────────────────
