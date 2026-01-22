@@ -222,9 +222,17 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
 
             // Just make sure the existing session is active; do NOT change category/mode.
             do {
-                try AVAudioSession.sharedInstance().setActive(true)
+                let session = AVAudioSession.sharedInstance()
+
+                // If you do NOT need mic while playing:
+                try session.setCategory(.playback, mode: .default, options: [])
+
+                // If you DO need mic sometimes while playing, use this instead:
+                // try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
+
+                try session.setActive(true)
             } catch {
-                print("⚠️ [NativeAudioPlayer] Could not re-activate audio session: \(error)")
+                print("⚠️ [NativeAudioPlayer] Audio session setup failed: \(error)")
             }
 
             player.volume = 1.0

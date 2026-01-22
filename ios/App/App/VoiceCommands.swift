@@ -11,9 +11,9 @@ public class VoiceCommandsPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "VoiceCommandsPlugin"
     public let jsName = "VoiceCommands"
     public let pluginMethods: [CAPPluginMethod] = [
-        CAPPluginMethod(name: "start",      returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "stop",       returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "isAvailable",returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "start", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "isAvailable", returnType: CAPPluginReturnPromise)
     ]
     
     private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
@@ -70,6 +70,10 @@ public class VoiceCommandsPlugin: CAPPlugin, CAPBridgedPlugin {
         remoteController.teardownRemoteCommands()
         call.resolve()
     }
+    @objc func isAvailable(_ call: CAPPluginCall) {
+        call.resolve(["available": true])
+    }
+
 
     // MARK: - Permissions
 
