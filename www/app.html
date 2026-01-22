@@ -1114,8 +1114,82 @@ async function getOrGenerateAudio(card, side) {
     return null;
   }
 }
+// Cache for non-card prompts (instructions, "Going to main menu", etc.)
+const textAudioCache = {}; // key: voice-speed-textHash -> url
+
+function hashText(s) {
+  // tiny stable hash for cache keys (not crypto)
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return String(h >>> 0);
+}
+
+async function getOrGenerateAudioForText(text, opts = {}) {
+  const voice = opts.voice || "alloy";
+  const speed = typeof opts.speed === "number" ? opts.speed : 1.0;
+
+  const clean = String(text || "").trim();
+  if (!clean) return null;
+
+  const key = `${voice}-${speed}-${hashText(clean)}`;
+  if (textAudioCache[key]) return textAudioCache[key];
+
+  const payload = {
+    // Use a stable synthetic id so your edge function can still store/cache if it wants
+    cardId: `misc_${hashText(clean)}`,
+    side: "misc",
+    text: clean,
+    voice,
+    speed,
+  };
+
+  try {
+    const { data, error } = await window.supabaseClient.functions.invoke(
+      "tts-generate",
+      { body: payload }
+    );
+    if (error) {
+      console.error("[TTS] text invoke error:", error);
+      return null;
+    }
+    const url = data?.audio_url;
+    if (!url) {
+      console.error("[TTS] text missing audio_url:", data);
+      return null;
+    }
+    textAudioCache[key] = url;
+    return url;
+  } catch (e) {
+    console.error("[TTS] text invoke threw:", e);
+    return null;
+  }
+}
+
 
 let nativeAudioGeneration = 0;
+
+async function nativePlaySingleUrl(url, onEnd) {
+  if (!isNativeIOS || !NativeAudioPlayer || !url) return false;
+
+  nativeAudioGeneration++;
+  const myGen = nativeAudioGeneration;
+
+  // stop previous cleanly
+  try { await NativeAudioPlayer.stop(); } catch (_) {}
+
+  let sub = null;
+  if (onEnd && typeof NativeAudioPlayer.addListener === "function") {
+    sub = await NativeAudioPlayer.addListener("trackEnded", () => {
+      if (myGen !== nativeAudioGeneration) return; // stale
+      try { sub?.remove?.(); } catch (_) {}
+      onEnd();
+    });
+  }
+
+  await NativeAudioPlayer.setQueue({ urls: [url] });
+  await NativeAudioPlayer.play();
+  return true;
+}
 
 async function playCardSideAudio(card, side, onEnd) {
   const plainText = getPlainTextFromCard(
@@ -1124,41 +1198,22 @@ async function playCardSideAudio(card, side, onEnd) {
 
   // iOS native path: use MP3 + NativeAudioPlayer
   if (isNativeIOS && NativeAudioPlayer) {
-    nativeAudioGeneration++;
-    const myGen = nativeAudioGeneration;
-
     try {
       const url = await getOrGenerateAudio(card, side);
       if (!url) throw new Error("No audio_url from TTS function");
 
-      // stop previous
-      if (typeof NativeAudioPlayer.stop === "function") {
-        try { await NativeAudioPlayer.stop(); } catch (_) {}
-      }
-
-      // 🔑 one-time trackEnded listener for THIS play
-      let sub = null;
-      if (onEnd && typeof NativeAudioPlayer.addListener === "function") {
-        sub = await NativeAudioPlayer.addListener("trackEnded", () => {
-          // ignore stale callbacks
-          if (myGen !== nativeAudioGeneration) return;
-          try { sub?.remove?.(); } catch (_) {}
-          onEnd();
-        });
-      }
-
-      await NativeAudioPlayer.setQueue({ urls: [url] });
-      await NativeAudioPlayer.play();
-      return;
+      const ok = await nativePlaySingleUrl(url, onEnd);
+      if (ok) return;
     } catch (err) {
-      console.error("[NativeAudio] failed, falling back to TTS:", err);
-      // fall through to web TTS path below
+      console.error("[NativeAudio] failed, falling back to WEB TTS:", err);
+      // fall through
     }
   }
 
-  // 🌐 fallback
-  speak(plainText, onEnd);
+  // Web fallback only (speechSynthesis)
+  speakWithWebTts(plainText, onEnd);
 }
+
 
 
 // ---- NativeAudioPlayer plugin detection (for background audio) ----
@@ -2565,20 +2620,7 @@ function getDeckPhaseCounts(deck) {
     const statusDiv = document.getElementById("status");
     // Prefer native iOS TTS when running inside the Capacitor app
 // Prefer native iOS TTS when running inside the Capacitor app
-let nativeTts = null;
 
-if (window.Capacitor && window.Capacitor.Plugins) {
-  const p = window.Capacitor.Plugins;
-
-  // Try a few likely plugin IDs so we don't mismatch the Swift name
-  nativeTts =
-    p.NativeTTS ||
-    p.NativeTts ||
-    p.NativeTTSPlugin ||
-    null;
-}
-
-const isNativeApp = !!nativeTts;
 console.log("[BOOT] isNativeApp =", isNativeApp, "nativeTts =", nativeTts);
 
 
@@ -2811,52 +2853,41 @@ if (answerDelayAfterSpeechSecInput) {
 }
 
     // Helper: stop all audio + listening
-    function stopAllAudio() {
+    async function stopAllAudio() {
   // Bump generation so any in-flight TTS callbacks ignore their finish
   speakGeneration++;
   clearAnswerAfterSpeechDelay();
 
-  // 🔊 Stop native iOS TTS (if present)
+  // Stop native iOS TTS (if present)
   if (nativeTts) {
-    try {
-      nativeTts.stop();
-    } catch (e) {
-      console.error("Error stopping NativeTTS:", e);
-    }
+    try { await nativeTts.stop?.(); } catch (e) { console.error("Error stopping NativeTTS:", e); }
   }
-   if (isNativeIOS && NativeAudioPlayer) {
+
+  // ✅ Stop native audio player (and invalidate stale trackEnded callbacks)
+  if (isNativeIOS && NativeAudioPlayer) {
     try {
-      NativeAudioPlayer.stop();   // or pause(), depending on your plugin
+      nativeAudioGeneration++; // invalidate any pending trackEnded callbacks
+      await NativeAudioPlayer.stop();
     } catch (e) {
       console.error("Error stopping NativeAudioPlayer:", e);
     }
-    // Optional: reset indices so a new session starts fresh
     currentAudioIndex = 0;
     currentCardIndex = 0;
   }
 
-  // 🔊 Stop browser TTS
+  // Stop browser TTS
   if (window.speechSynthesis) {
-    try {
-      window.speechSynthesis.cancel();
-    } catch (e) {
-      console.error("Error cancelling browser speech:", e);
-    }
+    try { window.speechSynthesis.cancel(); } catch (e) { console.error("Error cancelling browser speech:", e); }
   }
 
   isSpeaking = false;
 
-  // Stop native voice plugin (speech recognition)
+  // Stop speech recognition
   if (nativeVoicePlugin) {
-    try {
-      nativeVoicePlugin.stop();
-    } catch (e) {
-      console.error("Error stopping native voice plugin:", e);
-    }
+    try { await nativeVoicePlugin.stop?.(); } catch (e) { console.error("Error stopping native voice plugin:", e); }
     nativeVoiceActiveCallback = null;
   }
 
-  // Stop browser Web SpeechRecognition
   if (recognition) {
     try {
       keepListening = false;
@@ -2872,34 +2903,21 @@ if (answerDelayAfterSpeechSecInput) {
 
   // Wrapper: choose NativeTTS (iOS app) or browser TTS (web)
 function speak(text, onEnd) {
-  // Always sync with the UI controls right before speaking,
-  // so intro + cards all use the exact same volume & rate.
+  // Sync UI controls
   if (ttsRateInput) {
     const v = parseFloat(ttsRateInput.value);
-    if (!isNaN(v)) {
-      ttsRate = Math.max(0.5, Math.min(2, v));
-    }
+    if (!isNaN(v)) ttsRate = Math.max(0.5, Math.min(2, v));
   }
   if (ttsVolumeInput) {
     const v = parseFloat(ttsVolumeInput.value);
-    if (!isNaN(v)) {
-      ttsVolume = Math.max(0, Math.min(1, v));
-    }
+    if (!isNaN(v)) ttsVolume = Math.max(0, Math.min(1, v));
   }
 
-  // 🔇 Make sure NO mic is listening before we start speaking.
+  // stop mic before speaking
   if (nativeVoicePlugin) {
-    try {
-      nativeVoicePlugin.stop();
-    } catch (e) {
-      console.error(
-        "Error stopping native voice plugin before speaking:",
-        e
-      );
-    }
+    try { nativeVoicePlugin.stop(); } catch (_) {}
     nativeVoiceActiveCallback = null;
   }
-
   if (recognition) {
     try {
       keepListening = false;
@@ -2907,43 +2925,46 @@ function speak(text, onEnd) {
       recognition.onerror = null;
       recognition.onend = null;
       recognition.stop();
-    } catch (e) {
-      console.error("Error stopping browser recognition before speaking:", e);
-    }
+    } catch (_) {}
   }
 
-   // If we’re inside the iOS app and NativeTTS is available, use that first.
-  if (nativeTts) {
-    console.log("[TTS] Using NATIVE plugin TTS");
+  // ✅ iOS app path: MP3 via NativeAudioPlayer (background-safe)
+  if (isNativeIOS && NativeAudioPlayer) {
     speakGeneration++;
     const myGeneration = speakGeneration;
 
     isSpeaking = true;
     setStatus("Speaking...");
 
-    nativeTts
-      .speak({
-        text,
-        rate: ttsRate,
-        volume: ttsVolume,
-      })
-      .then(() => {
+    (async () => {
+      const url = await getOrGenerateAudioForText(text, { voice: "alloy", speed: 1.0 });
+      if (!url) {
+        // If MP3 generation fails, *then* fallback to web TTS (still works in simulator/web)
+        console.warn("[TTS] MP3 missing, falling back to web TTS");
+        speakWithWebTts(text, () => {
+          if (myGeneration !== speakGeneration) return;
+          isSpeaking = false;
+          setStatus("");
+          onEnd && onEnd();
+        });
+        return;
+      }
+
+      await nativePlaySingleUrl(url, () => {
         if (myGeneration !== speakGeneration) return;
         isSpeaking = false;
         setStatus("");
-        if (onEnd) onEnd();
-      })
-      .catch((err) => {
-        console.error("[TTS] NativeTTS error, falling back to web TTS:", err);
-        // Fallback to browser TTS if native fails
-        speakWithWebTts(text, onEnd);
+        onEnd && onEnd();
       });
+    })().catch((e) => {
+      console.error("[TTS] native MP3 speak crashed:", e);
+      speakWithWebTts(text, onEnd);
+    });
 
     return;
   }
 
-  console.log("[TTS] Using WEB speechSynthesis fallback");
-  // Otherwise (web / simulator without plugin): use browser TTS
+  // Web path
   speakWithWebTts(text, onEnd);
 }
 
@@ -3734,11 +3755,8 @@ setCardContent(silentAnswerText, currentCard.answer);
       );
     }
    // NEW: stop any current audio, then confirm + go to main menu
-function speakAndGoToMainMenu() {
-  // 🔇 cut off any answer TTS or listening that might still be running
-  stopAllAudio();
-
-  // Now speak a quick confirmation, then end the session
+async function speakAndGoToMainMenu() {
+  await stopAllAudio();
   speak("Going to the main menu.", () => {
     endStudySession();
   });
@@ -3794,11 +3812,11 @@ playCardSideAudio(currentCard, "question", () => {
 });
     }
 
-    function handleNextCardSkip() {
+    async function handleNextCardSkip() {
   if (!currentCard || !currentDeckId) return;
 
   // 1) Hard stop anything that could still fire the answer later
-  stopAllAudio();                 // cancels TTS + mic
+ await stopAllAudio();               // cancels TTS + mic
   clearQuestionDelayTimer();      // kills delay-mode timer
   clearStudyAheadGapTimer();      // kills study-ahead gap window
   clearAnswerAfterSpeechDelay();  // kills “answer after I stop speaking” timer
@@ -4106,8 +4124,8 @@ if (inAnswerAfterSpeechDelay) {
   if (handleGlobalVoiceCommands(text)) return;
   // ✅ Next card = skip answer + auto-easy (or just advance in study-ahead)
 if (isNextCardCommand(text) && currentMode === "voice") {
-  handleNextCardSkip();
-  return;
+ handleNextCardSkip().catch(console.error);
+return;
 }
   // ===== Mic mute command: ONLY during voice-answer gap (after question, before answer) =====
 if (awaitingAnswerSignal && currentMode === "voice") {
