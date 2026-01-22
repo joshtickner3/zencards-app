@@ -1115,6 +1115,8 @@ async function getOrGenerateAudio(card, side) {
   }
 }
 
+let nativeAudioGeneration = 0;
+
 async function playCardSideAudio(card, side, onEnd) {
   const plainText = getPlainTextFromCard(
     side === "question" ? card.question : card.answer
@@ -1122,32 +1124,30 @@ async function playCardSideAudio(card, side, onEnd) {
 
   // iOS native path: use MP3 + NativeAudioPlayer
   if (isNativeIOS && NativeAudioPlayer) {
+    nativeAudioGeneration++;
+    const myGen = nativeAudioGeneration;
+
     try {
-      console.log("[NativeAudio] playCardSideAudio:", {
-        side,
-        cardId: card.id,
-      });
-
       const url = await getOrGenerateAudio(card, side);
-      if (!url) {
-        throw new Error("No audio_url from TTS function");
-      }
+      if (!url) throw new Error("No audio_url from TTS function");
 
-      console.log("[NativeAudio] MP3 URL =", url);
-
-      // Clear any previous queue
+      // stop previous
       if (typeof NativeAudioPlayer.stop === "function") {
-        await NativeAudioPlayer.stop();
+        try { await NativeAudioPlayer.stop(); } catch (_) {}
       }
 
-      // Set queue with our single MP3
+      // 🔑 one-time trackEnded listener for THIS play
+      let sub = null;
+      if (onEnd && typeof NativeAudioPlayer.addListener === "function") {
+        sub = await NativeAudioPlayer.addListener("trackEnded", () => {
+          // ignore stale callbacks
+          if (myGen !== nativeAudioGeneration) return;
+          try { sub?.remove?.(); } catch (_) {}
+          onEnd();
+        });
+      }
+
       await NativeAudioPlayer.setQueue({ urls: [url] });
-
-      // Optional: register callback for when playback ends
-      if (onEnd) {
-        NativeAudioPlayer.onFinished = onEnd;
-      }
-
       await NativeAudioPlayer.play();
       return;
     } catch (err) {
@@ -1156,11 +1156,7 @@ async function playCardSideAudio(card, side, onEnd) {
     }
   }
 
-  // 🌐 Fallback: your existing TTS pipeline (web or NativeTTS)
-  console.log("[NativeAudio] Using fallback speak() for", {
-    side,
-    cardId: card.id,
-  });
+  // 🌐 fallback
   speak(plainText, onEnd);
 }
 
@@ -1234,22 +1230,10 @@ async function playWithNativeAudioPlayer(cards) {
 // Single entry point: decides native iOS vs normal web behavior
 // Single entry point: decides native iOS vs normal web behavior
 async function startDeckPlayback(cards) {
-  // On the web / simulator, always use the normal flow
-  if (!isNativeIOS || !NativeAudioPlayer) {
-    console.log("[NativeAudio] Not native iOS – using normal runVoiceLoop()");
-    runVoiceLoop();
-    return;
-  }
-
-  // Native iOS path: try background queue first
-  const ok = await playWithNativeAudioPlayer(cards);
-
-  if (!ok) {
-    console.warn(
-      "[NativeAudio] Background queue not available; falling back to normal runVoiceLoop()."
-    );
-    runVoiceLoop();
-  }
+  // Option A: always use the normal JS-controlled flow.
+  // Audio output will still be native/backgrounded because playCardSideAudio() handles that.
+  console.log("[NativeAudio] Option A: using runVoiceLoop() (single-track playback)");
+  runVoiceLoop();
 }
 
 let currentAudioIndex = 0; // 0 = first question audio in queue
@@ -1288,29 +1272,9 @@ async function maybePrefetchMore(cards) {
 function setupNativeAudioListeners(cards) {
   if (!isNativeIOS || !NativeAudioPlayer) return;
 
-  console.log("[NativeAudio] Setting up listeners");
+  console.log("[NativeAudio] Setting up listeners (Option A)");
 
-  NativeAudioPlayer.addListener("trackEnded", (info) => {
-    currentAudioIndex = info.index ?? (currentAudioIndex + 1);
-
-    // Every card has 2 audio tracks: question (even) and answer (odd)
-    const cardIndex = Math.floor(currentAudioIndex / 2);
-    const isAnswer = currentAudioIndex % 2 === 1;
-
-    console.log(
-      "[NativeAudio] trackEnded:",
-      "index =", currentAudioIndex,
-      "cardIndex =", cardIndex,
-      "isAnswer =", isAnswer
-    );
-
-    if (isAnswer) {
-      // Just finished answer → now we rate & move to next card
-      currentCardIndex = cardIndex;
-      maybePrefetchMore(cards);
-    }
-  });
-
+  // ONLY remote commands, no trackEnded-driven progression
   NativeAudioPlayer.addListener("remoteCommand", (info) => {
     const type = info.type;
     console.log("[NativeAudio] remoteCommand:", type);
@@ -1318,7 +1282,6 @@ function setupNativeAudioListeners(cards) {
     if (type === "next") {
       handleNextTapAsRating(cards);
     }
-    // "play" and "pause" can be handled if you want to sync UI
   });
 }
 
@@ -4355,11 +4318,15 @@ function speakAnswerThenAskDifficulty() {
       ? "How was that? Say again, hard, good, or easy."
       : "How was that?";
 
-    speak(promptText, () => {
-      if (!isPaused) {
-        listenForCommand(handleVoiceTranscript);
-      }
-    });
+    if (isNativeIOS && NativeAudioPlayer) {
+  // ✅ background-safe: don’t rely on NativeTTS here
+  setStatus(promptText);
+  if (!isPaused) listenForCommand(handleVoiceTranscript);
+} else {
+  speak(promptText, () => {
+    if (!isPaused) listenForCommand(handleVoiceTranscript);
+  });
+}
   });
 }
 
@@ -5051,14 +5018,8 @@ startVoiceBtn.addEventListener("click", async () => {
 
   // Intro → then branch: native iOS (background) vs web
   speak(intro, () => {
-    if (isNativeIOS && NativeAudioPlayer) {
-      // ✅ Native iOS: use background-capable MP3 queue
-      startDeckPlayback(cardsForSession);
-    } else {
-      // 🌐 Web / simulator: keep old voice loop behavior
-      runVoiceLoop();
-    }
-  });
+  runVoiceLoop(); // ✅ Option A: JS-controlled flow always
+});
 });
     // <<< END MODIFIED HANDLER <<<
 
