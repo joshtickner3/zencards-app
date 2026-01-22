@@ -102,8 +102,15 @@ public class VoiceCommandsPlugin: CAPPlugin, CAPBridgedPlugin {
     private func configureAudioSessionForListening() {
         let session = AVAudioSession.sharedInstance()
         do {
-            // IMPORTANT: record-only session while listening
-            try session.setCategory(.record, mode: .measurement, options: [])
+            // ✅ supports playing audio AND using the mic
+            try session.setCategory(
+                .playAndRecord,
+                mode: .measurement,
+                options: [
+                    .defaultToSpeaker,    // routes to speaker instead of receiver
+                    .allowBluetooth       // allows BT headsets for mic
+                ]
+            )
             try session.setActive(true, options: [])
         } catch {
             print("AudioSession listening config error: \(error)")
@@ -126,7 +133,7 @@ public class VoiceCommandsPlugin: CAPPlugin, CAPBridgedPlugin {
         recognitionRequest.shouldReportPartialResults = true
 
         let inputNode = audioEngine.inputNode
-        let recordingFormat = inputNode.outputFormat(forBus: 0)
+        let recordingFormat = inputNode.inputFormat(forBus: 0)
 
         inputNode.removeTap(onBus: 0)
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in

@@ -18,12 +18,27 @@ const supabase = createClient(supabaseUrl, serviceKey);
 // ─────────────────────────────
 // CORS
 // ─────────────────────────────
-const corsHeaders: Record<string, string> = {
-  "Access-Control-Allow-Origin": "https://zencardstudy.com",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers":
-    "authorization, apikey, content-type, x-client-info",
-};
+
+function buildCorsHeaders(req: Request) {
+  const origin = req.headers.get("origin") ?? "";
+
+  const allowed = new Set([
+    "https://zencardstudy.com",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "capacitor://localhost",
+    "ionic://localhost",
+  ]);
+
+  const allowOrigin = allowed.has(origin) ? origin : "https://zencardstudy.com";
+
+  return {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Vary": "Origin",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
+  };
+}
 
 // ─────────────────────────────
 // OpenAI TTS → MP3
@@ -78,7 +93,9 @@ async function synthesizeToMp3(
 // ─────────────────────────────
 // HTTP handler
 // ─────────────────────────────
+
 serve(async (req) => {
+  const corsHeaders = buildCorsHeaders(req);
   // CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -102,6 +119,9 @@ serve(async (req) => {
     }
 
     const { cardId, side, text, voice, speed } = body;
+    const voiceNorm = typeof voice === "string" && voice.length ? voice : "alloy";
+const speedNorm = typeof speed === "number" ? speed : 1.0;
+
 
     if (!cardId || !side || !text) {
       return new Response(
@@ -119,8 +139,8 @@ serve(async (req) => {
       .select("audio_url, voice, speed")
       .eq("card_id", cardId)
       .eq("side", side)
-      .eq("voice", voice)
-      .eq("speed", speed)
+     .eq("voice", voiceNorm)
+.eq("speed", speedNorm)
       .maybeSingle();
 
     if (existingError) {
@@ -128,11 +148,11 @@ serve(async (req) => {
     }
 
     if (existing && existing.audio_url) {
-      console.log("[tts-generate] cache hit", { cardId, side, voice, speed });
-      return new Response(
-        JSON.stringify({ audio_url: existing.audio_url }),
-        { headers: { "Content-Type": "application/json", ...corsHeaders } },
-      );
+      console.log("[tts-generate] cache hit", { cardId, side, voice: voiceNorm, speed: speedNorm });
+      return new Response(JSON.stringify({ audio_url: existing.audio_url }), {
+  status: 200,
+  headers: { "Content-Type": "application/json", ...corsHeaders },
+});
     }
 
     console.log("[tts-generate] cache miss – generating", {
@@ -143,7 +163,7 @@ serve(async (req) => {
     });
 
     // 2) Generate MP3 via OpenAI
-    const mp3Bytes = await synthesizeToMp3(text, voice, speed);
+  const mp3Bytes = await synthesizeToMp3(text, voiceNorm, speedNorm);
 
     // 3) Upload to Storage
     const filePath = `${cardId}/${side}-${Date.now()}.mp3`;
@@ -178,8 +198,8 @@ serve(async (req) => {
         card_id: cardId,
         side,
         audio_url: publicUrl,
-        voice,
-        speed,
+         voice: voiceNorm,
+  speed: speedNorm,
       })
       .select("audio_url")
       .single();
@@ -191,10 +211,11 @@ serve(async (req) => {
 
     console.log("[tts-generate] success", { cardId, side });
 
-    return new Response(
-      JSON.stringify({ audio_url: inserted.audio_url }),
-      { headers: { "Content-Type": "application/json", ...corsHeaders } },
-    );
+    return new Response(JSON.stringify({ audio_url: inserted.audio_url }), {
+  status: 200,
+  headers: { "Content-Type": "application/json", ...corsHeaders },
+});
+
   } catch (e) {
     console.error("[tts-generate] error:", e);
     const message = e instanceof Error ? e.message : String(e);
