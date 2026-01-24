@@ -5153,37 +5153,58 @@ startVoiceBtn.addEventListener("click", async () => {
 }
 
  async function init() {
-  // 1) Load local first (fast)
+  // 0) Setup native plugins first
+  try { setupNativePlugins(); } catch (e) { console.warn("setupNativePlugins failed:", e); }
+  try { initNativeVoicePlugin(); } catch (e) { console.warn("initNativeVoicePlugin failed:", e); }
+
+  // 1) Check session early - if no session, redirect to login
+  try {
+    const { data: sessionData, error: sessErr } = await supabaseClient.auth.getSession();
+    const session = sessionData?.session || null;
+
+    console.log("[BOOT] getSession()", {
+      hasSession: !!session,
+      sessErr: sessErr ? { message: sessErr.message, name: sessErr.name } : null
+    });
+
+    if (!session) {
+      console.warn("[BOOT] No session. Redirecting to index.html");
+      window.location.replace("index.html");
+      return;
+    }
+
+    // 2) Set currentUser + show auth bar
+    currentUser = session.user;
+    if (userEmailLabel) userEmailLabel.textContent = currentUser.email || "";
+    if (authLoggedIn) authLoggedIn.classList.remove("hidden");
+
+  } catch (e) {
+    console.error("[BOOT] Session check failed:", e);
+    window.location.replace("index.html");
+    return;
+  }
+
+  // 3) Load local data first (fast)
   try {
     loadFromStorage();
   } catch (e) {
     console.error("loadFromStorage failed:", e);
   }
 
-  // 2) Immediately render whatever we have locally
+  // 4) Immediately render whatever we have locally
   try {
     if (typeof rebuildDeckUI === "function") rebuildDeckUI();
   } catch (e) {
     console.error("rebuildDeckUI (local) failed:", e);
   }
 
-  // 3) Native plugin wiring
-  try { setupNativePlugins(); } catch (e) { console.warn("setupNativePlugins failed:", e); }
-  try { initNativeVoicePlugin(); } catch (e) { console.warn("initNativeVoicePlugin failed:", e); }
-
-  // 4) Remote load (if logged in)
+  // 5) Load remote state (if logged in)
   try {
-    const { data: { session }, error } = await supabaseClient.auth.getSession();
-    if (error) console.error("getSession error:", error);
-
-    console.log("[app.html] session:", session);
-    console.log("[app.html] user:", session?.user);
-
-    if (session?.user && typeof loadStateFromSupabase === "function") {
+    if (currentUser && typeof loadStateFromSupabase === "function") {
       await loadStateFromSupabase();
       hasLoadedRemote = true;
 
-      // 5) Re-render again AFTER remote arrives
+      // 6) Re-render again AFTER remote arrives
       try {
         if (typeof rebuildDeckUI === "function") rebuildDeckUI();
       } catch (e) {
