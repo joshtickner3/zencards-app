@@ -2329,6 +2329,13 @@ function getDeckPhaseCounts(deck) {
   return { newCount, learningCount, reviewCount };
 }
 
+// ===== Rebuild entire deck UI (called on init and after remote load) =====
+function rebuildDeckUI() {
+  console.log("[REBUILD] rebuildDeckUI called", { decksLen: decks.length });
+  refreshDeckSelect();
+  refreshCardsList();
+}
+
     function refreshDeckSelect() {
   const currentValue = selectedDeckId;
   deckSelect.innerHTML = "";
