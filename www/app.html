@@ -5117,13 +5117,19 @@ startVoiceBtn.addEventListener("click", async () => {
   autoEnterStudyAhead = !!autoEnterStudyAheadCheckbox.checked;
   loopStudyAhead = !!loopStudyAheadCheckbox.checked;
 
+  // ✅ Determine answer mode (needed to decide if we need VoiceCommands)
+  const selectedAnswerMode = answerModeVoiceRadio.checked ? "voice" : "delay";
+
   // ✅ Only initialize VoiceCommands if we actually need voice input
-  // Skip if in auto-good mode (no STT needed)
-  if (!autoGoodMode) {
+  // Skip if in auto-good mode WITH delay answer (no STT needed)
+  // But DO initialize if answer mode is "voice" (need to detect when user speaks)
+  const needsVoiceCommands = !autoGoodMode || selectedAnswerMode === "voice";
+  
+  if (needsVoiceCommands) {
     try { setupNativePlugins(); } catch (_) {}
     try { initNativeVoicePlugin(); } catch (_) {}
   } else {
-    // In auto-good mode, ensure VoiceCommands is stopped if it was already running
+    // Auto-good mode with delay answer - no voice commands needed
     if (nativeVoicePlugin) {
       try { await nativeVoicePlugin.stop(); } catch (_) {}
     }
@@ -5138,9 +5144,9 @@ startVoiceBtn.addEventListener("click", async () => {
 
   // ✅ Browser-only mic permission (NEVER in native app)
   if (
-    !isNativeApp &&                   // ✅ key change
-    !nativeVoicePlugin &&             // not using native iOS STT plugin
-    !autoGoodMode &&                  // only needed when we actually need voice commands
+    !isNativeApp &&                     // ✅ key change
+    !nativeVoicePlugin &&               // not using native iOS STT plugin
+    needsVoiceCommands &&               // only needed when we actually need voice commands
     navigator.mediaDevices &&
     navigator.mediaDevices.getUserMedia
   ) {
@@ -5158,9 +5164,8 @@ startVoiceBtn.addEventListener("click", async () => {
     }
   }
 
-  // If there is NO native plugin and NO browser STT, and we are not in auto mode,
-  // then we can't do voice commands.
-  if (!nativeVoicePlugin && !speechSupported && !autoGoodMode) {
+  // If we need voice commands but have NO native plugin and NO browser STT, we can't proceed
+  if (needsVoiceCommands && !nativeVoicePlugin && !speechSupported) {
     alert("Speech recognition not supported in this environment.");
     return;
   }
@@ -5184,12 +5189,9 @@ startVoiceBtn.addEventListener("click", async () => {
   hasSpokenCurrentQuestion = false;
   hasSpokenCurrentAnswer = false;
 
-  // If auto mode is on, force delay mode (no STT needed)
-  if (autoGoodMode) {
-    answerMode = "delay";
-  } else {
-    answerMode = answerModeVoiceRadio.checked ? "voice" : "delay";
-  }
+  // Determine answer mode from user selection (NOT forced by autoGoodMode)
+  // autoGoodMode just changes HOW we rate, not WHEN we show the answer
+  answerMode = answerModeVoiceRadio.checked ? "voice" : "delay";
 
   const secs = parseInt(answerDelaySecondsInput.value, 10);
   answerDelayMs = isNaN(secs) ? 4000 : Math.max(1, Math.min(60, secs)) * 1000;
