@@ -125,17 +125,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     private func configureAudioSession() {
         let session = AVAudioSession.sharedInstance()
         do {
-            // CRITICAL: Configure to FORCE audio output to speaker
+            // CRITICAL: Use .playAndRecord with defaultToSpeaker to force speaker output
+            // (defaultToSpeaker only works with .playAndRecord, not .playback)
             try session.setCategory(
-                .playback,
+                .playAndRecord,
                 mode: .default,
                 options: [
                     .duckOthers,                        // Lower other app audio
-                    .defaultToSpeaker                   // Route to speaker NOT receiver
+                    .defaultToSpeaker,                  // Route to speaker NOT receiver
+                    .allowBluetooth                     // Allow Bluetooth audio devices
                 ]
             )
             try session.setActive(true, options: .notifyOthersOnDeactivation)
-            print("🔊 [AppDelegate] Audio session configured: .playback + defaultToSpeaker")
+            print("🔊 [AppDelegate] Audio session configured: .playAndRecord + defaultToSpeaker + duckOthers")
         } catch {
             print("❌ [AppDelegate] Audio session error: \(error)")
         }
