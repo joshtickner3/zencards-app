@@ -1213,6 +1213,17 @@ async function nativePlaySingleUrl(url, onEnd) {
   nativeAudioGeneration++;
   const myGen = nativeAudioGeneration;
 
+  // CRITICAL: Stop VoiceCommands listening BEFORE playing audio
+  // Otherwise AVAudioEngine locks the audio input and prevents playback
+  if (nativeVoicePlugin) {
+    try {
+      console.log("[NativeAudio] Stopping VoiceCommands to allow audio playback");
+      await nativeVoicePlugin.stop();
+    } catch (e) {
+      console.warn("[NativeAudio] Failed to stop VoiceCommands:", e);
+    }
+  }
+
   // cleanup helper
   const cleanup = async () => {
     if (nativeEndedWatchdogId) {
@@ -5100,15 +5111,23 @@ startVoiceBtn.addEventListener("click", async () => {
   saveLastMode("voice");
   if (selectedDeckId) saveLastDeckId(selectedDeckId);
 
-  // ✅ Make sure native plugins are detected *right now*
-  try { setupNativePlugins(); } catch (_) {}
-  try { initNativeVoicePlugin(); } catch (_) {}
-
-  // ✅ Set autoGoodMode/options BEFORE any mic permission logic
+  // ✅ Set autoGoodMode/options EARLY so we can use it for conditional initialization
   autoModeBehavior = autoRatingSelect.value || "good";
   autoGoodMode = !!autoGoodToggle.checked;
   autoEnterStudyAhead = !!autoEnterStudyAheadCheckbox.checked;
   loopStudyAhead = !!loopStudyAheadCheckbox.checked;
+
+  // ✅ Only initialize VoiceCommands if we actually need voice input
+  // Skip if in auto-good mode (no STT needed)
+  if (!autoGoodMode) {
+    try { setupNativePlugins(); } catch (_) {}
+    try { initNativeVoicePlugin(); } catch (_) {}
+  } else {
+    // In auto-good mode, ensure VoiceCommands is stopped if it was already running
+    if (nativeVoicePlugin) {
+      try { await nativeVoicePlugin.stop(); } catch (_) {}
+    }
+  }
 
   // ✅ Deck id: fall back to dropdown value if selectedDeckId isn't set
   currentDeckId = selectedDeckId || (deckSelect ? deckSelect.value : null);
