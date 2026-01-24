@@ -8,7 +8,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
     private var backgroundTaskId: UIBackgroundTaskIdentifier = .invalid
-    private var backgroundTaskRenewalTimer: Timer?
+    private var backgroundTaskQueue = DispatchSourceTimer()
+    private let backgroundQueue = DispatchQueue(label: "com.zencards.background-task")
 
     // MARK: - App Launch
     func application(
@@ -41,29 +42,63 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func applicationDidEnterBackground(_ application: UIApplication) {
         print("📱 [AppDelegate] App entered background")
-        // Request background execution time to keep audio session alive
-        // Renew every 2.5 minutes to keep it alive indefinitely while audio plays
-        beginBackgroundTask()
-        startBackgroundTaskRenewal()
+        beginBackgroundTaskWithRenewal()
     }
 
     func applicationWillEnterForeground(_ application: UIApplication) {
         print("📱 [AppDelegate] App will enter foreground")
-        // Clean up background task when returning to foreground
-        stopBackgroundTaskRenewal()
+        endBackgroundTaskWithRenewal()
+    }
+
+    private func beginBackgroundTaskWithRenewal() {
+        // End any existing task and timer first
+        endBackgroundTaskWithRenewal()
+        
+        // Start initial background task
+        beginBackgroundTask()
+        
+        // Create a GCD timer (more reliable than NSTimer for background tasks)
+        let timer = DispatchSourceTimer()
+        timer.schedule(deadline: .now() + 150, repeating: 150.0, leeway: .seconds(5))
+        
+        timer.setEventHandler { [weak self] in
+            print("🔄 [AppDelegate] GCD Timer: Renewing background task...")
+            self?.endBackgroundTask()
+            self?.beginBackgroundTask()
+        }
+        
+        backgroundQueue.async {
+            timer.resume()
+            self.backgroundTaskQueue = timer
+        }
+        
+        print("⏰ [AppDelegate] Starting background task renewal with GCD (every 150s)")
+    }
+
+    private func endBackgroundTaskWithRenewal() {
+        print("⏸ [AppDelegate] Stopping background task and timer")
+        
+        // Cancel the timer
+        backgroundQueue.async {
+            self.backgroundTaskQueue.cancel()
+        }
+        
+        // End the background task
         endBackgroundTask()
     }
 
     private func beginBackgroundTask() {
-        // End any existing task first
+        // End any existing task first to avoid warnings
         if backgroundTaskId != .invalid {
             UIApplication.shared.endBackgroundTask(backgroundTaskId)
         }
         
         backgroundTaskId = UIApplication.shared.beginBackgroundTask(withName: "ZenCardsAudioPlayback") { [weak self] in
-            print("�� [AppDelegate] Background task expiration handler called")
-            self?.endBackgroundTask()
+            print("🛑 [AppDelegate] Background task expiration handler fired")
+            // Immediately start a new one to keep going
+            self?.beginBackgroundTask()
         }
+        
         print("🔄 [AppDelegate] Background task started: \(backgroundTaskId.rawValue)")
     }
 
@@ -73,24 +108,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             print("🛑 [AppDelegate] Background task ended: \(backgroundTaskId.rawValue)")
             backgroundTaskId = .invalid
         }
-    }
-
-    private func startBackgroundTaskRenewal() {
-        backgroundTaskRenewalTimer?.invalidate()
-        
-        print("⏰ [AppDelegate] Starting background task renewal timer")
-        // Renew every 2.5 minutes (150 seconds) to keep background execution alive
-        backgroundTaskRenewalTimer = Timer.scheduledTimer(withTimeInterval: 150.0, repeats: true) { [weak self] _ in
-            print("🔄 [AppDelegate] Timer: Renewing background task...")
-            self?.endBackgroundTask()
-            self?.beginBackgroundTask()
-        }
-    }
-
-    private func stopBackgroundTaskRenewal() {
-        print("⏸ [AppDelegate] Stopping background task renewal timer")
-        backgroundTaskRenewalTimer?.invalidate()
-        backgroundTaskRenewalTimer = nil
     }
 
     // MARK: - Permissions
@@ -114,13 +131,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             try session.setCategory(
                 .playback,
                 mode: .default,
-                options: [
-                    .duckOthers,              // Lower volume of other apps
-                    .interruptSpokenAudioAndMixWithOthers  // Don't stop other audio, just mix
-                ]
+                options: [.duckOthers]
             )
             try session.setActive(true, options: .notifyOthersOnDeactivation)
-            print("✅ Background audio session configured (aggressive mode)")
+            print("✅ Background audio session configured")
         } catch {
             print("❌ Audio session error: \(error)")
         }
