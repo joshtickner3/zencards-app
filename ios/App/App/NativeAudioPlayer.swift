@@ -216,10 +216,23 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
             // These must be set BEFORE calling play()
             player.preventsDisplaySleepDuringVideoPlayback = false
             
+            // Now Playing info (for Control Center tile)
+            if let first = items.first {
+                let infoCenter = MPNowPlayingInfoCenter.default()
+                let duration = CMTimeGetSeconds(first.asset.duration)
+                infoCenter.nowPlayingInfo = [
+                    MPMediaItemPropertyTitle: "ZenCards Study Session",
+                    MPNowPlayingInfoPropertyIsLiveStream: false,
+                    MPMediaItemPropertyPlaybackDuration: duration,
+                    MPNowPlayingInfoPropertyElapsedPlaybackTime: 0
+                ]
+            }
+            
             // Log queue setup for debugging
             print("✅ [NativeAudioPlayer] Queue created with \(items.count) AVPlayerItem(s)")
             print("   ↳ actionAtItemEnd: advance")
             print("   ↳ automaticallyWaitsToMinimizeStalling: false")
+            call.resolve()
         }
     }
 
