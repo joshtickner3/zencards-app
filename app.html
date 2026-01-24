@@ -1218,9 +1218,8 @@ async function nativePlaySingleUrl(url, onEnd) {
     nativeEndedSubs = [];
   };
 
-  // stop previous cleanly + remove old listeners
+  // Clean up old listeners ONLY (don't stop the player to avoid iOS suspension issues)
   try { await cleanup(); } catch (_) {}
-  try { await NativeAudioPlayer.stop(); } catch (_) {}
 
   // One unified "ended" handler (ignore stale generations)
   const ended = async () => {
@@ -1259,9 +1258,16 @@ async function nativePlaySingleUrl(url, onEnd) {
     ended();
   }, 90000);
 
-  // Start playback
-  await NativeAudioPlayer.setQueue({ urls: [url] });
-  await NativeAudioPlayer.play();
+  // CRITICAL: Don't call stop() before setQueue - iOS may suspend between calls while backgrounded
+  // Just update the queue with new URL and ensure playing
+  try {
+    await NativeAudioPlayer.setQueue({ urls: [url] });
+    console.log("[NativeAudio] Queue updated with new URL, calling play()");
+    await NativeAudioPlayer.play();
+  } catch (e) {
+    console.error("[NativeAudio] Failed to setQueue or play:", e);
+    return false;
+  }
 
   return true;
 }
