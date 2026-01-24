@@ -4298,13 +4298,6 @@ if (awaitingAnswerSignal && currentMode === "voice") {
 
     return; // important: don’t fall through
   }
-  
-  // ✅ If we get here while awaitingAnswerSignal is true, the user said something OTHER than "mute microphone"
-  // So proceed with playing the answer
-  console.log("[VOICE] User spoke in voice-answer mode (not mute), calling startOrResetAnswerAfterSpeechDelay");
-  awaitingAnswerSignal = false;
-  startOrResetAnswerAfterSpeechDelay();
-  return;
 }
 
   // If we were in the study-ahead answer gap, we no longer need a special case here;
@@ -4339,6 +4332,12 @@ if (awaitingAnswerSignal && currentMode === "voice") {
   }
 
   // If we're waiting for the user to say "I'm ready" in voice-answer mode
+  if (awaitingAnswerSignal) {
+  console.log("[VOICE] User spoke in voice-answer mode, calling startOrResetAnswerAfterSpeechDelay");
+  awaitingAnswerSignal = false;
+  startOrResetAnswerAfterSpeechDelay();
+  return;
+}
 
   // Difficulty / rating flow (normal, schedule-changing mode only)
   if (awaitingDifficulty) {
