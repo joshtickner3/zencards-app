@@ -26,6 +26,7 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private var player: AVQueuePlayer?
     private var currentIndex: Int = 0
+    private var updateNowPlayingTimer: Timer?
 
     // MARK: - Lifecycle
     public override func load() {
@@ -114,7 +115,55 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
         player.advanceToNextItem()
         currentIndex += 1
         print("⏭ [NativeAudioPlayer] skipToNextInternal – index now \(currentIndex)")
+        updateNowPlayingInfo()
         notifyListeners("trackEnded", data: ["index": currentIndex])
+    }
+
+    // MARK: - Now Playing Info (for Control Center & Lock Screen)
+
+    private func startNowPlayingUpdates() {
+        updateNowPlayingInfo()
+        
+        // Update every 0.5 seconds while playing
+        updateNowPlayingTimer?.invalidate()
+        updateNowPlayingTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            self?.updateNowPlayingInfo()
+        }
+    }
+
+    private func stopNowPlayingUpdates() {
+        updateNowPlayingTimer?.invalidate()
+        updateNowPlayingTimer = nil
+    }
+
+    private func updateNowPlayingInfo() {
+        guard let player = player else { return }
+        
+        let infoCenter = MPNowPlayingInfoCenter.default()
+        
+        // Get current item duration
+        var duration: Double = 0
+        if let currentItem = player.currentItem {
+            duration = CMTimeGetSeconds(currentItem.asset.duration)
+            if duration.isNaN || duration.isInfinite {
+                duration = 0
+            }
+        }
+        
+        // Get current playback time
+        let currentTime = CMTimeGetSeconds(player.currentTime())
+        let playbackTime = currentTime.isNaN || currentTime.isInfinite ? 0 : currentTime
+        
+        var nowPlayingInfo: [String: Any] = [
+            MPMediaItemPropertyTitle: "ZenCards Study Session",
+            MPMediaItemPropertyArtist: "ZenCards",
+            MPNowPlayingInfoPropertyIsLiveStream: false,
+            MPMediaItemPropertyPlaybackDuration: duration,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: playbackTime,
+            MPNowPlayingInfoPropertyPlaybackRate: player.rate
+        ]
+        
+        infoCenter.nowPlayingInfo = nowPlayingInfo
     }
 
     // MARK: - Plugin methods (called from JS)
@@ -220,23 +269,32 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
 
-            // Just make sure the existing session is active; do NOT change category/mode.
+            // Configure audio session for background playback + Bluetooth/CarPlay support
             do {
                 let session = AVAudioSession.sharedInstance()
-
-                // If you do NOT need mic while playing:
-                try session.setCategory(.playback, mode: .default, options: [])
-
-                // If you DO need mic sometimes while playing, use this instead:
-                // try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
-
-                try session.setActive(true)
+                
+                // Use playAndRecord to allow both audio playback AND microphone input (for hands-free)
+                // But default output to speaker so audio plays through speaker by default
+                try session.setCategory(
+                    .playAndRecord,
+                    mode: .default,
+                    options: [
+                        .defaultToSpeaker,      // Route to speaker by default
+                        .allowBluetooth,        // Allow Bluetooth audio (AirPods, CarPlay, etc.)
+                        .allowBluetoothA2DP,    // Bluetooth A2DP for audio playback
+                        .duckOthers             // Lower volume of other apps during playback
+                    ]
+                )
+                
+                try session.setActive(true, options: .notifyOthersOnDeactivation)
+                print("✅ [NativeAudioPlayer] Audio session configured for background + Bluetooth")
             } catch {
                 print("⚠️ [NativeAudioPlayer] Audio session setup failed: \(error)")
             }
 
             player.volume = 1.0
             player.play()
+            self.startNowPlayingUpdates()
             print("✅ [NativeAudioPlayer] player.play() – rate now: \(player.rate)")
             call.resolve()
         }
@@ -247,6 +305,7 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
 
         DispatchQueue.main.async {
             self.player?.pause()
+            self.stopNowPlayingUpdates()
             call.resolve()
         }
     }
@@ -273,6 +332,11 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
             player.pause()
             player.removeAllItems()
             self.currentIndex = 0
+            self.stopNowPlayingUpdates()
+            
+            // Clear Now Playing info
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+            
             print("✅ [NativeAudioPlayer] player stopped and queue cleared")
             call.resolve()
         }
