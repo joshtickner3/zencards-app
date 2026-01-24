@@ -1057,6 +1057,16 @@ function setupNativePlugins() {
     NativeAudioPlayer = null;
   }
 }
+// Re-check once the bridge is ready (iOS timing fix)
+window.addEventListener("capacitorNativeBridgeReady", () => {
+  console.log("[NativeEnv] capacitorNativeBridgeReady -> re-setup plugins");
+  setupNativePlugins();
+});
+
+// Also re-check on DOM ready just in case
+document.addEventListener("DOMContentLoaded", () => {
+  setupNativePlugins();
+});
 
 // run once at boot
 setupNativePlugins();
@@ -2621,7 +2631,17 @@ function getDeckPhaseCounts(deck) {
     // Prefer native iOS TTS when running inside the Capacitor app
 // Prefer native iOS TTS when running inside the Capacitor app
 
-console.log("[BOOT] isNativeApp =", isNativeApp, "nativeTts =", nativeTts);
+// ===== Native environment flags (SAFE; never crash) =====
+const cap = window.Capacitor;
+const isNativeApp =
+  !!cap && (typeof cap.isNativePlatform === "function"
+    ? cap.isNativePlatform()
+    : (typeof cap.getPlatform === "function" && cap.getPlatform() !== "web"));
+
+const nativeTts =
+  cap?.Plugins?.NativeTTS || null;  // only if you actually have this plugin
+
+console.log("[BOOT] isNativeApp =", isNativeApp, "nativeTts =", !!nativeTts);
 
 
 // ========== RENDER HELPERS FOR IMAGES + MATH ==========
@@ -3425,8 +3445,8 @@ function startMicMute(seconds) {
       }
     }
 
-    function showMainMenu() {
-      stopAllAudio();
+    async function showMainMenu() {
+     await stopAllAudio();
       clearStudyAheadGapTimer();
       clearQuestionDelayTimer();
 
@@ -3466,9 +3486,9 @@ function updateDeckBadge() {
   deckBadge.textContent = deck ? `Deck: ${deck.name}` : "";
 }
 
-function openAddCardModal() {
+async function openAddCardModal() {
   // Stop audio/listening so the modal is calm in hands-free mode
-  stopAllAudio();
+  await stopAllAudio();
   clearStudyAheadGapTimer();
   clearQuestionDelayTimer();
 
@@ -3489,9 +3509,9 @@ function closeAddCardModal() {
   if (currentMode === "voice" && !isPaused) runVoiceLoop();
   if (currentMode === "silent" && !isPaused) runSilentLoop();
 }
-function openInstructionsModal() {
+async function openInstructionsModal() {
   // pause audio/listening so the modal isn’t chaotic in hands-free mode
-  stopAllAudio();
+ await stopAllAudio();
   clearStudyAheadGapTimer();
   clearQuestionDelayTimer();
   clearAnswerAfterSpeechDelay();
@@ -3549,19 +3569,19 @@ document.addEventListener("keydown", (e) => {
       updateDeckBadge();
     }
 
-    backToMenuBtn.addEventListener("click", () => {
-      stopAllAudio();
+    backToMenuBtn.addEventListener("click", async () => {
+      await stopAllAudio();
       showMainMenu();
     });
 
-    pauseBtn.addEventListener("click", () => {
+    pauseBtn.addEventListener("click", async () => {
   isPaused = true;
 
   // NEW: make Resume replay the SAME card in hands-free mode
   if (currentMode === "voice" && currentCard) {
     restartCardOnResumeVoice = true;
   }
-stopAllAudio();  
+await stopAllAudio(); 
   clearStudyAheadGapTimer();
   clearQuestionDelayTimer();
 
@@ -3977,14 +3997,14 @@ function isMainMenuCommand(text) {
 }
 
 // NEW: stop any current audio, then confirm + go to main menu
-function speakAndGoToMainMenu() {
-  stopAllAudio();
+async function speakAndGoToMainMenu() {
+  await stopAllAudio();
   speak("Going to the main menu.", () => {
     endStudySession();
   });
 }
 
-function handleGlobalVoiceCommands(text) {
+async function handleGlobalVoiceCommands(text) {
   const t = text.toLowerCase();
 
   // 🔁 Repeat question — allowed in ANY voice state when we have a card
@@ -4049,7 +4069,7 @@ if (
     if (currentCard) restartCardOnResumeVoice = true;
 
     // ✅ kill anything that could advance the session
-    stopAllAudio();
+    await stopAllAudio();
     clearStudyAheadGapTimer();
     clearQuestionDelayTimer();
     clearAnswerAfterSpeechDelay();
@@ -4849,7 +4869,7 @@ setCardContent(voiceAnswerText, currentCard.answer);
 
         // Rating buttons for voice (hands-free) mode – optional tap instead of speaking
     if (voiceRatingButtons) {
-  voiceRatingButtons.addEventListener("click", (e) => {
+  voiceRatingButtons.addEventListener("click", async (e) => {
     const btn = e.target.closest("button[data-voice-rating]");
     if (!btn || !currentCard) return;
 
@@ -4860,7 +4880,8 @@ setCardContent(voiceAnswerText, currentCard.answer);
     awaitingAnswerSignal = false;
     awaitingDifficulty = false;
 
-    stopAllAudio();
+    await stopAllAudio();
+
 
     if (!noScheduleChanges) {
       const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
@@ -4942,18 +4963,34 @@ startVoiceBtn.addEventListener("click", async () => {
   saveLastMode("voice");
   if (selectedDeckId) saveLastDeckId(selectedDeckId);
 
-  // 🔊 Browser-only: request mic perm if we need STT here
+  // ✅ Make sure native plugins are detected *right now*
+  try { setupNativePlugins(); } catch (_) {}
+  try { initNativeVoicePlugin(); } catch (_) {}
+
+  // ✅ Set autoGoodMode/options BEFORE any mic permission logic
+  autoModeBehavior = autoRatingSelect.value || "good";
+  autoGoodMode = !!autoGoodToggle.checked;
+  autoEnterStudyAhead = !!autoEnterStudyAheadCheckbox.checked;
+  loopStudyAhead = !!loopStudyAheadCheckbox.checked;
+
+  // ✅ Deck id: fall back to dropdown value if selectedDeckId isn't set
+  currentDeckId = selectedDeckId || (deckSelect ? deckSelect.value : null);
+  if (!currentDeckId) {
+    alert("Please select a deck first.");
+    return;
+  }
+
+  // ✅ Browser-only mic permission (NEVER in native app)
   if (
-    !nativeVoicePlugin &&              // not using native iOS STT plugin
-    !autoGoodMode &&                   // we actually need voice commands
+    !isNativeApp &&                   // ✅ key change
+    !nativeVoicePlugin &&             // not using native iOS STT plugin
+    !autoGoodMode &&                  // only needed when we actually need voice commands
     navigator.mediaDevices &&
     navigator.mediaDevices.getUserMedia
   ) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      if (stream && stream.getTracks) {
-        stream.getTracks().forEach((t) => t.stop());
-      }
+      if (stream && stream.getTracks) stream.getTracks().forEach((t) => t.stop());
       console.log("Microphone permission requested.");
     } catch (err) {
       console.error("Microphone permission error:", err);
@@ -4965,21 +5002,18 @@ startVoiceBtn.addEventListener("click", async () => {
     }
   }
 
-  currentDeckId = selectedDeckId;
-  if (!currentDeckId) return;
-
-  // Auto mode + options
-  autoModeBehavior = autoRatingSelect.value || "good";
-  autoGoodMode = !!autoGoodToggle.checked;
-  autoEnterStudyAhead = !!autoEnterStudyAheadCheckbox.checked;
-  loopStudyAhead = !!loopStudyAheadCheckbox.checked;
-
   // If there is NO native plugin and NO browser STT, and we are not in auto mode,
   // then we can't do voice commands.
   if (!nativeVoicePlugin && !speechSupported && !autoGoodMode) {
     alert("Speech recognition not supported in this environment.");
     return;
   }
+
+  // ✅ Clean slate (prevents “nothing happens” due to stale timers/audio)
+  await stopAllAudio();
+  clearStudyAheadGapTimer();
+  clearQuestionDelayTimer();
+  clearAnswerAfterSpeechDelay();
 
   skipInstructionsAfterFirst = !!skipInstructionsAfterFirstCheckbox.checked;
   hasSpokenInstructionsOnce = false;
@@ -4991,8 +5025,6 @@ startVoiceBtn.addEventListener("click", async () => {
   reviewQueue = [];
   aheadQueue = [];
   aheadQueueIndex = 0;
-  clearStudyAheadGapTimer();
-  clearQuestionDelayTimer();
   hasSpokenCurrentQuestion = false;
   hasSpokenCurrentAnswer = false;
 
@@ -5004,14 +5036,10 @@ startVoiceBtn.addEventListener("click", async () => {
   }
 
   const secs = parseInt(answerDelaySecondsInput.value, 10);
-  answerDelayMs = isNaN(secs)
-    ? 4000
-    : Math.max(1, Math.min(60, secs)) * 1000;
+  answerDelayMs = isNaN(secs) ? 4000 : Math.max(1, Math.min(60, secs)) * 1000;
 
   const gapSecs = parseInt(studyAheadGapSecondsInput.value, 10);
-  studyAheadGapMs = isNaN(gapSecs)
-    ? 4000
-    : Math.max(1, Math.min(60, gapSecs)) * 1000;
+  studyAheadGapMs = isNaN(gapSecs) ? 4000 : Math.max(1, Math.min(60, gapSecs)) * 1000;
 
   // Switch UI into voice mode
   voiceUI.classList.remove("hidden");
@@ -5023,22 +5051,12 @@ startVoiceBtn.addEventListener("click", async () => {
     ? describeAutoIntro()
     : "Starting hands free study session. I will read a question, then the answer, then ask how hard it was.";
 
-  // 🔹 Build the card list for this session (same due-logic as runVoiceLoop)
-  const cardsForSession = getDueCardsForDeck(currentDeckId, false, true);
-
-  if (!cardsForSession.length) {
-    // No cards due: keep behavior nice for both web + native
-    speak("This deck has no cards due right now.", () => {
-      showMainMenu();
-    });
-    return;
-  }
-
-  // Intro → then branch: native iOS (background) vs web
+  // ✅ Don’t pre-check cards here; let runVoiceLoop be the single source of truth
   speak(intro, () => {
-  runVoiceLoop(); // ✅ Option A: JS-controlled flow always
+    runVoiceLoop();
+  });
 });
-});
+
     // <<< END MODIFIED HANDLER <<<
 
     if (studyInstructionsBtn) {
