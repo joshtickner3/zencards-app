@@ -102,18 +102,20 @@ public class VoiceCommandsPlugin: CAPPlugin, CAPBridgedPlugin {
     private func configureAudioSessionForListening() {
         let session = AVAudioSession.sharedInstance()
         do {
-            // ✅ supports playing audio AND using the mic
+            // ✅ Use .playAndRecord to support BOTH playback AND recording simultaneously
+            // This is essential for voice mode where audio is playing while we listen
             try session.setCategory(
                 .playAndRecord,
                 mode: .measurement,
                 options: [
-                    .defaultToSpeaker,    // routes to speaker instead of receiver
-                    .allowBluetooth       // allows BT headsets for mic
+                    .defaultToSpeaker,           // routes to speaker instead of receiver
+                    .duckOthers                  // duck background audio (no conflicts with .allowBluetooth)
                 ]
             )
             try session.setActive(true, options: [])
+            print("🎤 [VoiceCommands] Audio session configured for .playAndRecord with .defaultToSpeaker + .duckOthers")
         } catch {
-            print("AudioSession listening config error: \(error)")
+            print("❌ [VoiceCommands] AudioSession listening config error: \(error)")
         }
     }
 

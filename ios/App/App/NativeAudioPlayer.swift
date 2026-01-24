@@ -188,21 +188,6 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
         urls.forEach { print("   ↳ queue URL: \($0)") }
 
         DispatchQueue.main.async {
-            // CRITICAL: Configure audio session BEFORE creating the player
-            // This ensures the audio routing is set up correctly
-            do {
-                let session = AVAudioSession.sharedInstance()
-                try session.setCategory(
-                    .playback,
-                    mode: .default,
-                    options: [.duckOthers]
-                )
-                try session.setActive(true, options: .notifyOthersOnDeactivation)
-                print("🔊 [NativeAudioPlayer] Audio session pre-configured in setQueue()")
-            } catch {
-                print("⚠️ [NativeAudioPlayer] Audio session setup in setQueue failed: \(error)")
-            }
-            
             self.currentIndex = 0
 
             var items: [AVPlayerItem] = []
@@ -294,26 +279,28 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             // Configure audio session for background playback
+            // This needs to handle BOTH cases:
+            // 1. When VoiceCommands is active (.playAndRecord with .defaultToSpeaker)
+            // 2. When only audio playback is needed (.playback with .duckOthers)
             do {
                 let session = AVAudioSession.sharedInstance()
+                let currentCategory = session.category
                 
-                // CRITICAL: Use .playback category (NOT .playAndRecord which conflicts with VoiceCommands)
-                // Only use options that don't conflict with other categories
-                try session.setCategory(
-                    .playback,
-                    mode: .default,
-                    options: [.duckOthers]  // Just duck other apps, nothing else
-                )
+                // If VoiceCommands has already set .playAndRecord, keep it (it supports both recording + playback)
+                // Otherwise, ensure we're in .playback mode
+                if currentCategory != .playAndRecord {
+                    print("🔊 [NativeAudioPlayer] Audio session not in .playAndRecord, switching to .playback")
+                    try session.setCategory(
+                        .playback,
+                        mode: .default,
+                        options: [.duckOthers]
+                    )
+                } else {
+                    print("🔊 [NativeAudioPlayer] Audio session already in .playAndRecord (from VoiceCommands), maintaining it")
+                }
                 
                 try session.setActive(true, options: .notifyOthersOnDeactivation)
-                print("✅ [NativeAudioPlayer] Audio session configured for background playback")
-                
-                // Debug: Check audio routing
-                let outputs = session.currentRoute.outputs
-                print("🔊 [NativeAudioPlayer] Audio outputs: \(outputs.count)")
-                for output in outputs {
-                    print("   ↳ Output: \(output.portType.rawValue) (\(output.portName))")
-                }
+                print("✅ [NativeAudioPlayer] Audio session confirmed active for playback")
             } catch {
                 print("⚠️ [NativeAudioPlayer] Audio session setup failed: \(error)")
             }

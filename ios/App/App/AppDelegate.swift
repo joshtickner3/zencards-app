@@ -125,16 +125,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     private func configureAudioSession() {
         let session = AVAudioSession.sharedInstance()
         do {
-            // Aggressive background audio configuration
+            // Use .playAndRecord so we can handle BOTH playback and voice input
+            // This is essential for hands-free mode where audio plays while listening for commands
             try session.setCategory(
-                .playback,
+                .playAndRecord,
                 mode: .default,
-                options: [.duckOthers]
+                options: [
+                    .defaultToSpeaker,  // route to speaker not receiver
+                    .duckOthers         // duck other audio
+                ]
             )
             try session.setActive(true, options: .notifyOthersOnDeactivation)
-            print("✅ Background audio session configured")
+            print("✅ [AppDelegate] Background audio session configured for .playAndRecord")
         } catch {
-            print("❌ Audio session error: \(error)")
+            print("❌ [AppDelegate] Audio session error: \(error)")
         }
     }
 
