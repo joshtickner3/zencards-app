@@ -303,6 +303,16 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
             player.play()
             self.startNowPlayingUpdates()
             print("✅ [NativeAudioPlayer] player.play() – rate now: \(player.rate)")
+            
+            // Ensure audio session stays active even when app enters background
+            do {
+                let session = AVAudioSession.sharedInstance()
+                try session.setActive(true, options: [.notifyOthersOnDeactivation])
+                print("✅ [NativeAudioPlayer] Audio session reactivated for background")
+            } catch {
+                print("⚠️ [NativeAudioPlayer] Failed to reactivate audio session: \(error)")
+            }
+            
             call.resolve()
         }
     }

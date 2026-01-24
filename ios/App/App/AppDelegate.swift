@@ -40,6 +40,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     // MARK: - Background Execution
 
     func applicationDidEnterBackground(_ application: UIApplication) {
+        print("📱 [AppDelegate] App entered background")
         // Request background execution time to keep audio session alive
         // Renew every 2.5 minutes to keep it alive indefinitely while audio plays
         beginBackgroundTask()
@@ -47,13 +48,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationWillEnterForeground(_ application: UIApplication) {
+        print("📱 [AppDelegate] App will enter foreground")
         // Clean up background task when returning to foreground
         stopBackgroundTaskRenewal()
         endBackgroundTask()
     }
 
     private func beginBackgroundTask() {
+        // End any existing task first
+        if backgroundTaskId != .invalid {
+            UIApplication.shared.endBackgroundTask(backgroundTaskId)
+        }
+        
         backgroundTaskId = UIApplication.shared.beginBackgroundTask(withName: "ZenCardsAudioPlayback") { [weak self] in
+            print("�� [AppDelegate] Background task expiration handler called")
             self?.endBackgroundTask()
         }
         print("🔄 [AppDelegate] Background task started: \(backgroundTaskId.rawValue)")
@@ -70,18 +78,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     private func startBackgroundTaskRenewal() {
         backgroundTaskRenewalTimer?.invalidate()
         
+        print("⏰ [AppDelegate] Starting background task renewal timer")
         // Renew every 2.5 minutes (150 seconds) to keep background execution alive
         backgroundTaskRenewalTimer = Timer.scheduledTimer(withTimeInterval: 150.0, repeats: true) { [weak self] _ in
-            print("🔄 [AppDelegate] Renewing background task...")
+            print("🔄 [AppDelegate] Timer: Renewing background task...")
             self?.endBackgroundTask()
             self?.beginBackgroundTask()
         }
     }
 
     private func stopBackgroundTaskRenewal() {
+        print("⏸ [AppDelegate] Stopping background task renewal timer")
         backgroundTaskRenewalTimer?.invalidate()
         backgroundTaskRenewalTimer = nil
-        print("🛑 [AppDelegate] Background task renewal stopped")
     }
 
     // MARK: - Permissions
