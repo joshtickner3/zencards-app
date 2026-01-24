@@ -1225,6 +1225,7 @@ async function nativePlaySingleUrl(url, onEnd) {
   // One unified "ended" handler (ignore stale generations)
   const ended = async () => {
     if (myGen !== nativeAudioGeneration) return;
+    console.log("[NativeAudio] Audio ended, calling onEnd callback");
     await cleanup();
     onEnd && onEnd();
   };
@@ -2754,6 +2755,7 @@ let speakGeneration = 0;
 let nativeVoicePlugin = null;
 let nativeVoiceActiveCallback = null;
 let usingNativeVoice = false;
+let nativeVoiceTimeoutId = null;
 
 function initNativeVoicePlugin() {
   if (!window.Capacitor || !window.Capacitor.Plugins) return;
@@ -2771,10 +2773,27 @@ function initNativeVoicePlugin() {
     const isFinal = !!(data && data.isFinal);
     if (!text) return;
 
+    console.log("[Voice] Received transcript:", { text, isFinal, hasCallback: !!nativeVoiceActiveCallback });
+
     if (isFinal && nativeVoiceActiveCallback) {
+      console.log("[Voice] isFinal=true, calling callback");
+      if (nativeVoiceTimeoutId) clearTimeout(nativeVoiceTimeoutId);
       const cb = nativeVoiceActiveCallback;
       nativeVoiceActiveCallback = null;
       cb(text);
+    } else if (!isFinal && nativeVoiceActiveCallback && text.length > 0) {
+      // WORKAROUND: If we have a non-final transcript with actual content, set a timer
+      // If no more transcripts arrive for 500ms, assume user finished speaking
+      console.log("[Voice] Got interim result, setting timeout to accept after 500ms if no more input");
+      if (nativeVoiceTimeoutId) clearTimeout(nativeVoiceTimeoutId);
+      nativeVoiceTimeoutId = setTimeout(() => {
+        if (nativeVoiceActiveCallback) {
+          console.log("[Voice] Timeout fired, using interim transcript:", text);
+          const cb = nativeVoiceActiveCallback;
+          nativeVoiceActiveCallback = null;
+          cb(text);
+        }
+      }, 500);
     }
   });
 }
@@ -2979,6 +2998,7 @@ if (answerDelayAfterSpeechSecInput) {
   if (nativeVoicePlugin) {
     try { await nativeVoicePlugin.stop?.(); } catch (e) { console.error("Error stopping native voice plugin:", e); }
     nativeVoiceActiveCallback = null;
+    if (nativeVoiceTimeoutId) { clearTimeout(nativeVoiceTimeoutId); nativeVoiceTimeoutId = null; }
   }
 
   if (recognition) {
