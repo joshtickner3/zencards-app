@@ -110,6 +110,12 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
                 print("   ↳ Server Address: \(lastEvent.serverAddress ?? "unknown")")
                 print("   ↳ Downloaded duration: \(lastEvent.durationWatched)s")
             }
+            
+            // CRITICAL: Update Now Playing info now that item is ready
+            DispatchQueue.main.async {
+                self.updateNowPlayingInfo()
+                print("📍 [NativeAudioPlayer] Now Playing info updated after item became ready")
+            }
         }
     }
 
@@ -202,8 +208,9 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
         var duration: Double = 0
         if let currentItem = player.currentItem {
             duration = CMTimeGetSeconds(currentItem.asset.duration)
-            if duration.isNaN || duration.isInfinite {
-                duration = 0
+            if duration.isNaN || duration.isInfinite || duration == 0 {
+                // Item metadata not loaded yet, skip update
+                return
             }
         }
         
@@ -221,6 +228,7 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
         ]
         
         infoCenter.nowPlayingInfo = nowPlayingInfo
+        print("📍 [NativeAudioPlayer] Now Playing info updated: duration=\(duration)s, elapsed=\(playbackTime)s, rate=\(player.rate)")
     }
 
     // MARK: - Plugin methods (called from JS)
