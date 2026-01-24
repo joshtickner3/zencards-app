@@ -122,6 +122,8 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc private func itemDidFinishPlaying(_ notification: Notification) {
         currentIndex += 1
         print("✅ [NativeAudioPlayer] Item finished – new index: \(currentIndex)")
+        // DON'T stop Now Playing updates here - let timer continue in case next item queues
+        // This keeps Control Center responsive
         notifyListeners("trackEnded", data: ["index": currentIndex])
     }
 
@@ -201,18 +203,15 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private func updateNowPlayingInfo() {
         guard let player = player else { return }
+        guard let currentItem = player.currentItem else { return }
+        
+        // If there's no item or duration is invalid, skip (don't set with garbage data)
+        let duration = CMTimeGetSeconds(currentItem.asset.duration)
+        if duration.isNaN || duration.isInfinite || duration == 0 {
+            return
+        }
         
         let infoCenter = MPNowPlayingInfoCenter.default()
-        
-        // Get current item duration
-        var duration: Double = 0
-        if let currentItem = player.currentItem {
-            duration = CMTimeGetSeconds(currentItem.asset.duration)
-            if duration.isNaN || duration.isInfinite || duration == 0 {
-                // Item metadata not loaded yet, skip update
-                return
-            }
-        }
         
         // Get current playback time
         let currentTime = CMTimeGetSeconds(player.currentTime())
@@ -350,22 +349,23 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
 
-            // For background playback, we need to be aggressive about audio session setup
+            // CRITICAL: Configure audio session to route to speaker
             do {
                 let session = AVAudioSession.sharedInstance()
-                let currentCategory = session.category
                 
-                // CRITICAL: Use .playback category for maximum background compatibility
-                // Don't use .playAndRecord unless we're actively recording/listening
-                print("🔊 [NativeAudioPlayer] Setting audio session to .playback (most background-compatible)")
+                // Set category to .playback and route to speaker
+                print("🔊 [NativeAudioPlayer] Setting audio session to .playback with defaultToSpeaker + duckOthers")
                 try session.setCategory(
                     .playback,
                     mode: .default,
-                    options: [.duckOthers]
+                    options: [
+                        .duckOthers,                        // Lower other app audio
+                        .defaultToSpeaker                   // Route to speaker NOT receiver
+                    ]
                 )
                 
                 try session.setActive(true, options: .notifyOthersOnDeactivation)
-                print("✅ [NativeAudioPlayer] Audio session configured for pure playback")
+                print("✅ [NativeAudioPlayer] Audio session configured to route to speaker")
             } catch {
                 print("⚠️ [NativeAudioPlayer] Audio session setup failed: \(error)")
             }
@@ -447,7 +447,7 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
             self.stopNowPlayingUpdates()
             self.stopPlaybackKeepalive()
             
-            // Clear Now Playing info
+            // CRITICAL: Clear Now Playing info so Control Center doesn't show stale/zero data
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
             
             print("✅ [NativeAudioPlayer] player stopped and queue cleared")
