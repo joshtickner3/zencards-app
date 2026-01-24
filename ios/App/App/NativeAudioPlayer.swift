@@ -212,20 +212,14 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
             player.automaticallyWaitsToMinimizeStalling = false
             self.player = player
 
-            // Now Playing info (for Control Center tile)
-            if let first = items.first {
-                let infoCenter = MPNowPlayingInfoCenter.default()
-                let duration = CMTimeGetSeconds(first.asset.duration)
-                infoCenter.nowPlayingInfo = [
-                    MPMediaItemPropertyTitle: "ZenCards Study Session",
-                    MPNowPlayingInfoPropertyIsLiveStream: false,
-                    MPMediaItemPropertyPlaybackDuration: duration,
-                    MPNowPlayingInfoPropertyElapsedPlaybackTime: 0
-                ]
-            }
-
+            // CRITICAL: Ensure player is configured for background playback
+            // These must be set BEFORE calling play()
+            player.preventsDisplaySleepDuringVideoPlayback = false
+            
+            // Log queue setup for debugging
             print("✅ [NativeAudioPlayer] Queue created with \(items.count) AVPlayerItem(s)")
-            call.resolve()
+            print("   ↳ actionAtItemEnd: advance")
+            print("   ↳ automaticallyWaitsToMinimizeStalling: false")
         }
     }
 
@@ -273,10 +267,10 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
             do {
                 let session = AVAudioSession.sharedInstance()
                 
-                // Use playAndRecord to allow both audio playback AND microphone input (for hands-free)
-                // But default output to speaker so audio plays through speaker by default
+                // Use .playback (NOT .playAndRecord) for reliable background audio
+                // VoiceCommands handles its own audio session separately when listening
                 try session.setCategory(
-                    .playAndRecord,
+                    .playback,
                     mode: .default,
                     options: [
                         .defaultToSpeaker,      // Route to speaker by default
