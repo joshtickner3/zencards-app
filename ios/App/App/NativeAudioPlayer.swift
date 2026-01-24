@@ -27,6 +27,7 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
     private var player: AVQueuePlayer?
     private var currentIndex: Int = 0
     private var updateNowPlayingTimer: Timer?
+    private var playbackKeepaliveTimer: Timer?  // New: monitors and restores playback
 
     // MARK: - Lifecycle
     public override func load() {
@@ -88,8 +89,27 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
             name: .AVPlayerItemFailedToPlayToEndTime,
             object: nil
         )
+        
+        // Observe when player is ready to play (for URL loading diagnostics)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(playerItemBecameReadyToPlay(_:)),
+            name: AVPlayerItem.newAccessLogEntryNotification,
+            object: nil
+        )
 
         print("🔔 [NativeAudioPlayer] Registered AVPlayerItem notifications")
+    }
+    
+    @objc private func playerItemBecameReadyToPlay(_ notification: Notification) {
+        if let item = notification.object as? AVPlayerItem {
+            print("✅ [NativeAudioPlayer] AVPlayerItem ready to play (log available)")
+            if let accessLog = item.accessLog(), let lastEvent = accessLog.events.last {
+                print("   ↳ URL: \(lastEvent.uri ?? "unknown")")
+                print("   ↳ Server Address: \(lastEvent.serverAddress ?? "unknown")")
+                print("   ↳ Downloaded duration: \(lastEvent.durationWatched)s")
+            }
+        }
     }
 
     @objc private func itemDidFinishPlaying(_ notification: Notification) {
@@ -129,11 +149,38 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
         updateNowPlayingTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             self?.updateNowPlayingInfo()
         }
+        print("📍 [NativeAudioPlayer] Now Playing updates started")
     }
 
     private func stopNowPlayingUpdates() {
         updateNowPlayingTimer?.invalidate()
         updateNowPlayingTimer = nil
+        print("📍 [NativeAudioPlayer] Now Playing updates stopped")
+    }
+    
+    private func startPlaybackKeepalive() {
+        // Stop any existing keepalive timer
+        playbackKeepaliveTimer?.invalidate()
+        
+        // Check every 1 second if playback got suspended and restart if needed
+        playbackKeepaliveTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            guard let self = self, let player = self.player else { return }
+            
+            // If player was supposed to be playing but got paused, restart it
+            if player.timeControlStatus != .playing && player.currentItem != nil {
+                print("🚨 [NativeAudioPlayer] Keepalive: Playback was suspended! Restarting...")
+                print("   ↳ Previous status: \(player.timeControlStatus.rawValue)")
+                player.play()
+                print("   ↳ Play() called again, new status: \(player.timeControlStatus.rawValue)")
+            }
+        }
+        print("🔄 [NativeAudioPlayer] Playback keepalive monitor started (checks every 1s)")
+    }
+    
+    private func stopPlaybackKeepalive() {
+        playbackKeepaliveTimer?.invalidate()
+        playbackKeepaliveTimer = nil
+        print("🔄 [NativeAudioPlayer] Playback keepalive monitor stopped")
     }
 
     private func updateNowPlayingInfo() {
@@ -229,6 +276,13 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
                 ]
             }
             
+            // CRITICAL: Add KVO observers to track item status changes (for diagnosing URL loading failures)
+            for (index, item) in items.enumerated() {
+                item.addObserver(self, forKeyPath: "status", options: [.new, .old], context: nil)
+                item.addObserver(self, forKeyPath: "error", options: [.new], context: nil)
+                print("📊 [NativeAudioPlayer] KVO observers added to item \(index)")
+            }
+            
             // Log queue setup for debugging
             print("✅ [NativeAudioPlayer] Queue created with \(items.count) AVPlayerItem(s)")
             print("   ↳ actionAtItemEnd: advance")
@@ -299,20 +353,42 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             // Verify player state before playing
-            print("📊 [NativeAudioPlayer] Player state before play():")
+            print("📊 [NativeAudioPlayer] Player state BEFORE play():")
             print("   ↳ volume: \(player.volume)")
             print("   ↳ rate: \(player.rate)")
-            print("   ↳ timeControlStatus: \(player.timeControlStatus.rawValue)")
+            let statusBefore = player.timeControlStatus.rawValue
+            print("   ↳ timeControlStatus: \(statusBefore) (0=paused, 1=waitingToPlayAtSpecifiedRate, 2=playing)")
+            
             if let currentItem = player.currentItem {
-                print("   ↳ currentItem duration: \(CMTimeGetSeconds(currentItem.duration))")
-                print("   ↳ currentItem status: \(currentItem.status.rawValue)")
+                let durationSeconds = CMTimeGetSeconds(currentItem.asset.duration)
+                print("   ↳ currentItem duration: \(durationSeconds)s")
+                print("   ↳ currentItem status: \(currentItem.status.rawValue) (0=unknown, 1=ready, 2=failed)")
+                if let error = currentItem.error {
+                    print("   ↳ ❌ ERROR on item: \(error.localizedDescription)")
+                }
+            } else {
+                print("   ↳ ⚠️ currentItem is nil!")
             }
             
             player.volume = 1.0
             player.play()
             self.startNowPlayingUpdates()
-            print("✅ [NativeAudioPlayer] player.play() – rate now: \(player.rate)")
-            print("   ↳ timeControlStatus: \(player.timeControlStatus.rawValue)")
+            self.startPlaybackKeepalive()  // NEW: Monitor for suspension and restart if needed
+            
+            print("✅ [NativeAudioPlayer] player.play() called")
+            print("📊 [NativeAudioPlayer] Player state AFTER play():")
+            let statusAfter = player.timeControlStatus.rawValue
+            print("   ↳ rate: \(player.rate)")
+            print("   ↳ timeControlStatus: \(statusAfter) (0=paused, 1=waitingToPlayAtSpecifiedRate, 2=playing)")
+            
+            if statusAfter == 2 {
+                print("   ✅ Player is PLAYING")
+            } else if statusAfter == 1 {
+                print("   ⏳ Player is WAITING (likely buffering audio from URL)")
+            } else if statusAfter == 0 {
+                print("   ⚠️ Player is still PAUSED – something prevented playback!")
+            }
+            
             call.resolve()
         }
     }
@@ -323,6 +399,7 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
         DispatchQueue.main.async {
             self.player?.pause()
             self.stopNowPlayingUpdates()
+            self.stopPlaybackKeepalive()
             call.resolve()
         }
     }
@@ -350,12 +427,51 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
             player.removeAllItems()
             self.currentIndex = 0
             self.stopNowPlayingUpdates()
+            self.stopPlaybackKeepalive()
             
             // Clear Now Playing info
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
             
             print("✅ [NativeAudioPlayer] player stopped and queue cleared")
             call.resolve()
+        }
+    }
+    
+    // MARK: - KVO Observation for diagnostics
+    
+    override public func observeValue(
+        forKeyPath keyPath: String?,
+        of object: Any?,
+        change: [NSKeyValueChangeKey : Any]?,
+        context: UnsafeMutableRawPointer?
+    ) {
+        guard let item = object as? AVPlayerItem else { return }
+        
+        if keyPath == "status" {
+            switch item.status {
+            case .unknown:
+                print("📊 [NativeAudioPlayer] Item status changed to: UNKNOWN")
+            case .readyToPlay:
+                print("✅ [NativeAudioPlayer] Item status changed to: READY TO PLAY")
+                if let accessLog = item.accessLog(), let lastEvent = accessLog.events.last {
+                    print("   ↳ URL loaded from: \(lastEvent.serverAddress ?? "unknown")")
+                }
+            case .failed:
+                print("❌ [NativeAudioPlayer] Item status changed to: FAILED")
+                if let error = item.error {
+                    print("   ↳ Error: \(error.localizedDescription)")
+                    print("   ↳ Error code: \((error as NSError).code)")
+                    print("   ↳ Error domain: \((error as NSError).domain)")
+                }
+            @unknown default:
+                print("? [NativeAudioPlayer] Item status changed to: UNKNOWN VALUE")
+            }
+        } else if keyPath == "error" {
+            if let error = item.error {
+                print("❌ [NativeAudioPlayer] Item error detected: \(error.localizedDescription)")
+                print("   ↳ Code: \((error as NSError).code)")
+                print("   ↳ Domain: \((error as NSError).domain)")
+            }
         }
     }
 }
