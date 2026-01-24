@@ -3922,11 +3922,21 @@ playCardSideAudio(currentCard, "question", () => {
       }
     }, delay * 1000);
   } else {
-    // Voice answer mode stays the same
+    // Voice answer mode: listen for user's speech to trigger answer playback
     awaitingAnswerSignal = true;
     setStudyState(StudyState.WAITING_FOR_ANSWER);
     setStatus("Listening for your answer...");
-    listenForCommand(handleVoiceTranscript);
+    
+    // Add small delay on iOS to allow audio to fully release and voice recognition to activate
+    if (isNativeIOS) {
+      setTimeout(() => {
+        if (!isPaused && awaitingAnswerSignal) {
+          listenForCommand(handleVoiceTranscript);
+        }
+      }, 300);
+    } else {
+      listenForCommand(handleVoiceTranscript);
+    }
   }
 });
     }
@@ -4228,6 +4238,8 @@ if (
 }
 
  async function handleVoiceTranscript(text) {
+  console.log("[VOICE] handleVoiceTranscript called with text:", text, { awaitingAnswerSignal, awaitingDifficulty, inAnswerAfterSpeechDelay });
+  
   // If we are waiting to play the answer after speech ended, ANY transcript resets the countdown
   if (inAnswerAfterSpeechDelay) {
     if (isNextCardCommand(text)) { handleNextCardSkip(); return; }
@@ -4321,6 +4333,7 @@ if (awaitingAnswerSignal && currentMode === "voice") {
 
   // If we're waiting for the user to say "I'm ready" in voice-answer mode
   if (awaitingAnswerSignal) {
+  console.log("[VOICE] User spoke in voice-answer mode, calling startOrResetAnswerAfterSpeechDelay");
   awaitingAnswerSignal = false;
   startOrResetAnswerAfterSpeechDelay();
   return;
