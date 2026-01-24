@@ -188,6 +188,21 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
         urls.forEach { print("   ↳ queue URL: \($0)") }
 
         DispatchQueue.main.async {
+            // CRITICAL: Configure audio session BEFORE creating the player
+            // This ensures the audio routing is set up correctly
+            do {
+                let session = AVAudioSession.sharedInstance()
+                try session.setCategory(
+                    .playback,
+                    mode: .default,
+                    options: [.duckOthers]
+                )
+                try session.setActive(true, options: .notifyOthersOnDeactivation)
+                print("🔊 [NativeAudioPlayer] Audio session pre-configured in setQueue()")
+            } catch {
+                print("⚠️ [NativeAudioPlayer] Audio session setup in setQueue failed: \(error)")
+            }
+            
             self.currentIndex = 0
 
             var items: [AVPlayerItem] = []
@@ -210,6 +225,7 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
             let player = AVQueuePlayer(items: items)
             player.actionAtItemEnd = .advance
             player.automaticallyWaitsToMinimizeStalling = false
+            player.volume = 1.0  // Ensure volume is not muted
             self.player = player
 
             // CRITICAL: Ensure player is configured for background playback
@@ -232,6 +248,7 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
             print("✅ [NativeAudioPlayer] Queue created with \(items.count) AVPlayerItem(s)")
             print("   ↳ actionAtItemEnd: advance")
             print("   ↳ automaticallyWaitsToMinimizeStalling: false")
+            print("   ↳ player.volume: \(player.volume)")
             call.resolve()
         }
     }
@@ -290,14 +307,32 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
                 
                 try session.setActive(true, options: .notifyOthersOnDeactivation)
                 print("✅ [NativeAudioPlayer] Audio session configured for background playback")
+                
+                // Debug: Check audio routing
+                let outputs = session.currentRoute.outputs
+                print("🔊 [NativeAudioPlayer] Audio outputs: \(outputs.count)")
+                for output in outputs {
+                    print("   ↳ Output: \(output.portType.rawValue) (\(output.portName))")
+                }
             } catch {
                 print("⚠️ [NativeAudioPlayer] Audio session setup failed: \(error)")
             }
 
+            // Verify player state before playing
+            print("📊 [NativeAudioPlayer] Player state before play():")
+            print("   ↳ volume: \(player.volume)")
+            print("   ↳ rate: \(player.rate)")
+            print("   ↳ timeControlStatus: \(player.timeControlStatus.rawValue)")
+            if let currentItem = player.currentItem {
+                print("   ↳ currentItem duration: \(CMTimeGetSeconds(currentItem.duration))")
+                print("   ↳ currentItem status: \(currentItem.status.rawValue)")
+            }
+            
             player.volume = 1.0
             player.play()
             self.startNowPlayingUpdates()
             print("✅ [NativeAudioPlayer] player.play() – rate now: \(player.rate)")
+            print("   ↳ timeControlStatus: \(player.timeControlStatus.rawValue)")
             call.resolve()
         }
     }
