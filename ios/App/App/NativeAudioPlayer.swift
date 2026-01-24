@@ -276,25 +276,20 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
 
-            // Configure audio session for background playback + Bluetooth/CarPlay support
+            // Configure audio session for background playback
             do {
                 let session = AVAudioSession.sharedInstance()
                 
-                // Use .playback (NOT .playAndRecord) for reliable background audio
-                // VoiceCommands handles its own audio session separately when listening
+                // CRITICAL: Use .playback category (NOT .playAndRecord which conflicts with VoiceCommands)
+                // Only use options that don't conflict with other categories
                 try session.setCategory(
                     .playback,
                     mode: .default,
-                    options: [
-                        .defaultToSpeaker,      // Route to speaker by default
-                        .allowBluetooth,        // Allow Bluetooth audio (AirPods, CarPlay, etc.)
-                        .allowBluetoothA2DP,    // Bluetooth A2DP for audio playback
-                        .duckOthers             // Lower volume of other apps during playback
-                    ]
+                    options: [.duckOthers]  // Just duck other apps, nothing else
                 )
                 
                 try session.setActive(true, options: .notifyOthersOnDeactivation)
-                print("✅ [NativeAudioPlayer] Audio session configured for background + Bluetooth")
+                print("✅ [NativeAudioPlayer] Audio session configured for background playback")
             } catch {
                 print("⚠️ [NativeAudioPlayer] Audio session setup failed: \(error)")
             }
@@ -303,16 +298,6 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
             player.play()
             self.startNowPlayingUpdates()
             print("✅ [NativeAudioPlayer] player.play() – rate now: \(player.rate)")
-            
-            // Ensure audio session stays active even when app enters background
-            do {
-                let session = AVAudioSession.sharedInstance()
-                try session.setActive(true, options: [.notifyOthersOnDeactivation])
-                print("✅ [NativeAudioPlayer] Audio session reactivated for background")
-            } catch {
-                print("⚠️ [NativeAudioPlayer] Failed to reactivate audio session: \(error)")
-            }
-            
             call.resolve()
         }
     }
