@@ -7,6 +7,8 @@ import Speech
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
+    private var backgroundTaskId: UIBackgroundTaskIdentifier = .invalid
+    private var backgroundTaskRenewalTimer: Timer?
 
     // MARK: - App Launch
     func application(
@@ -14,7 +16,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
 
-        // Configure audio so we’re allowed to play in the background
+        // Configure audio so we're allowed to play in the background
         configureAudioSession()
 
         // Ask for mic + speech permissions
@@ -35,6 +37,52 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return true
     }
 
+    // MARK: - Background Execution
+
+    func applicationDidEnterBackground(_ application: UIApplication) {
+        // Request background execution time to keep audio session alive
+        // Renew every 2.5 minutes to keep it alive indefinitely while audio plays
+        beginBackgroundTask()
+        startBackgroundTaskRenewal()
+    }
+
+    func applicationWillEnterForeground(_ application: UIApplication) {
+        // Clean up background task when returning to foreground
+        stopBackgroundTaskRenewal()
+        endBackgroundTask()
+    }
+
+    private func beginBackgroundTask() {
+        backgroundTaskId = UIApplication.shared.beginBackgroundTask(withName: "ZenCardsAudioPlayback") { [weak self] in
+            self?.endBackgroundTask()
+        }
+        print("🔄 [AppDelegate] Background task started: \(backgroundTaskId.rawValue)")
+    }
+
+    private func endBackgroundTask() {
+        if backgroundTaskId != .invalid {
+            UIApplication.shared.endBackgroundTask(backgroundTaskId)
+            print("🛑 [AppDelegate] Background task ended: \(backgroundTaskId.rawValue)")
+            backgroundTaskId = .invalid
+        }
+    }
+
+    private func startBackgroundTaskRenewal() {
+        backgroundTaskRenewalTimer?.invalidate()
+        
+        // Renew every 2.5 minutes (150 seconds) to keep background execution alive
+        backgroundTaskRenewalTimer = Timer.scheduledTimer(withTimeInterval: 150.0, repeats: true) { [weak self] _ in
+            print("🔄 [AppDelegate] Renewing background task...")
+            self?.endBackgroundTask()
+            self?.beginBackgroundTask()
+        }
+    }
+
+    private func stopBackgroundTaskRenewal() {
+        backgroundTaskRenewalTimer?.invalidate()
+        backgroundTaskRenewalTimer = nil
+        print("🛑 [AppDelegate] Background task renewal stopped")
+    }
 
     // MARK: - Permissions
 
@@ -53,10 +101,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     private func configureAudioSession() {
         let session = AVAudioSession.sharedInstance()
         do {
-            // Simple, “safe” background-playback config
-            try session.setCategory(.playback, options: [.mixWithOthers])
-            try session.setActive(true)
-            print("✅ Background audio session configured")
+            // Aggressive background audio configuration
+            try session.setCategory(
+                .playback,
+                mode: .default,
+                options: [
+                    .duckOthers,              // Lower volume of other apps
+                    .interruptSpokenAudioAndMixWithOthers  // Don't stop other audio, just mix
+                ]
+            )
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
+            print("✅ Background audio session configured (aggressive mode)")
         } catch {
             print("❌ Audio session error: \(error)")
         }
