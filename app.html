@@ -1175,23 +1175,30 @@ async function getOrGenerateAudioForText(text, opts = {}) {
   }
 }
 async function playPromptAudio(text, onEnd) {
-  try {
-    // Prefer native MP3 playback when available (background-capable)
-    if (isNativeIOS && NativeAudioPlayer) {
+  // ✅ iOS native path: generate MP3 and play via NativeAudioPlayer - NO WEB FALLBACK
+  if (isNativeIOS && NativeAudioPlayer) {
+    try {
       const url = await getOrGenerateAudioForText(text, { purpose: "prompt" });
-      if (url) {
-        const ok = await nativePlaySingleUrl(url, onEnd);
-        if (ok) return;
+      if (!url) {
+        console.error("[Prompt] Failed to generate audio URL");
+        onEnd && onEnd();
+        return;
       }
-      // fallthrough if url missing or nativePlaySingleUrl returned false
-    }
 
-    // Web fallback
-    speak(text, onEnd);
-  } catch (e) {
-    console.warn("playPromptAudio failed, falling back to speak:", e);
-    speak(text, onEnd);
+      const ok = await nativePlaySingleUrl(url, onEnd);
+      if (ok) return;
+
+      console.error("[Prompt] nativePlaySingleUrl returned false");
+      onEnd && onEnd();
+    } catch (e) {
+      console.error("[Prompt] Native path failed:", e);
+      onEnd && onEnd();
+    }
+    return;
   }
+
+  // Web fallback (desktop/browser only)
+  speak(text, onEnd);
 }
 
 
@@ -3058,7 +3065,7 @@ function speak(text, onEnd) {
     } catch (_) {}
   }
 
-  // ✅ iOS app path: MP3 via NativeAudioPlayer (background-safe)
+  // ✅ iOS app path: MP3 via NativeAudioPlayer (background-safe) - NO WEB TTS FALLBACK
   if (isNativeIOS && NativeAudioPlayer) {
     speakGeneration++;
     const myGeneration = speakGeneration;
@@ -3067,60 +3074,45 @@ function speak(text, onEnd) {
     setStatus("Speaking...");
 
     (async () => {
-      const url = await getOrGenerateAudioForText(text, { voice: "alloy", speed: 1.0 });
-     if (!url) {
-  console.warn("[TTS] MP3 missing. Trying web TTS fallback...");
+      try {
+        const url = await getOrGenerateAudioForText(text, { voice: "alloy", speed: 1.0 });
+        if (!url) {
+          console.error("[TTS] Failed to generate audio URL - skipping to onEnd");
+          isSpeaking = false;
+          setStatus("");
+          onEnd && onEnd();
+          return;
+        }
 
-  // Web TTS might be unavailable in iOS WKWebView; still don't hang.
-  let finished = false;
-  const failSafe = setTimeout(() => {
-    if (finished) return;
-    finished = true;
-    console.warn("[TTS] webTTS fallback watchdog fired — forcing onEnd()");
-    isSpeaking = false;
-    setStatus("");
-    onEnd && onEnd();
-  }, 4000);
-
-  speakWithWebTts(text, () => {
-    if (finished) return;
-    finished = true;
-    clearTimeout(failSafe);
-    if (myGeneration !== speakGeneration) return;
-    isSpeaking = false;
-    setStatus("");
-    onEnd && onEnd();
-  });
-
-  return;
-}
-
-      await nativePlaySingleUrl(url, () => {
-        if (myGeneration !== speakGeneration) return;
+        await nativePlaySingleUrl(url, () => {
+          if (myGeneration !== speakGeneration) return;
+          isSpeaking = false;
+          setStatus("");
+          onEnd && onEnd();
+        });
+      } catch (e) {
+        console.error("[TTS] Native iOS path crashed:", e);
         isSpeaking = false;
         setStatus("");
         onEnd && onEnd();
-      });
-    })().catch((e) => {
-      console.error("[TTS] native MP3 speak crashed:", e);
-      speakWithWebTts(text, onEnd);
-    });
+      }
+    })();
 
     return;
   }
 
-  // Web path
+  // Web path (desktop/browser only)
   speakWithWebTts(text, onEnd);
 }
 function speakSafe(text, onEnd) {
-  // iOS native path: generate MP3 and play via NativeAudioPlayer (background-safe)
+  // ✅ iOS native path: generate MP3 and play via NativeAudioPlayer - NO WEB FALLBACK
   if (isNativeIOS && NativeAudioPlayer) {
     (async () => {
       try {
         const url = await getOrGenerateAudioForText(text, { voice: "alloy", speed: 1.0 });
         if (!url) {
-          // fallback if mp3 generation fails
-          speak(text, onEnd);
+          console.error("[speakSafe] Failed to generate audio URL");
+          onEnd && onEnd();
           return;
         }
         await nativePlaySingleUrl(url, () => {
@@ -3128,13 +3120,13 @@ function speakSafe(text, onEnd) {
         });
       } catch (e) {
         console.error("[speakSafe] native path failed:", e);
-        speak(text, onEnd);
+        onEnd && onEnd();
       }
     })();
     return;
   }
 
-  // web path
+  // Web path (desktop/browser only)
   speak(text, onEnd);
 }
 
