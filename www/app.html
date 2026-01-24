@@ -3868,19 +3868,6 @@ setCardContent(silentAnswerText, currentCard.answer);
 
     // ===================== VOICE MODE =====================
 
-    // Helper: detect "main menu" style commands
-    function isMainMenuCommand(text) {
-      const t = text.toLowerCase();
-      return (
-        t.includes("main menu") ||
-        (t.includes("menu") && t.includes("main")) ||
-        t.includes("go back") ||
-        t.includes("back to menu") ||
-        t.includes("back to the menu") ||
-        t.includes("go to the menu") ||
-        t.includes("go to main menu")
-      );
-    }
    // NEW: stop any current audio, then confirm + go to main menu
 async function speakAndGoToMainMenu() {
   await stopAllAudio();
@@ -4146,7 +4133,7 @@ async function handleGlobalVoiceCommands(text) {
 
       // If we're at post-completion choice, re-prompt main menu
       if (awaitingPostCompletionChoice) {
-        speaksafe("Say main menu to go back.", () => {
+        speakSafe("Say main menu to go back.", () => {
           listenForCommand(handleVoiceTranscript);
         });
         return;
