@@ -1261,11 +1261,22 @@ async function nativePlaySingleUrl(url, onEnd) {
   // CRITICAL: Don't call stop() before setQueue - iOS may suspend between calls while backgrounded
   // Just update the queue with new URL and ensure playing
   try {
+    console.log("[NativeAudio] Calling setQueue with URL:", url);
     await NativeAudioPlayer.setQueue({ urls: [url] });
-    console.log("[NativeAudio] Queue updated with new URL, calling play()");
-    await NativeAudioPlayer.play();
+    console.log("[NativeAudio] ✅ setQueue succeeded, now calling play()");
+    
+    // Add a timeout wrapper to detect if play() hangs
+    const playPromise = Promise.race([
+      NativeAudioPlayer.play(),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("play() timeout - no response from native")), 5000)
+      )
+    ]);
+    
+    await playPromise;
+    console.log("[NativeAudio] ✅ play() succeeded - audio should be playing");
   } catch (e) {
-    console.error("[NativeAudio] Failed to setQueue or play:", e);
+    console.error("[NativeAudio] ❌ Failed during setQueue or play:", e);
     return false;
   }
 
