@@ -1174,6 +1174,26 @@ async function getOrGenerateAudioForText(text, opts = {}) {
     return null;
   }
 }
+async function playPromptAudio(text, onEnd) {
+  try {
+    // Prefer native MP3 playback when available (background-capable)
+    if (isNativeIOS && NativeAudioPlayer) {
+      const url = await getOrGenerateAudioForText(text, { purpose: "prompt" });
+      if (url) {
+        const ok = await nativePlaySingleUrl(url, onEnd);
+        if (ok) return;
+      }
+      // fallthrough if url missing or nativePlaySingleUrl returned false
+    }
+
+    // Web fallback
+    speak(text, onEnd);
+  } catch (e) {
+    console.warn("playPromptAudio failed, falling back to speak:", e);
+    speak(text, onEnd);
+  }
+}
+
 
 
 let nativeAudioGeneration = 0;
@@ -4213,25 +4233,24 @@ if (
   return false;
 }
 
-    async function handleVoiceTranscript(text) {
-      // If we are waiting to play the answer after speech ended, ANY transcript resets the countdown
-if (inAnswerAfterSpeechDelay) {
+ async function handleVoiceTranscript(text) {
+  // If we are waiting to play the answer after speech ended, ANY transcript resets the countdown
+  if (inAnswerAfterSpeechDelay) {
+    if (isNextCardCommand(text)) { handleNextCardSkip(); return; }
+    if (normalizeCmdText(text).length > 0) {
+      startOrResetAnswerAfterSpeechDelay();
+      return;
+    }
+  }
 
-if (isNextCardCommand(text)) { handleNextCardSkip().catch(console.error); return; }
+  // ✅ IMPORTANT: await the async global handler
+  if (await handleGlobalVoiceCommands(text)) return;
 
-  // Optional: ignore empty
-  if (normalizeCmdText(text).length > 0) {
-    startOrResetAnswerAfterSpeechDelay();
+  // ✅ Next card = skip answer + auto-easy (or just advance in study-ahead)
+  if (isNextCardCommand(text) && currentMode === "voice") {
+    handleNextCardSkip().catch(console.error);
     return;
   }
-}
-  // First, let global commands capture things like pause, resume, main menu, repeats
-  if (await handleGlobalVoiceCommands(text)) return;
-  // ✅ Next card = skip answer + auto-easy (or just advance in study-ahead)
-if (isNextCardCommand(text) && currentMode === "voice") {
- handleNextCardSkip().catch(console.error);
-return;
-}
   // ===== Mic mute command: ONLY during voice-answer gap (after question, before answer) =====
 if (awaitingAnswerSignal && currentMode === "voice") {
   const t = normalizeCmdText(text);
@@ -4441,15 +4460,11 @@ function speakAnswerThenAskDifficulty() {
       ? "How was that? Say again, hard, good, or easy."
       : "How was that?";
 
-    if (isNativeIOS && NativeAudioPlayer) {
-  // ✅ background-safe: don’t rely on NativeTTS here
-  setStatus(promptText);
+   setStatus(promptText);
+
+playPromptAudio(promptText, () => {
   if (!isPaused) listenForCommand(handleVoiceTranscript);
-} else {
-  speak(promptText, () => {
-    if (!isPaused) listenForCommand(handleVoiceTranscript);
-  });
-}
+});
   });
 }
 
@@ -5150,11 +5165,26 @@ startVoiceBtn.addEventListener("click", async () => {
   });
 }
 
- (async function init() {
-  loadFromStorage();
-    setupNativePlugins();
-     initNativeVoicePlugin();
+ async function init() {
+  // 1) Load local first (fast)
+  try {
+    loadFromStorage();
+  } catch (e) {
+    console.error("loadFromStorage failed:", e);
+  }
 
+  // 2) Immediately render whatever we have locally
+  try {
+    if (typeof rebuildDeckUI === "function") rebuildDeckUI();
+  } catch (e) {
+    console.error("rebuildDeckUI (local) failed:", e);
+  }
+
+  // 3) Native plugin wiring
+  try { setupNativePlugins(); } catch (e) { console.warn("setupNativePlugins failed:", e); }
+  try { initNativeVoicePlugin(); } catch (e) { console.warn("initNativeVoicePlugin failed:", e); }
+
+  // 4) Remote load (if logged in)
   try {
     const { data: { session }, error } = await supabaseClient.auth.getSession();
     if (error) console.error("getSession error:", error);
@@ -5162,13 +5192,15 @@ startVoiceBtn.addEventListener("click", async () => {
     console.log("[app.html] session:", session);
     console.log("[app.html] user:", session?.user);
 
-    if (session?.user) {
-      if (typeof loadStateFromSupabase === "function") {
-        await loadStateFromSupabase();
-        hasLoadedRemote = true;
-      } else {
-        console.warn("loadStateFromSupabase() missing; skipping remote load.");
-        hasLoadedRemote = false;
+    if (session?.user && typeof loadStateFromSupabase === "function") {
+      await loadStateFromSupabase();
+      hasLoadedRemote = true;
+
+      // 5) Re-render again AFTER remote arrives
+      try {
+        if (typeof rebuildDeckUI === "function") rebuildDeckUI();
+      } catch (e) {
+        console.error("rebuildDeckUI (remote) failed:", e);
       }
     } else {
       hasLoadedRemote = false;
@@ -5177,7 +5209,9 @@ startVoiceBtn.addEventListener("click", async () => {
     console.error("init remote load failed", e);
     hasLoadedRemote = false;
   }
-})();
+}
+
+init();
 
 if (debugNativeQueueBtn) {
   debugNativeQueueBtn.addEventListener("click", async () => {
