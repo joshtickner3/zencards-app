@@ -8,7 +8,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
     private var backgroundTaskId: UIBackgroundTaskIdentifier = .invalid
-    private var backgroundTaskQueue = DispatchSourceTimer()
+    private var backgroundTaskTimer: DispatchSourceTimer?
     private let backgroundQueue = DispatchQueue(label: "com.zencards.background-task")
 
     // MARK: - App Launch
@@ -24,7 +24,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         requestPermissions()
 
         // Enable pinch-zoom in the Capacitor WKWebView (iOS app)
-        // Enable pinch-zoom...
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
             guard
                 let bridgeVC = self?.window?.rootViewController as? CAPBridgeViewController,
@@ -46,7 +45,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationWillEnterForeground(_ application: UIApplication) {
-        print("📱 [AppDelegate] App will enter foreground")
+        print("�� [AppDelegate] App will enter foreground")
         endBackgroundTaskWithRenewal()
     }
 
@@ -58,7 +57,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         beginBackgroundTask()
         
         // Create a GCD timer (more reliable than NSTimer for background tasks)
-        let timer = DispatchSourceTimer()
+        let timer = DispatchSource.makeTimerSource(queue: backgroundQueue)
         timer.schedule(deadline: .now() + 150, repeating: 150.0, leeway: .seconds(5))
         
         timer.setEventHandler { [weak self] in
@@ -67,10 +66,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             self?.beginBackgroundTask()
         }
         
-        backgroundQueue.async {
-            timer.resume()
-            self.backgroundTaskQueue = timer
-        }
+        backgroundTaskTimer = timer
+        timer.resume()
         
         print("⏰ [AppDelegate] Starting background task renewal with GCD (every 150s)")
     }
@@ -79,8 +76,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         print("⏸ [AppDelegate] Stopping background task and timer")
         
         // Cancel the timer
-        backgroundQueue.async {
-            self.backgroundTaskQueue.cancel()
+        if let timer = backgroundTaskTimer {
+            timer.cancel()
+            backgroundTaskTimer = nil
         }
         
         // End the background task
