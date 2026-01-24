@@ -1177,6 +1177,8 @@ async function getOrGenerateAudioForText(text, opts = {}) {
 
 
 let nativeAudioGeneration = 0;
+let nativeEndedSubs = [];
+let nativeEndedWatchdogId = null;
 
 async function nativePlaySingleUrl(url, onEnd) {
   if (!isNativeIOS || !NativeAudioPlayer || !url) return false;
@@ -1184,20 +1186,62 @@ async function nativePlaySingleUrl(url, onEnd) {
   nativeAudioGeneration++;
   const myGen = nativeAudioGeneration;
 
-  // stop previous cleanly
+  // cleanup helper
+  const cleanup = async () => {
+    if (nativeEndedWatchdogId) {
+      clearTimeout(nativeEndedWatchdogId);
+      nativeEndedWatchdogId = null;
+    }
+    for (const sub of nativeEndedSubs) {
+      try { await sub?.remove?.(); } catch (_) {}
+    }
+    nativeEndedSubs = [];
+  };
+
+  // stop previous cleanly + remove old listeners
+  try { await cleanup(); } catch (_) {}
   try { await NativeAudioPlayer.stop(); } catch (_) {}
 
-  let sub = null;
-  if (onEnd && typeof NativeAudioPlayer.addListener === "function") {
-    sub = await NativeAudioPlayer.addListener("trackEnded", () => {
-      if (myGen !== nativeAudioGeneration) return; // stale
-      try { sub?.remove?.(); } catch (_) {}
-      onEnd();
-    });
+  // One unified "ended" handler (ignore stale generations)
+  const ended = async () => {
+    if (myGen !== nativeAudioGeneration) return;
+    await cleanup();
+    onEnd && onEnd();
+  };
+
+  // Listen to multiple possible event names (plugin implementations vary)
+  if (typeof NativeAudioPlayer.addListener === "function") {
+    try {
+      // Your current expected event
+      nativeEndedSubs.push(await NativeAudioPlayer.addListener("trackEnded", ended));
+    } catch (_) {}
+
+    try {
+      // Common alternative names some people use
+      nativeEndedSubs.push(await NativeAudioPlayer.addListener("ended", ended));
+    } catch (_) {}
+
+    try {
+      nativeEndedSubs.push(await NativeAudioPlayer.addListener("playbackEnded", ended));
+    } catch (_) {}
+
+    try {
+      nativeEndedSubs.push(await NativeAudioPlayer.addListener("audioEnded", ended));
+    } catch (_) {}
   }
 
+  // Watchdog: if native never fires an ended event, don't hang forever.
+  // 90s is conservative (covers long prompts). Tune later.
+  nativeEndedWatchdogId = setTimeout(() => {
+    if (myGen !== nativeAudioGeneration) return;
+    console.warn("[NativeAudio] Watchdog fired — forcing onEnd() so flow continues.");
+    ended();
+  }, 90000);
+
+  // Start playback
   await NativeAudioPlayer.setQueue({ urls: [url] });
   await NativeAudioPlayer.play();
+
   return true;
 }
 
@@ -1814,6 +1858,8 @@ function restoreLastDeckSelection() {
 async function initAppSession() {
   console.log("[BOOT] initAppSession()");
     setupNativePlugins();
+    initNativeVoicePlugin();
+
 
   // 1) Check session first (fast)
   const { data: sessionData, error: sessErr } = await supabaseClient.auth.getSession();
@@ -2958,17 +3004,32 @@ function speak(text, onEnd) {
 
     (async () => {
       const url = await getOrGenerateAudioForText(text, { voice: "alloy", speed: 1.0 });
-      if (!url) {
-        // If MP3 generation fails, *then* fallback to web TTS (still works in simulator/web)
-        console.warn("[TTS] MP3 missing, falling back to web TTS");
-        speakWithWebTts(text, () => {
-          if (myGeneration !== speakGeneration) return;
-          isSpeaking = false;
-          setStatus("");
-          onEnd && onEnd();
-        });
-        return;
-      }
+     if (!url) {
+  console.warn("[TTS] MP3 missing. Trying web TTS fallback...");
+
+  // Web TTS might be unavailable in iOS WKWebView; still don't hang.
+  let finished = false;
+  const failSafe = setTimeout(() => {
+    if (finished) return;
+    finished = true;
+    console.warn("[TTS] webTTS fallback watchdog fired — forcing onEnd()");
+    isSpeaking = false;
+    setStatus("");
+    onEnd && onEnd();
+  }, 4000);
+
+  speakWithWebTts(text, () => {
+    if (finished) return;
+    finished = true;
+    clearTimeout(failSafe);
+    if (myGeneration !== speakGeneration) return;
+    isSpeaking = false;
+    setStatus("");
+    onEnd && onEnd();
+  });
+
+  return;
+}
 
       await nativePlaySingleUrl(url, () => {
         if (myGeneration !== speakGeneration) return;
@@ -2987,6 +3048,32 @@ function speak(text, onEnd) {
   // Web path
   speakWithWebTts(text, onEnd);
 }
+function speakSafe(text, onEnd) {
+  // iOS native path: generate MP3 and play via NativeAudioPlayer (background-safe)
+  if (isNativeIOS && NativeAudioPlayer) {
+    (async () => {
+      try {
+        const url = await getOrGenerateAudioForText(text, { voice: "alloy", speed: 1.0 });
+        if (!url) {
+          // fallback if mp3 generation fails
+          speak(text, onEnd);
+          return;
+        }
+        await nativePlaySingleUrl(url, () => {
+          if (onEnd) onEnd();
+        });
+      } catch (e) {
+        console.error("[speakSafe] native path failed:", e);
+        speak(text, onEnd);
+      }
+    })();
+    return;
+  }
+
+  // web path
+  speak(text, onEnd);
+}
+
 
 // Pure browser TTS (this is basically your old speak() body)
 function speakWithWebTts(text, onEnd) {
@@ -3777,9 +3864,7 @@ setCardContent(silentAnswerText, currentCard.answer);
    // NEW: stop any current audio, then confirm + go to main menu
 async function speakAndGoToMainMenu() {
   await stopAllAudio();
-  speak("Going to the main menu.", () => {
-    endStudySession();
-  });
+ speakSafe("Going to the main menu.", () => { endStudySession(); });
 }
 
 
@@ -3999,7 +4084,7 @@ function isMainMenuCommand(text) {
 // NEW: stop any current audio, then confirm + go to main menu
 async function speakAndGoToMainMenu() {
   await stopAllAudio();
-  speak("Going to the main menu.", () => {
+  speakSafe("Going to the main menu.", () => {
     endStudySession();
   });
 }
@@ -4016,7 +4101,7 @@ async function handleGlobalVoiceCommands(text) {
   // 🔁 Repeat answer — allowed whenever we've already shown an answer
   if (t.includes("repeat answer") && currentMode === "voice" && currentCard) {
     const plainAnswer = getPlainTextFromCard(currentCard.answer);
-    speak("Answer: " + plainAnswer, () => {
+    speakSafe("Answer: " + plainAnswer, () => {
       if (isPaused) return;
 
       // If we're in study-ahead + gap, restart the gap window
@@ -4041,7 +4126,7 @@ async function handleGlobalVoiceCommands(text) {
 
       // If we're at post-completion choice, re-prompt main menu
       if (awaitingPostCompletionChoice) {
-        speak("Say main menu to go back.", () => {
+        speaksafe("Say main menu to go back.", () => {
           listenForCommand(handleVoiceTranscript);
         });
         return;
@@ -4079,7 +4164,7 @@ if (
     setStatus("Paused. Say 'resume study session' or tap Resume.");
 
     // optional: quick confirmation, but it won't affect pause state
-    speak("Paused.", () => {
+    speakSafe("Paused.", () => {
       // keep listening while paused so you can say "resume study session"
       listenForCommand(handleVoiceTranscript);
     });
@@ -4093,7 +4178,7 @@ if (
     (t.includes("resume") && (t.includes("study") || t.includes("session")))
   ) {
     if (isPaused) {
-  speak("Resuming study session.", () => {
+  speakSafe("Resuming study session.", () => {
     isPaused = false;
     pauseBtn.disabled = false;
     resumeBtn.disabled = true;
@@ -4128,11 +4213,11 @@ if (
   return false;
 }
 
-    function handleVoiceTranscript(text) {
+    async function handleVoiceTranscript(text) {
       // If we are waiting to play the answer after speech ended, ANY transcript resets the countdown
 if (inAnswerAfterSpeechDelay) {
 
-  if (isNextCardCommand(text)) { handleNextCardSkip(); return; }
+if (isNextCardCommand(text)) { handleNextCardSkip().catch(console.error); return; }
 
   // Optional: ignore empty
   if (normalizeCmdText(text).length > 0) {
@@ -4141,7 +4226,7 @@ if (inAnswerAfterSpeechDelay) {
   }
 }
   // First, let global commands capture things like pause, resume, main menu, repeats
-  if (handleGlobalVoiceCommands(text)) return;
+  if (await handleGlobalVoiceCommands(text)) return;
   // ✅ Next card = skip answer + auto-easy (or just advance in study-ahead)
 if (isNextCardCommand(text) && currentMode === "voice") {
  handleNextCardSkip().catch(console.error);
@@ -4155,18 +4240,18 @@ if (awaitingAnswerSignal && currentMode === "voice") {
     awaitingMuteSeconds = true;
 
     // Speak the allowed options and then listen for a number
-    speak("10, 20, 30, 40, 50, or 60 seconds?", () => {
+    speakSafe("10, 20, 30, 40, 50, or 60 seconds?", () => {
       listenForCommand((numText) => {
         const n = parseMuteSeconds(numText);
         if (!n) {
           // reprompt once (safe, minimal)
-          speak("Please say 10, 20, 30, 40, 50, or 60.", () => {
+          speakSafe("Please say 10, 20, 30, 40, 50, or 60.", () => {
             awaitingMuteSeconds = true;
             listenForCommand((numText2) => {
               const n2 = parseMuteSeconds(numText2);
               awaitingMuteSeconds = false;
               if (!n2) {
-                speak("Okay, not muting.", () => {
+                speakSafe("Okay, not muting.", () => {
                   // resume listening for the answer
                   if (!isPaused && awaitingAnswerSignal) {
                     setStatus("Listening for your answer...");
@@ -4243,7 +4328,7 @@ if (awaitingAnswerSignal && currentMode === "voice") {
     // In study-ahead (noScheduleChanges) we should never be here,
     // but if we are, just re-prompt for main menu.
     if (noScheduleChanges) {
-      speak("Say main menu to go to the main menu.", () => {
+      speakSafe("Say main menu to go to the main menu.", () => {
         listenForCommand(handleVoiceTranscript);
       });
       return;
@@ -4389,7 +4474,7 @@ function speakAnswerThenAskDifficulty() {
 
       if (!restartOnly && !studyAheadPromptedOnceVoice) {
         studyAheadPromptedOnceVoice = true;
-        speak("You are in study ahead mode. You can say repeat answer, repeat question, pause study session, resume study session, or main menu before the next card.", () => {
+        speakSafe("You are in study ahead mode. You can say repeat answer, repeat question, pause study session, resume study session, or main menu before the next card.", () => {
           if (isPaused) return;
           startListeningAndTimer();
         });
@@ -4479,9 +4564,9 @@ function speakAnswerThenAskDifficulty() {
         if (voiceAnswer) voiceAnswer.classList.add("hidden");
 
         setStudyState(StudyState.IDLE);
-        speak("This deck has no cards.", () => {
+        speakSafe("This deck has no cards.", () => {
           awaitingPostCompletionChoice = true;
-          speak("Say main menu to go back.", () =>
+          speakSafe("Say main menu to go back.", () =>
             listenForCommand(handleVoiceTranscript)
           );
         });
@@ -4572,7 +4657,7 @@ if (overdue.length > 0) {
   speak(
     "There are no more cards available to study in this deck right now.",
     () => {
-      speak("Say main menu to go back, or study ahead to enter review all cards in this deck again.", () =>
+      speakSafe("Say main menu to go back, or study ahead to enter review all cards in this deck again.", () =>
         listenForCommand(handleVoiceTranscript)
       );
     }
