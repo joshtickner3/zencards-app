@@ -1213,9 +1213,9 @@ async function nativePlaySingleUrl(url, onEnd) {
   nativeAudioGeneration++;
   const myGen = nativeAudioGeneration;
 
-  // CRITICAL: Stop VoiceCommands listening BEFORE playing audio
-  // Otherwise AVAudioEngine locks the audio input and prevents playback
-  if (nativeVoicePlugin) {
+  // CRITICAL: Only stop VoiceCommands if it was actually initialized for this session
+  // In auto-good + wait mode, VoiceCommands isn't initialized, so don't try to stop it
+  if (nativeVoicePlugin && currentMode === "voice" && (answerMode === "voice" || !autoGoodMode)) {
     try {
       console.log("[NativeAudio] Stopping VoiceCommands to allow audio playback");
       await nativeVoicePlugin.stop();

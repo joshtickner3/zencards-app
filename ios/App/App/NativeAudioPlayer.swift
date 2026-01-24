@@ -278,29 +278,22 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
 
-            // Configure audio session for background playback
-            // This needs to handle BOTH cases:
-            // 1. When VoiceCommands is active (.playAndRecord with .defaultToSpeaker)
-            // 2. When only audio playback is needed (.playback with .duckOthers)
+            // For background playback, we need to be aggressive about audio session setup
             do {
                 let session = AVAudioSession.sharedInstance()
                 let currentCategory = session.category
                 
-                // If VoiceCommands has already set .playAndRecord, keep it (it supports both recording + playback)
-                // Otherwise, ensure we're in .playback mode
-                if currentCategory != .playAndRecord {
-                    print("🔊 [NativeAudioPlayer] Audio session not in .playAndRecord, switching to .playback")
-                    try session.setCategory(
-                        .playback,
-                        mode: .default,
-                        options: [.duckOthers]
-                    )
-                } else {
-                    print("🔊 [NativeAudioPlayer] Audio session already in .playAndRecord (from VoiceCommands), maintaining it")
-                }
+                // CRITICAL: Use .playback category for maximum background compatibility
+                // Don't use .playAndRecord unless we're actively recording/listening
+                print("🔊 [NativeAudioPlayer] Setting audio session to .playback (most background-compatible)")
+                try session.setCategory(
+                    .playback,
+                    mode: .default,
+                    options: [.duckOthers]
+                )
                 
                 try session.setActive(true, options: .notifyOthersOnDeactivation)
-                print("✅ [NativeAudioPlayer] Audio session confirmed active for playback")
+                print("✅ [NativeAudioPlayer] Audio session configured for pure playback")
             } catch {
                 print("⚠️ [NativeAudioPlayer] Audio session setup failed: \(error)")
             }
