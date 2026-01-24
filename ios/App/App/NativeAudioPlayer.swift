@@ -27,7 +27,8 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
     private var player: AVQueuePlayer?
     private var currentIndex: Int = 0
     private var updateNowPlayingTimer: Timer?
-    private var playbackKeepaliveTimer: Timer?  // New: monitors and restores playback
+    private var playbackKeepaliveTimer: DispatchSourceTimer?  // Changed: GCD timer that works in background
+    private let playbackKeepaliveQueue = DispatchQueue(label: "com.zencards.playbackKeepalive", qos: .userInitiated)
 
     // MARK: - Lifecycle
     public override func load() {
@@ -160,25 +161,34 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
     
     private func startPlaybackKeepalive() {
         // Stop any existing keepalive timer
-        playbackKeepaliveTimer?.invalidate()
+        playbackKeepaliveTimer?.cancel()
+        playbackKeepaliveTimer = nil
         
-        // Check every 1 second if playback got suspended and restart if needed
-        playbackKeepaliveTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+        // Create GCD timer that CONTINUES IN BACKGROUND (unlike NSTimer)
+        let timer = DispatchSource.makeTimerSource(queue: playbackKeepaliveQueue)
+        timer.schedule(deadline: .now(), repeating: 1.0)  // Fire every 1 second
+        
+        timer.setEventHandler { [weak self] in
             guard let self = self, let player = self.player else { return }
             
             // If player was supposed to be playing but got paused, restart it
             if player.timeControlStatus != .playing && player.currentItem != nil {
-                print("🚨 [NativeAudioPlayer] Keepalive: Playback was suspended! Restarting...")
-                print("   ↳ Previous status: \(player.timeControlStatus.rawValue)")
-                player.play()
-                print("   ↳ Play() called again, new status: \(player.timeControlStatus.rawValue)")
+                DispatchQueue.main.async {
+                    print("🚨 [NativeAudioPlayer] Keepalive: Playback was suspended! Restarting...")
+                    print("   ↳ Previous status: \(player.timeControlStatus.rawValue)")
+                    player.play()
+                    print("   ↳ Play() called again, new status: \(player.timeControlStatus.rawValue)")
+                }
             }
         }
-        print("🔄 [NativeAudioPlayer] Playback keepalive monitor started (checks every 1s)")
+        
+        timer.resume()
+        playbackKeepaliveTimer = timer
+        print("🔄 [NativeAudioPlayer] GCD-based playback keepalive monitor started (checks every 1s in background)")
     }
     
     private func stopPlaybackKeepalive() {
-        playbackKeepaliveTimer?.invalidate()
+        playbackKeepaliveTimer?.cancel()
         playbackKeepaliveTimer = nil
         print("🔄 [NativeAudioPlayer] Playback keepalive monitor stopped")
     }
