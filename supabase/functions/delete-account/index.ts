@@ -1,99 +1,131 @@
-// Supabase Edge Function: delete-account
-// Cancels user's Stripe subscription (if any) and deletes their Supabase account.
-// Expects: { user_id: string, email: string }
-// Requires: STRIPE_SECRET_KEY env var set in Supabase project
-
+// supabase/functions/delete-account/index.ts
+// Cancels the caller's Stripe subscription (by stripe_subscription_id) and deletes their Supabase Auth user.
+// IMPORTANT:
+// - Set env vars in Supabase: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, STRIPE_SECRET_KEY
+// - Ensure your "subscriptions" table has: user_id (uuid), stripe_subscription_id (text)
+// - Client must call with Authorization: Bearer <access_token>
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY");
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
 const STRIPE_API = "https://api.stripe.com/v1";
 
-async function getStripeCustomerId(supabase, user_id) {
-  // Assumes you store Stripe customer id in a 'stripe_customer_id' column in 'users' or 'subscriptions' table
-  // Adjust query as needed for your schema
-  const { data, error } = await supabase
-    .from('subscriptions')
-    .select('stripe_customer_id')
-    .eq('user_id', user_id)
-    .maybeSingle();
-  if (error || !data) return null;
-  return data.stripe_customer_id;
+function corsHeaders() {
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
 }
 
-async function cancelStripeSubscription(stripeCustomerId) {
-  // Find active subscription for this customer
-  const resp = await fetch(`${STRIPE_API}/subscriptions?customer=${stripeCustomerId}&status=all&limit=1`, {
-    headers: { "Authorization": `Bearer ${STRIPE_SECRET_KEY}` }
-  });
-  const json = await resp.json();
-  if (!json.data || !json.data.length) return null;
-  const sub = json.data.find((s) => s.status === "active" || s.status === "trialing");
-  if (!sub) return null;
-  // Cancel immediately
-  await fetch(`${STRIPE_API}/subscriptions/${sub.id}`, {
+async function stripeCancelSubscription(subscriptionId: string) {
+  // DELETE /v1/subscriptions/{id} cancels immediately
+  const resp = await fetch(`${STRIPE_API}/subscriptions/${encodeURIComponent(subscriptionId)}`, {
     method: "DELETE",
-    headers: { "Authorization": `Bearer ${STRIPE_SECRET_KEY}` }
+    headers: {
+      Authorization: `Bearer ${STRIPE_SECRET_KEY}`,
+    },
   });
-  return sub.id;
+
+  const text = await resp.text();
+  if (!resp.ok) throw new Error(`Stripe cancel failed ${resp.status}: ${text}`);
+
+  // Stripe returns JSON
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
 }
 
 Deno.serve(async (req) => {
-    // Get Supabase project URL and service role key from environment variables
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set as environment variables.");
-    }
-    const supabase = createClient(supabaseUrl, supabaseKey);
   // CORS preflight
-  if (req.method === "OPTIONS") {
-    return new Response("ok", {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-      }
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders() });
+
+  // Only allow POST
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405,
+      headers: { ...corsHeaders(), "Content-Type": "application/json" },
     });
   }
 
-  // supabase client already created above
-  if (!user_id || !email) {
-    return new Response(JSON.stringify({ error: "Missing user_id or email" }), {
-      status: 400,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-      }
-    });
-  }
-
-  // 1. Cancel Stripe subscription if exists
-  let stripeCustomerId = await getStripeCustomerId(supabase, user_id);
-  if (stripeCustomerId) {
-    await cancelStripeSubscription(stripeCustomerId);
-  }
-
-  // 2. Delete user from Supabase Auth
-  const { error: deleteError } = await supabase.auth.admin.deleteUser(user_id);
-  if (deleteError) {
-    return new Response(JSON.stringify({ error: "Failed to delete user from Supabase" }), {
-      status: 500,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-      }
-    });
-  }
-
-  // 3. Optionally, delete user data from other tables here
-
-  return new Response(JSON.stringify({ success: true }), {
-    status: 200,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  try {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      return new Response(JSON.stringify({ error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" }), {
+        status: 500,
+        headers: { ...corsHeaders(), "Content-Type": "application/json" },
+      });
     }
-  });
+    if (!STRIPE_SECRET_KEY) {
+      return new Response(JSON.stringify({ error: "Missing STRIPE_SECRET_KEY" }), {
+        status: 500,
+        headers: { ...corsHeaders(), "Content-Type": "application/json" },
+      });
+    }
+
+    // Service role client (admin)
+    const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Verify caller identity from JWT (don't trust body)
+    const authHeader = req.headers.get("Authorization") || "";
+    const jwt = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+
+    if (!jwt) {
+      return new Response(JSON.stringify({ error: "Missing Authorization Bearer token" }), {
+        status: 401,
+        headers: { ...corsHeaders(), "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: userData, error: userErr } = await admin.auth.getUser(jwt);
+    if (userErr || !userData?.user) {
+      return new Response(JSON.stringify({ error: "Invalid auth token" }), {
+        status: 401,
+        headers: { ...corsHeaders(), "Content-Type": "application/json" },
+      });
+    }
+
+    const user_id = userData.user.id;
+
+    // 1) Lookup subscription id
+    const { data: subRow, error: subErr } = await admin
+      .from("subscriptions")
+      .select("stripe_subscription_id")
+      .eq("user_id", user_id)
+      .maybeSingle();
+
+    // 2) Cancel Stripe subscription if present (ignore "not found" row)
+    let stripeResult: unknown = null;
+    if (!subErr && subRow?.stripe_subscription_id) {
+      stripeResult = await stripeCancelSubscription(subRow.stripe_subscription_id);
+    }
+
+    // 3) Delete user from Supabase Auth
+    const { error: delErr } = await admin.auth.admin.deleteUser(user_id);
+    if (delErr) {
+      return new Response(JSON.stringify({ error: `Failed to delete user: ${delErr.message}` }), {
+        status: 500,
+        headers: { ...corsHeaders(), "Content-Type": "application/json" },
+      });
+    }
+
+    // 4) Optional: delete their rows (recommended). Uncomment as needed.
+    // await admin.from("subscriptions").delete().eq("user_id", user_id);
+    // await admin.from("decks").delete().eq("user_id", user_id);
+    // await admin.from("cards").delete().eq("user_id", user_id);
+
+    return new Response(JSON.stringify({ success: true, stripeCanceled: !!stripeResult }), {
+      status: 200,
+      headers: { ...corsHeaders(), "Content-Type": "application/json" },
+    });
+  } catch (e) {
+    return new Response(JSON.stringify({ error: String((e as any)?.message || e) }), {
+      status: 500,
+      headers: { ...corsHeaders(), "Content-Type": "application/json" },
+    });
+  }
 });
