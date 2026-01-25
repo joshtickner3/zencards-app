@@ -89,5 +89,5 @@ Deno.serve(async (req) => {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     }
-  });
+    const supabase = createClient(supabaseUrl, supabaseKey);
 });
