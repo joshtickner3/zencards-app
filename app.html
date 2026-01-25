@@ -21,6 +21,32 @@
       }
     }
   };
+// ===== App background/foreground auto-pause/resume logic =====
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden) {
+    // App is backgrounded
+    if (!isPaused) {
+      pauseStudySession();
+      setStatus('App paused.');
+      speakWithWebTts('App paused.', null);
+    }
+  } else {
+    // App is foregrounded
+    setStatus('App paused.');
+    speakWithWebTts('App paused.', null);
+    // Resume mic/listening if in voice mode
+    if (currentMode === 'voice' && isPaused) {
+      resumeMicListening();
+    }
+  }
+});
+
+function resumeMicListening() {
+  // Resume listening for voice commands
+  if (typeof listenForCommand === 'function') {
+    listenForCommand(handleVoiceTranscript);
+  }
+}
 </script>
 
 <script
