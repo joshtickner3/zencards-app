@@ -2383,7 +2383,7 @@ function getTtsSettingsObj() {
   let s = {};
   try { s = raw ? JSON.parse(raw) : {}; } catch { s = {}; }
 
-  if (typeof s.rate !== "number") s.rate = 0.85;
+  if (typeof s.rate !== "number") s.rate = 1.0;
   if (typeof s.volume !== "number") s.volume = 1.0;
   if (typeof s.answerDelayAfterSpeechSec !== "number") s.answerDelayAfterSpeechSec = 0;
 
@@ -2548,43 +2548,33 @@ function speakWithWebTts(text, onEnd) {
   speakGeneration++;
   const myGeneration = speakGeneration;
 
-  // Split text on periods and commas, speak each segment with a 1 second pause between
-  const voices = window.speechSynthesis.getVoices();
-  let preferredVoice = voices.find(v => v.name === "Samantha");
-  if (!preferredVoice) {
-    preferredVoice = voices.find(v => v.lang.startsWith('en') && v.localService && v.name.toLowerCase().includes('english'))
-      || voices.find(v => v.lang.startsWith('en') && v.localService)
-      || voices.find(v => v.lang.startsWith('en'));
+  // Split text into segments, keeping delimiters
+  const segments = [];
+  let regex = /([^.,]+)([.,]?)/g;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    const phrase = match[1].trim();
+    const delim = match[2];
+    if (phrase) segments.push({ text: phrase + (delim || ""), pause: delim === '.' ? 1000 : delim === ',' ? 500 : 0 });
   }
 
-  // Split on period or comma, keeping the delimiter
-  const segments = text.split(/([.,])/g).reduce((arr, part, idx, src) => {
-    if (part === '.' || part === ',') {
-      arr[arr.length - 1] += part;
-    } else if (part.trim() !== '') {
-      arr.push(part.trim());
-    }
-    return arr;
-  }, []);
+  const voices = window.speechSynthesis.getVoices();
+  const samantha = voices.find(v => v.name === "Samantha");
 
-  let segmentIndex = 0;
-  function speakNextSegment() {
-    if (segmentIndex >= segments.length) {
+  let idx = 0;
+  function speakSegment() {
+    if (idx >= segments.length) {
       isSpeaking = false;
       setStatus("");
       if (onEnd) onEnd();
       return;
     }
-    const seg = segments[segmentIndex++];
-    if (!seg) {
-      speakNextSegment();
-      return;
+    const seg = segments[idx++];
+    const utt = new SpeechSynthesisUtterance(seg.text);
+    if (samantha) {
+      utt.voice = samantha;
     }
-    const utt = new SpeechSynthesisUtterance(seg);
-    if (preferredVoice) {
-      utt.voice = preferredVoice;
-    }
-    utt.rate = typeof ttsRate === "number" ? ttsRate : 0.85;
+    utt.rate = typeof ttsRate === "number" ? ttsRate : 1.0;
     utt.pitch = 1.0;
     utt.volume = typeof ttsVolume === "number" ? ttsVolume : 1.0;
     utt.onstart = () => {
@@ -2594,15 +2584,15 @@ function speakWithWebTts(text, onEnd) {
     };
     utt.onend = () => {
       if (myGeneration !== speakGeneration) return;
-      setTimeout(speakNextSegment, 1000); // 1 second pause
+      setTimeout(speakSegment, seg.pause);
     };
     utt.onerror = (err) => {
       console.error("TTS error:", err);
-      setTimeout(speakNextSegment, 1000);
+      setTimeout(speakSegment, seg.pause);
     };
     window.speechSynthesis.speak(utt);
   }
-  speakNextSegment();
+  speakSegment();
 }
 
     function listenForCommand(callback) {
