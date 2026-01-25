@@ -40,6 +40,13 @@ async function cancelStripeSubscription(stripeCustomerId) {
 }
 
 Deno.serve(async (req) => {
+    // Get Supabase project URL and service role key from environment variables
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set as environment variables.");
+    }
+    const supabase = createClient(supabaseUrl, supabaseKey);
   // CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", {
@@ -52,7 +59,6 @@ Deno.serve(async (req) => {
   }
 
   const supabase = createClient();
-  const { user_id, email } = await req.json();
   if (!user_id || !email) {
     return new Response(JSON.stringify({ error: "Missing user_id or email" }), {
       status: 400,
