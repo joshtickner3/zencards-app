@@ -2383,7 +2383,7 @@ function getTtsSettingsObj() {
   let s = {};
   try { s = raw ? JSON.parse(raw) : {}; } catch { s = {}; }
 
-  if (typeof s.rate !== "number") s.rate = 1.0;
+  if (typeof s.rate !== "number") s.rate = 0.8;
   if (typeof s.volume !== "number") s.volume = 1.0;
   if (typeof s.answerDelayAfterSpeechSec !== "number") s.answerDelayAfterSpeechSec = 0;
 
@@ -2555,7 +2555,7 @@ function speakWithWebTts(text, onEnd) {
   while ((match = regex.exec(text)) !== null) {
     const phrase = match[1].trim();
     const delim = match[2];
-    if (phrase) segments.push({ text: phrase + (delim || ""), pause: delim === '.' ? 1000 : delim === ',' ? 500 : 0 });
+    if (phrase) segments.push({ text: phrase + (delim || ""), pause: delim === '.' ? 500 : delim === ',' ? 250 : 0 });
   }
 
   const voices = window.speechSynthesis.getVoices();
@@ -2579,7 +2579,7 @@ function speakWithWebTts(text, onEnd) {
     if (preferredVoice) {
       utt.voice = preferredVoice;
     }
-    utt.rate = typeof ttsRate === "number" ? ttsRate : 1.0;
+    utt.rate = typeof ttsRate === "number" ? ttsRate : 0.8;
     utt.pitch = 1.0;
     utt.volume = typeof ttsVolume === "number" ? ttsVolume : 1.0;
     utt.onstart = () => {
