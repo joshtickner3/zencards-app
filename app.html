@@ -2559,7 +2559,12 @@ function speakWithWebTts(text, onEnd) {
   }
 
   const voices = window.speechSynthesis.getVoices();
-  const samantha = voices.find(v => v.name === "Samantha");
+  // Prefer Alex, then Samantha, then other English voices
+  let preferredVoice = voices.find(v => v.name === "Alex");
+  if (!preferredVoice) preferredVoice = voices.find(v => v.name === "Samantha");
+  if (!preferredVoice) preferredVoice = voices.find(v => v.lang.startsWith('en') && v.localService && v.name.toLowerCase().includes('english'));
+  if (!preferredVoice) preferredVoice = voices.find(v => v.lang.startsWith('en') && v.localService);
+  if (!preferredVoice) preferredVoice = voices.find(v => v.lang.startsWith('en'));
 
   let idx = 0;
   function speakSegment() {
@@ -2571,8 +2576,8 @@ function speakWithWebTts(text, onEnd) {
     }
     const seg = segments[idx++];
     const utt = new SpeechSynthesisUtterance(seg.text);
-    if (samantha) {
-      utt.voice = samantha;
+    if (preferredVoice) {
+      utt.voice = preferredVoice;
     }
     utt.rate = typeof ttsRate === "number" ? ttsRate : 1.0;
     utt.pitch = 1.0;
