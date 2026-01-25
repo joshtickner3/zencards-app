@@ -1312,7 +1312,7 @@ a:hover{
         if (!confirm('Are you sure you want to permanently delete your account and cancel your subscription? This cannot be undone.')) return;
         // Call Supabase Edge Function to delete account and cancel subscription
         try {
-          const resp = await fetch('/functions/v1/delete-account', {
+          const resp = await fetch('https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/delete-account', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
