@@ -32,21 +32,19 @@ document.addEventListener('visibilitychange', function() {
     }
   } else {
     // App is foregrounded
-    setStatus('App paused.');
-    speakWithWebTts('App paused.', null);
-    // Resume mic/listening if in voice mode
     if (currentMode === 'voice' && isPaused) {
-      resumeMicListening();
+      // Auto-resume and restart the current question
+      resumeStudySession();
+      setTimeout(() => {
+        if (currentCard) {
+          speakWithWebTts(getPlainTextFromCard(currentCard.question), () => {
+            listenForCommand(handleVoiceTranscript);
+          });
+        }
+      }, 300); // slight delay to ensure state is ready
     }
   }
 });
-
-function resumeMicListening() {
-  // Resume listening for voice commands
-  if (typeof listenForCommand === 'function') {
-    listenForCommand(handleVoiceTranscript);
-  }
-}
 </script>
 
 <script
