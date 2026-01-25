@@ -2558,46 +2558,63 @@ function speakWithWebTts(text, onEnd) {
     if (phrase) segments.push({ text: phrase + (delim || ""), pause: delim === '.' ? 500 : delim === ',' ? 250 : 0 });
   }
 
-  const voices = window.speechSynthesis.getVoices();
-  // Prefer Daniel (male, UK), then Samantha, then other English voices
-  let preferredVoice = voices.find(v => v.name === "Daniel");
-  if (!preferredVoice) preferredVoice = voices.find(v => v.name === "Daniel (Enhanced)");
-  if (!preferredVoice) preferredVoice = voices.find(v => v.lang.startsWith('en') && v.localService && v.name.toLowerCase().includes('english'));
-  if (!preferredVoice) preferredVoice = voices.find(v => v.lang.startsWith('en') && v.localService);
-  if (!preferredVoice) preferredVoice = voices.find(v => v.lang.startsWith('en'));
-
-  let idx = 0;
-  function speakSegment() {
-    if (idx >= segments.length) {
-      isSpeaking = false;
-      setStatus("");
-      if (onEnd) onEnd();
-      return;
-    }
-    const seg = segments[idx++];
-    const utt = new SpeechSynthesisUtterance(seg.text);
-    if (preferredVoice) {
-      utt.voice = preferredVoice;
-    }
-    utt.rate = typeof ttsRate === "number" ? ttsRate : 0.8;
-    utt.pitch = 1.0;
-    utt.volume = typeof ttsVolume === "number" ? ttsVolume : 1.0;
-    utt.onstart = () => {
-      if (myGeneration !== speakGeneration) return;
-      isSpeaking = true;
-      setStatus("Speaking...");
-    };
-    utt.onend = () => {
-      if (myGeneration !== speakGeneration) return;
-      setTimeout(speakSegment, seg.pause);
-    };
-    utt.onerror = (err) => {
-      console.error("TTS error:", err);
-      setTimeout(speakSegment, seg.pause);
-    };
-    window.speechSynthesis.speak(utt);
+  function getPreferredVoice() {
+    const voices = window.speechSynthesis.getVoices();
+    // Only use Daniel or Daniel (Enhanced), or another English male voice, but never Samantha
+    let preferredVoice = voices.find(v => v.name === "Daniel");
+    if (!preferredVoice) preferredVoice = voices.find(v => v.name === "Daniel (Enhanced)");
+    if (!preferredVoice) preferredVoice = voices.find(v => v.lang.startsWith('en') && v.gender === 'male');
+    if (!preferredVoice) preferredVoice = voices.find(v => v.lang.startsWith('en') && v.localService && v.name.toLowerCase().includes('male'));
+    if (!preferredVoice) preferredVoice = voices.find(v => v.lang.startsWith('en') && v.localService && !v.name.toLowerCase().includes('samantha'));
+    if (!preferredVoice) preferredVoice = voices.find(v => v.lang.startsWith('en') && !v.name.toLowerCase().includes('samantha'));
+    return preferredVoice;
   }
-  speakSegment();
+
+  function startSpeaking() {
+    const preferredVoice = getPreferredVoice();
+    let idx = 0;
+    function speakSegment() {
+      if (idx >= segments.length) {
+        isSpeaking = false;
+        setStatus("");
+        if (onEnd) onEnd();
+        return;
+      }
+      const seg = segments[idx++];
+      const utt = new SpeechSynthesisUtterance(seg.text);
+      if (preferredVoice) {
+        utt.voice = preferredVoice;
+      }
+      utt.rate = typeof ttsRate === "number" ? ttsRate : 0.8;
+      utt.pitch = 1.0;
+      utt.volume = typeof ttsVolume === "number" ? ttsVolume : 1.0;
+      utt.onstart = () => {
+        if (myGeneration !== speakGeneration) return;
+        isSpeaking = true;
+        setStatus("Speaking...");
+      };
+      utt.onend = () => {
+        if (myGeneration !== speakGeneration) return;
+        setTimeout(speakSegment, seg.pause);
+      };
+      utt.onerror = (err) => {
+        console.error("TTS error:", err);
+        setTimeout(speakSegment, seg.pause);
+      };
+      window.speechSynthesis.speak(utt);
+    }
+    speakSegment();
+  }
+
+  // Ensure voices are loaded before speaking
+  if (window.speechSynthesis.getVoices().length === 0) {
+    window.speechSynthesis.onvoiceschanged = function handler() {
+      window.speechSynthesis.onvoiceschanged = null;
+      startSpeaking();
+    };
+  } else {
+    startSpeaking();
+  }
 }
 
     function listenForCommand(callback) {
