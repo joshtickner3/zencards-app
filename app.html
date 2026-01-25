@@ -1015,7 +1015,62 @@ const cardAudioCache = {}; // key: cardId-side-voice-speed → url
 // --- Make sure our native plugins are registered on the JS side ---
 // ---- Native plugins / environment wiring ----
 // ---- Native plugins / environment wiring ----
-// Native audio/player logic removed. All platforms now use browser speechSynthesis for TTS.
+// --- Make sure our native plugins are registered on the JS side ---
+// ---- Native plugins / environment wiring ----
+let isNativeIOS = false;
+let NativeAudioPlayer = null;
+
+function setupNativePlugins() {
+  try {
+    const cap = window.Capacitor;
+
+    if (!cap || typeof cap.getPlatform !== "function") {
+      console.log("[NativeEnv] Capacitor not ready yet or getPlatform missing");
+      isNativeIOS = false;
+      NativeAudioPlayer = null;
+      return;
+    }
+
+    const platform = cap.getPlatform();          // "ios", "android", "web", etc.
+    const plugins = cap.Plugins || {};
+
+    console.log("[NativeEnv] platform =", platform);
+    console.log("[NativeEnv] plugins available =", Object.keys(plugins));
+
+    // The Swift plugin uses jsName = "NativeAudioPlayer"
+    NativeAudioPlayer = plugins.NativeAudioPlayer || null;
+
+    console.log("[NativeEnv] NativeAudioPlayer =", NativeAudioPlayer);
+
+    // We only consider ourselves "native iOS" when:
+    //  - platform is "ios"
+    //  - and the plugin object actually exists
+    isNativeIOS = platform === "ios" && !!NativeAudioPlayer;
+
+    console.log("[NativeEnv] setup complete", {
+      isNativeIOS,
+      hasNativeAudioPlayer: !!NativeAudioPlayer,
+    });
+  } catch (err) {
+    console.error("[NativeEnv] setupNativePlugins failed:", err);
+    isNativeIOS = false;
+    NativeAudioPlayer = null;
+  }
+}
+// Re-check once the bridge is ready (iOS timing fix)
+window.addEventListener("capacitorNativeBridgeReady", () => {
+  console.log("[NativeEnv] capacitorNativeBridgeReady -> re-setup plugins");
+  setupNativePlugins();
+});
+
+// Also re-check on DOM ready just in case
+document.addEventListener("DOMContentLoaded", () => {
+  setupNativePlugins();
+});
+
+// run once at boot
+setupNativePlugins();
+window.setupNativePlugins = setupNativePlugins;
 
 // Simple in-memory cache so we don’t call TTS twice
 
@@ -1119,10 +1174,31 @@ async function getOrGenerateAudioForText(text, opts = {}) {
     return null;
   }
 }
-
 async function playPromptAudio(text, onEnd) {
-  // All platforms: use browser speechSynthesis
-  speakWithWebTts(text, onEnd);
+  // ✅ iOS native path: generate MP3 and play via NativeAudioPlayer - NO WEB FALLBACK
+  if (isNativeIOS && NativeAudioPlayer) {
+    try {
+      const url = await getOrGenerateAudioForText(text, { purpose: "prompt" });
+      if (!url) {
+        console.error("[Prompt] Failed to generate audio URL");
+        onEnd && onEnd();
+        return;
+      }
+
+      const ok = await nativePlaySingleUrl(url, onEnd);
+      if (ok) return;
+
+      console.error("[Prompt] nativePlaySingleUrl returned false");
+      onEnd && onEnd();
+    } catch (e) {
+      console.error("[Prompt] Native path failed:", e);
+      onEnd && onEnd();
+    }
+    return;
+  }
+
+  // Web fallback (desktop/browser only)
+  speak(text, onEnd);
 }
 
 
@@ -1225,12 +1301,26 @@ async function nativePlaySingleUrl(url, onEnd) {
   return true;
 }
 
-
 async function playCardSideAudio(card, side, onEnd) {
   const plainText = getPlainTextFromCard(
     side === "question" ? card.question : card.answer
   );
-  // All platforms: use browser speechSynthesis
+
+  // iOS native path: use MP3 + NativeAudioPlayer
+  if (isNativeIOS && NativeAudioPlayer) {
+    try {
+      const url = await getOrGenerateAudio(card, side);
+      if (!url) throw new Error("No audio_url from TTS function");
+
+      const ok = await nativePlaySingleUrl(url, onEnd);
+      if (ok) return;
+    } catch (err) {
+      console.error("[NativeAudio] failed, falling back to WEB TTS:", err);
+      // fall through
+    }
+  }
+
+  // Web fallback only (speechSynthesis)
   speakWithWebTts(plainText, onEnd);
 }
 
@@ -2960,7 +3050,6 @@ if (answerDelayAfterSpeechSecInput) {
 }
 
   // Wrapper: choose NativeTTS (iOS app) or browser TTS (web)
-
 function speak(text, onEnd) {
   // Sync UI controls
   if (ttsRateInput) {
@@ -2987,12 +3076,68 @@ function speak(text, onEnd) {
     } catch (_) {}
   }
 
-  // All platforms: use browser speechSynthesis
+  // ✅ iOS app path: MP3 via NativeAudioPlayer (background-safe) - NO WEB TTS FALLBACK
+  if (isNativeIOS && NativeAudioPlayer) {
+    speakGeneration++;
+    const myGeneration = speakGeneration;
+
+    isSpeaking = true;
+    setStatus("Speaking...");
+
+    (async () => {
+      try {
+        const url = await getOrGenerateAudioForText(text, { voice: "alloy", speed: 1.0 });
+        if (!url) {
+          console.error("[TTS] Failed to generate audio URL - skipping to onEnd");
+          isSpeaking = false;
+          setStatus("");
+          onEnd && onEnd();
+          return;
+        }
+
+        await nativePlaySingleUrl(url, () => {
+          if (myGeneration !== speakGeneration) return;
+          isSpeaking = false;
+          setStatus("");
+          onEnd && onEnd();
+        });
+      } catch (e) {
+        console.error("[TTS] Native iOS path crashed:", e);
+        isSpeaking = false;
+        setStatus("");
+        onEnd && onEnd();
+      }
+    })();
+
+    return;
+  }
+
+  // Web path (desktop/browser only)
   speakWithWebTts(text, onEnd);
 }
-
 function speakSafe(text, onEnd) {
-  // All platforms: use browser speechSynthesis
+  // ✅ iOS native path: generate MP3 and play via NativeAudioPlayer - NO WEB FALLBACK
+  if (isNativeIOS && NativeAudioPlayer) {
+    (async () => {
+      try {
+        const url = await getOrGenerateAudioForText(text, { voice: "alloy", speed: 1.0 });
+        if (!url) {
+          console.error("[speakSafe] Failed to generate audio URL");
+          onEnd && onEnd();
+          return;
+        }
+        await nativePlaySingleUrl(url, () => {
+          if (onEnd) onEnd();
+        });
+      } catch (e) {
+        console.error("[speakSafe] native path failed:", e);
+        onEnd && onEnd();
+      }
+    })();
+    return;
+  }
+
+  // Web path (desktop/browser only)
   speak(text, onEnd);
 }
 
