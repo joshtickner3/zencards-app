@@ -4465,10 +4465,11 @@ startVoiceBtn.addEventListener("click", async () => {
     return;
   }
 
-  // ✅ Browser-only mic permission (NEVER in native app)
+
+  // ✅ Browser mic permission (web version: always request if needed)
   if (
-    !isNativeApp &&                     // ✅ key change          // not using native iOS STT plugin
-    needsVoiceCommands &&               // only needed when we actually need voice commands
+    (typeof isNativeApp === "undefined" || !isNativeApp) &&
+    needsVoiceCommands &&
     navigator.mediaDevices &&
     navigator.mediaDevices.getUserMedia
   ) {
@@ -4625,7 +4626,6 @@ if (debugNativeQueueBtn) {
     await playWithWebTTS(webCards);
   });
 }
-
 
   </script>
 </body>
