@@ -38,10 +38,27 @@ async function cancelStripeSubscription(stripeCustomerId) {
 }
 
 Deno.serve(async (req) => {
+  // CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response("ok", {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+      }
+    });
+  }
+
   const supabase = createClient();
   const { user_id, email } = await req.json();
   if (!user_id || !email) {
-    return new Response(JSON.stringify({ error: "Missing user_id or email" }), { status: 400 });
+    return new Response(JSON.stringify({ error: "Missing user_id or email" }), {
+      status: 400,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+      }
+    });
   }
 
   // 1. Cancel Stripe subscription if exists
@@ -53,10 +70,22 @@ Deno.serve(async (req) => {
   // 2. Delete user from Supabase Auth
   const { error: deleteError } = await supabase.auth.admin.deleteUser(user_id);
   if (deleteError) {
-    return new Response(JSON.stringify({ error: "Failed to delete user from Supabase" }), { status: 500 });
+    return new Response(JSON.stringify({ error: "Failed to delete user from Supabase" }), {
+      status: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+      }
+    });
   }
 
   // 3. Optionally, delete user data from other tables here
 
-  return new Response(JSON.stringify({ success: true }), { status: 200 });
+  return new Response(JSON.stringify({ success: true }), {
+    status: 200,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    }
+  });
 });
