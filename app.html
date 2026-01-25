@@ -2559,8 +2559,8 @@ function speakWithWebTts(text, onEnd) {
   }
 
   const voices = window.speechSynthesis.getVoices();
-  // Prefer Moira, then Samantha, then other English voices
-  let preferredVoice = voices.find(v => v.name === "Moira");
+  // Prefer Daniel (male, UK), then Samantha, then other English voices
+  let preferredVoice = voices.find(v => v.name === "Daniel");
   if (!preferredVoice) preferredVoice = voices.find(v => v.name === "Samantha");
   if (!preferredVoice) preferredVoice = voices.find(v => v.lang.startsWith('en') && v.localService && v.name.toLowerCase().includes('english'));
   if (!preferredVoice) preferredVoice = voices.find(v => v.lang.startsWith('en') && v.localService);
