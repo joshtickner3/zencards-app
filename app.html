@@ -762,10 +762,8 @@ input[type="number"]:focus{
         <div class="row">
           <button id="startVoiceBtn">Start Hands-Free Study</button>
           <button id="startSilentBtn" class="secondary">Start Silent Study</button>
+
         </div>
-        <button id="debugNativeQueueBtn" class="secondary small" type="button">
-  Debug Native Queue
-</button>
 
 
         <button id="openInstructionsBtn" class="secondary small" type="button">
@@ -2711,8 +2709,8 @@ function speakWithWebTts(text, onEnd) {
 const autoEnterStudyAheadCheckbox = document.getElementById("autoEnterStudyAhead");
 const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
     const startVoiceBtn = document.getElementById("startVoiceBtn");
+
     const startSilentBtn = document.getElementById("startSilentBtn");
-    const debugNativeQueueBtn = document.getElementById("debugNativeQueueBtn");
 
 
     const silentUI = document.getElementById("silentUI");
@@ -4612,20 +4610,6 @@ startVoiceBtn.addEventListener("click", async () => {
 
 init();
 
-if (debugNativeQueueBtn) {
-  debugNativeQueueBtn.addEventListener("click", async () => {
-    const deckId = selectedDeckId || getLastDeckId();
-    const deck = deckId ? getDeckById(deckId) : null;
-
-    if (!deck || !deck.cards || deck.cards.length === 0) {
-      alert("No cards in the current deck.");
-      return;
-    }
-
-    const webCards = deck.cards.slice(0, Math.min(10, deck.cards.length));
-    await playWithWebTTS(webCards);
-  });
-}
 
   </script>
 </body>
