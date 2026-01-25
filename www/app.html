@@ -567,7 +567,7 @@ input[type="number"]:focus{
         <div class="row">
          <div>
   <label for="cardQuestion">Question:</label>
-  <textarea id="cardQuestion" placeholder="Enter question"></textarea>
+  <textarea id="cardQuestion" placeholder="Enter question" spellcheck="true" autocorrect="on" autocomplete="on" autocapitalize="sentences"></textarea>
   
   <div style="margin-top:0.25rem;font-size:0.8rem;">
     <button type="button"
@@ -583,7 +583,7 @@ input[type="number"]:focus{
 </div>
 <div>
   <label for="cardAnswer">Answer:</label>
-  <textarea id="cardAnswer" placeholder="Enter answer"></textarea>
+  <textarea id="cardAnswer" placeholder="Enter answer" spellcheck="true" autocorrect="on" autocomplete="on" autocapitalize="sentences"></textarea>
   
   <div style="margin-top:0.25rem;font-size:0.8rem;">
     <button type="button"
@@ -818,9 +818,9 @@ input[type="number"]:focus{
         </div>
         <div id="voiceEditPanel" class="hidden" style="margin-top:0.75rem;">
           <label for="voiceEditQuestion">Edit question:</label>
-          <textarea id="voiceEditQuestion"></textarea>
+          <textarea id="voiceEditQuestion" spellcheck="true" autocorrect="on" autocomplete="on" autocapitalize="sentences"></textarea>
           <label for="voiceEditAnswer">Edit answer:</label>
-          <textarea id="voiceEditAnswer"></textarea>
+          <textarea id="voiceEditAnswer" spellcheck="true" autocorrect="on" autocomplete="on" autocapitalize="sentences"></textarea>
           <div style="margin-top:0.5rem;">
             <button id="voiceSaveEditBtn">Save</button>
             <button id="voiceCancelEditBtn" class="secondary">Cancel</button>
@@ -851,9 +851,9 @@ input[type="number"]:focus{
         </div>
         <div id="silentEditPanel" class="hidden" style="margin-top:0.75rem;">
           <label for="silentEditQuestion">Edit question:</label>
-          <textarea id="silentEditQuestion"></textarea>
+          <textarea id="silentEditQuestion" spellcheck="true" autocorrect="on" autocomplete="on" autocapitalize="sentences"></textarea>
           <label for="silentEditAnswer">Edit answer:</label>
-          <textarea id="silentEditAnswer"></textarea>
+          <textarea id="silentEditAnswer" spellcheck="true" autocorrect="on" autocomplete="on" autocapitalize="sentences"></textarea>
           <div style="margin-top:0.5rem;">
             <button id="silentSaveEditBtn">Save</button>
             <button id="silentCancelEditBtn" class="secondary">Cancel</button>
@@ -910,12 +910,12 @@ input[type="number"]:focus{
 
     <div style="margin-top:0.75rem;">
       <label for="addCardModalQuestion">Question</label>
-      <textarea id="addCardModalQuestion" placeholder="Enter question"></textarea>
+      <textarea id="addCardModalQuestion" placeholder="Enter question" spellcheck="true" autocorrect="on" autocomplete="on" autocapitalize="sentences"></textarea>
     </div>
 
     <div style="margin-top:0.75rem;">
       <label for="addCardModalAnswer">Answer</label>
-      <textarea id="addCardModalAnswer" placeholder="Enter answer"></textarea>
+      <textarea id="addCardModalAnswer" placeholder="Enter answer" spellcheck="true" autocorrect="on" autocomplete="on" autocapitalize="sentences"></textarea>
     </div>
 
     <div class="row" style="margin-top:0.75rem;">
@@ -3161,10 +3161,19 @@ function speakWithWebTts(text, onEnd) {
   speakGeneration++;
   const myGeneration = speakGeneration;
 
+
   const utt = new SpeechSynthesisUtterance(text);
 
-  // Use the *same* volume & rate for intro, questions, and answers.
-  utt.rate = ttsRate || 1.0;
+  // Try to select the "Samantha" voice if available (Apple devices)
+  const voices = window.speechSynthesis.getVoices();
+  const samantha = voices.find(v => v.name === "Samantha");
+  if (samantha) {
+    utt.voice = samantha;
+  }
+
+  // Match Alloy's cadence: these values can be tuned as needed
+  utt.rate = 1.0; // Alloy's default speed is close to 1.0
+  utt.pitch = 1.0; // Normal pitch
   utt.volume = typeof ttsVolume === "number" ? ttsVolume : 1.0;
 
   utt.onstart = () => {

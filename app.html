@@ -3161,10 +3161,19 @@ function speakWithWebTts(text, onEnd) {
   speakGeneration++;
   const myGeneration = speakGeneration;
 
+
   const utt = new SpeechSynthesisUtterance(text);
 
-  // Use the *same* volume & rate for intro, questions, and answers.
-  utt.rate = ttsRate || 1.0;
+  // Try to select the "Samantha" voice if available (Apple devices)
+  const voices = window.speechSynthesis.getVoices();
+  const samantha = voices.find(v => v.name === "Samantha");
+  if (samantha) {
+    utt.voice = samantha;
+  }
+
+  // Match Alloy's cadence: these values can be tuned as needed
+  utt.rate = 1.0; // Alloy's default speed is close to 1.0
+  utt.pitch = 1.0; // Normal pitch
   utt.volume = typeof ttsVolume === "number" ? ttsVolume : 1.0;
 
   utt.onstart = () => {
