@@ -3008,10 +3008,11 @@ function startMicMute(seconds) {
     }
 
     async function showMainMenu() {
-     await stopAllAudio();
+    await stopAllAudio();
       clearStudyAheadGapTimer();
       clearQuestionDelayTimer();
 
+      // Do NOT clear currentCard here, so it is preserved for resuming study
       currentMode = null;
       mainMenuDiv.classList.remove("hidden");
       studySectionDiv.classList.add("hidden");
@@ -4073,8 +4074,11 @@ playPromptAudio(promptText, () => {
 
       let nextCard = null;
 
-      // Study-ahead voice mode (no schedule changes, uses aheadQueue)
-      if (noScheduleChanges && allowAhead) {
+      // If resuming after main menu, show the same card first
+      if (currentCard && currentMode === null) {
+        nextCard = currentCard;
+        currentMode = "voice"; // or "silent" if needed
+      } else if (noScheduleChanges && allowAhead) {
         if (!aheadQueue || aheadQueue.length === 0) {
           aheadQueue = shuffleArray(getDueCardsForDeck(currentDeckId, true, false));
           aheadQueueIndex = 0;
@@ -4087,14 +4091,14 @@ playPromptAudio(promptText, () => {
       } else {
         // Normal schedule-changing mode with randomized mixing
         const dueCards = getDueCardsForDeck(currentDeckId, false, includeOverdue);
-const { overdue, due } = splitOverdueAndDue(currentDeckId, dueCards);
+        const { overdue, due } = splitOverdueAndDue(currentDeckId, dueCards);
 
-// 🚨 Always exhaust overdue cards first
-if (overdue.length > 0) {
-  nextCard = pickRandomNextCardNormal(overdue, lastId, false);
-} else {
-  nextCard = pickRandomNextCardNormal(due, lastId, false);
-}
+        // 🚨 Always exhaust overdue cards first
+        if (overdue.length > 0) {
+          nextCard = pickRandomNextCardNormal(overdue, lastId, false);
+        } else {
+          nextCard = pickRandomNextCardNormal(due, lastId, false);
+        }
       }
 
       if (!nextCard && !allowAhead) {
