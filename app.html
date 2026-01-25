@@ -1684,20 +1684,34 @@ async function initAppSession() {
     // ===================== DECK & CARD UI =====================
     const editDeckNameBtn = document.getElementById("editDeckNameBtn");
 
-    if (editDeckNameBtn) {
-      editDeckNameBtn.addEventListener("click", () => {
-        if (!selectedDeckId) return;
-        const deck = getDeckById(selectedDeckId);
-        if (!deck) return;
-        const newName = prompt("Edit deck name:", deck.name);
-        if (newName && newName.trim() && newName.trim() !== deck.name) {
-          deck.name = newName.trim();
-          saveDecks();
-          refreshDeckSelect();
-          refreshCardsList();
-        }
-      });
+function updateEditDeckNameBtnState() {
+  if (!editDeckNameBtn) return;
+  // Disable if no deck is selected or no decks exist
+  editDeckNameBtn.disabled = !selectedDeckId || !getDeckById(selectedDeckId);
+}
+
+if (editDeckNameBtn) {
+  editDeckNameBtn.addEventListener("click", () => {
+    if (!selectedDeckId) return;
+    const deck = getDeckById(selectedDeckId);
+    if (!deck) return;
+    const newName = prompt("Edit deck name:", deck.name);
+    if (newName && newName.trim() && newName.trim() !== deck.name) {
+      deck.name = newName.trim();
+      saveDecks();
+      refreshDeckSelect();
+      refreshCardsList();
     }
+    updateEditDeckNameBtnState();
+  });
+}
+
+// Call this after deck select is refreshed
+const _origRefreshDeckSelect = refreshDeckSelect;
+refreshDeckSelect = function() {
+  _origRefreshDeckSelect.apply(this, arguments);
+  updateEditDeckNameBtnState();
+};
     const deckSelect = document.getElementById("deckSelect");
     const newDeckNameInput = document.getElementById("newDeckName");
     const addDeckBtn = document.getElementById("addDeckBtn");
