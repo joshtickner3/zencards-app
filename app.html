@@ -2548,51 +2548,61 @@ function speakWithWebTts(text, onEnd) {
   speakGeneration++;
   const myGeneration = speakGeneration;
 
-  // Preprocess text: add extra spaces after periods and commas for better pauses
-  let processedText = text
-    .replace(/([.,!?;:])([^\s])/g, '$1  $2') // double space after punctuation
-    .replace(/\n/g, '.  '); // treat newlines as sentence ends
-
-  const utt = new SpeechSynthesisUtterance(processedText);
-
-  // Always prefer Apple Samantha if available, else fallback to a natural voice
+  // Split text on periods and commas, speak each segment with a 1 second pause between
   const voices = window.speechSynthesis.getVoices();
   let preferredVoice = voices.find(v => v.name === "Samantha");
   if (!preferredVoice) {
-    // Try to pick a high-quality English voice if Samantha is not available
     preferredVoice = voices.find(v => v.lang.startsWith('en') && v.localService && v.name.toLowerCase().includes('english'))
       || voices.find(v => v.lang.startsWith('en') && v.localService)
       || voices.find(v => v.lang.startsWith('en'));
   }
-  if (preferredVoice) {
-    utt.voice = preferredVoice;
+
+  // Split on period or comma, keeping the delimiter
+  const segments = text.split(/([.,])/g).reduce((arr, part, idx, src) => {
+    if (part === '.' || part === ',') {
+      arr[arr.length - 1] += part;
+    } else if (part.trim() !== '') {
+      arr.push(part.trim());
+    }
+    return arr;
+  }, []);
+
+  let segmentIndex = 0;
+  function speakNextSegment() {
+    if (segmentIndex >= segments.length) {
+      isSpeaking = false;
+      setStatus("");
+      if (onEnd) onEnd();
+      return;
+    }
+    const seg = segments[segmentIndex++];
+    if (!seg) {
+      speakNextSegment();
+      return;
+    }
+    const utt = new SpeechSynthesisUtterance(seg);
+    if (preferredVoice) {
+      utt.voice = preferredVoice;
+    }
+    utt.rate = typeof ttsRate === "number" ? ttsRate : 0.85;
+    utt.pitch = 1.0;
+    utt.volume = typeof ttsVolume === "number" ? ttsVolume : 1.0;
+    utt.onstart = () => {
+      if (myGeneration !== speakGeneration) return;
+      isSpeaking = true;
+      setStatus("Speaking...");
+    };
+    utt.onend = () => {
+      if (myGeneration !== speakGeneration) return;
+      setTimeout(speakNextSegment, 1000); // 1 second pause
+    };
+    utt.onerror = (err) => {
+      console.error("TTS error:", err);
+      setTimeout(speakNextSegment, 1000);
+    };
+    window.speechSynthesis.speak(utt);
   }
-
-  // Slower, more natural cadence
-  utt.rate = typeof ttsRate === "number" ? ttsRate : 0.85;
-  utt.pitch = 1.0; // Normal pitch
-  utt.volume = typeof ttsVolume === "number" ? ttsVolume : 1.0;
-
-  utt.onstart = () => {
-    if (myGeneration !== speakGeneration) return;
-    isSpeaking = true;
-    setStatus("Speaking...");
-  };
-
-  const finish = () => {
-    if (myGeneration !== speakGeneration) return;
-    isSpeaking = false;
-    setStatus("");
-    if (onEnd) onEnd();
-  };
-
-  utt.onend = finish;
-  utt.onerror = (err) => {
-    console.error("TTS error:", err);
-    finish();
-  };
-
-  window.speechSynthesis.speak(utt);
+  speakNextSegment();
 }
 
     function listenForCommand(callback) {
