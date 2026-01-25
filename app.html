@@ -2383,7 +2383,7 @@ function getTtsSettingsObj() {
   let s = {};
   try { s = raw ? JSON.parse(raw) : {}; } catch { s = {}; }
 
-  if (typeof s.rate !== "number") s.rate = 1.0;
+  if (typeof s.rate !== "number") s.rate = 0.85;
   if (typeof s.volume !== "number") s.volume = 1.0;
   if (typeof s.answerDelayAfterSpeechSec !== "number") s.answerDelayAfterSpeechSec = 0;
 
@@ -2548,18 +2548,28 @@ function speakWithWebTts(text, onEnd) {
   speakGeneration++;
   const myGeneration = speakGeneration;
 
+  // Preprocess text: add extra spaces after periods and commas for better pauses
+  let processedText = text
+    .replace(/([.,!?;:])([^\s])/g, '$1  $2') // double space after punctuation
+    .replace(/\n/g, '.  '); // treat newlines as sentence ends
 
-  const utt = new SpeechSynthesisUtterance(text);
+  const utt = new SpeechSynthesisUtterance(processedText);
 
-  // Try to select the "Samantha" voice if available (Apple devices)
+  // Always prefer Apple Samantha if available, else fallback to a natural voice
   const voices = window.speechSynthesis.getVoices();
-  const samantha = voices.find(v => v.name === "Samantha");
-  if (samantha) {
-    utt.voice = samantha;
+  let preferredVoice = voices.find(v => v.name === "Samantha");
+  if (!preferredVoice) {
+    // Try to pick a high-quality English voice if Samantha is not available
+    preferredVoice = voices.find(v => v.lang.startsWith('en') && v.localService && v.name.toLowerCase().includes('english'))
+      || voices.find(v => v.lang.startsWith('en') && v.localService)
+      || voices.find(v => v.lang.startsWith('en'));
+  }
+  if (preferredVoice) {
+    utt.voice = preferredVoice;
   }
 
-  // Match Alloy's cadence: these values can be tuned as needed
-  utt.rate = typeof ttsRate === "number" ? ttsRate : 1.0;
+  // Slower, more natural cadence
+  utt.rate = typeof ttsRate === "number" ? ttsRate : 0.85;
   utt.pitch = 1.0; // Normal pitch
   utt.volume = typeof ttsVolume === "number" ? ttsVolume : 1.0;
 
