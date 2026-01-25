@@ -3644,6 +3644,37 @@ if (
  async function handleVoiceTranscript(text) {
   console.log("[VOICE] handleVoiceTranscript called with text:", text, { awaitingAnswerSignal, awaitingDifficulty, inAnswerAfterSpeechDelay });
   
+
+  // If paused, only allow resume command, ignore all other input (mic stays on)
+  if (isPaused) {
+    const t = text.toLowerCase();
+    if (
+      t.includes("resume study session") ||
+      (t.includes("resume") && (t.includes("study") || t.includes("session")))
+    ) {
+      speakSafe("Resuming study session.", () => {
+        isPaused = false;
+        pauseBtn.disabled = false;
+        resumeBtn.disabled = true;
+        if (currentMode === "voice") {
+          if (restartCardOnResumeVoice && currentCard) {
+            restartCardOnResumeVoice = false;
+            restartCurrentCardVoiceFlow();
+            return;
+          }
+          runVoiceLoop();
+        } else if (currentMode === "silent") {
+          runSilentLoop();
+        }
+      });
+    } else {
+      // Stay paused, keep listening indefinitely
+      setStatus("Paused. Say 'resume study session' or tap Resume.");
+      listenForCommand(handleVoiceTranscript);
+    }
+    return;
+  }
+
   // If we are waiting to play the answer after speech ended, ANY transcript resets the countdown
   if (inAnswerAfterSpeechDelay) {
     if (isNextCardCommand(text)) { handleNextCardSkip(); return; }
