@@ -1309,18 +1309,31 @@ a:hover{
           return;
         }
         // Confirm deletion
-        if (!confirm('Are you sure you want to permanently delete your account? This cannot be undone.')) return;
-        // Delete user
-        const { error: deleteError } = await supabaseClient.rpc('delete_user', { uid: user.id });
-        if (deleteError) {
+        if (!confirm('Are you sure you want to permanently delete your account and cancel your subscription? This cannot be undone.')) return;
+        // Call Supabase Edge Function to delete account and cancel subscription
+        try {
+          const resp = await fetch('/functions/v1/delete-account', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabaseClient.auth.session()?.access_token || ''}`
+            },
+            body: JSON.stringify({ user_id: user.id, email: user.email })
+          });
+          const result = await resp.json();
+          if (!resp.ok || result.error) {
+            errorDiv.textContent = result.error || 'Failed to delete account. Please contact support.';
+            errorDiv.style.display = 'block';
+            return;
+          }
+          await supabaseClient.auth.signOut();
+          modal.remove();
+          alert('Your account and subscription have been deleted.');
+          window.location.reload();
+        } catch (e) {
           errorDiv.textContent = 'Failed to delete account. Please contact support.';
           errorDiv.style.display = 'block';
-          return;
         }
-        await supabaseClient.auth.signOut();
-        modal.remove();
-        alert('Your account has been deleted.');
-        window.location.reload();
       };
     }
 
