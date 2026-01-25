@@ -25,23 +25,33 @@
 document.addEventListener('visibilitychange', function() {
   if (document.hidden) {
     // App is backgrounded
-    if (!isPaused) {
-      pauseStudySession();
-      setStatus('App paused.');
-      speakWithWebTts('App paused.', null);
+    if (!isPaused && currentMode === 'voice') {
+      // Robust pause logic: match button/voice command
+      isPaused = true;
+      if (currentCard) window.restartCardOnResumeVoice = true;
+      stopAllAudio();
+      clearStudyAheadGapTimer();
+      clearQuestionDelayTimer();
+      clearAnswerAfterSpeechDelay();
+      if (typeof pauseBtn !== 'undefined') pauseBtn.disabled = true;
+      if (typeof resumeBtn !== 'undefined') resumeBtn.disabled = false;
+      setStatus('Paused. Say "resume study session" or tap Resume.');
+      speakSafe('Paused.', () => {
+        listenForCommand(handleVoiceTranscript);
+      });
     }
   } else {
     // App is foregrounded
     if (currentMode === 'voice' && isPaused) {
-      // Auto-resume and restart the current question
-      resumeStudySession();
-      setTimeout(() => {
-        if (currentCard) {
-          speakWithWebTts(getPlainTextFromCard(currentCard.question), () => {
-            listenForCommand(handleVoiceTranscript);
-          });
-        }
-      }, 300); // slight delay to ensure state is ready
+      isPaused = false;
+      if (typeof pauseBtn !== 'undefined') pauseBtn.disabled = false;
+      if (typeof resumeBtn !== 'undefined') resumeBtn.disabled = true;
+      if (window.restartCardOnResumeVoice && currentCard) {
+        window.restartCardOnResumeVoice = false;
+        restartCurrentCardVoiceFlow();
+      } else {
+        runVoiceLoop();
+      }
     }
   }
 });
