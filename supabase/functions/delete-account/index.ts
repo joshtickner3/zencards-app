@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
     });
   }
 
-  const supabase = createClient();
+  // supabase client already created above
   if (!user_id || !email) {
     return new Response(JSON.stringify({ error: "Missing user_id or email" }), {
       status: 400,
@@ -95,5 +95,5 @@ Deno.serve(async (req) => {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     }
-    const supabase = createClient(supabaseUrl, supabaseKey);
+  });
 });
