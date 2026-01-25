@@ -1313,11 +1313,13 @@ a:hover{
         // Call Supabase Edge Function to delete account and cancel subscription
         try {
           console.log('[DeleteAccount] Attempting to call edge function...');
+          const { data: sessionData } = await supabaseClient.auth.getSession();
+          const accessToken = sessionData?.session?.access_token || '';
           const resp = await fetch('https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/delete-account', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${supabaseClient.auth.session()?.access_token || ''}`
+              'Authorization': `Bearer ${accessToken}`
             },
             body: JSON.stringify({ user_id: user.id, email: user.email })
           });
