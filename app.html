@@ -2171,7 +2171,11 @@ function rebuildDeckUI() {
       card.answer = a;
       saveDecks();
       refreshCardsList();
-      selectedCardInfo.textContent = `Updated card: ${selectedCardId}`;
+      cardQuestionInput.value = "";
+      cardAnswerInput.value = "";
+      selectedCardId = null;
+      selectedCardInfo.textContent = "";
+      updateCardBtn.disabled = true;
     });
     if (moveCardBtn) {
   moveCardBtn.addEventListener("click", () => {
