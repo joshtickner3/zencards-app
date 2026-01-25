@@ -2548,11 +2548,18 @@ function speakWithWebTts(text, onEnd) {
   speakGeneration++;
   const myGeneration = speakGeneration;
 
+  // Expand acronyms (2+ consecutive capital letters) to spaced letters for TTS
+  function expandAcronyms(str) {
+    return str.replace(/\b([A-Z]{2,})\b/g, (m) => m.split('').join(' '));
+  }
+
+  const processedText = expandAcronyms(text);
+
   // Split text into segments, keeping delimiters
   const segments = [];
   let regex = /([^.,]+)([.,]?)/g;
   let match;
-  while ((match = regex.exec(text)) !== null) {
+  while ((match = regex.exec(processedText)) !== null) {
     const phrase = match[1].trim();
     const delim = match[2];
     if (phrase) segments.push({ text: phrase + (delim || ""), pause: delim === '.' ? 500 : delim === ',' ? 250 : 0 });
