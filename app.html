@@ -1017,60 +1017,8 @@ const cardAudioCache = {}; // key: cardId-side-voice-speed → url
 // ---- Native plugins / environment wiring ----
 // --- Make sure our native plugins are registered on the JS side ---
 // ---- Native plugins / environment wiring ----
-let isNativeIOS = false;
-let NativeAudioPlayer = null;
 
-function setupNativePlugins() {
-  try {
-    const cap = window.Capacitor;
-
-    if (!cap || typeof cap.getPlatform !== "function") {
-      console.log("[NativeEnv] Capacitor not ready yet or getPlatform missing");
-      isNativeIOS = false;
-      NativeAudioPlayer = null;
-      return;
-    }
-
-    const platform = cap.getPlatform();          // "ios", "android", "web", etc.
-    const plugins = cap.Plugins || {};
-
-    console.log("[NativeEnv] platform =", platform);
-    console.log("[NativeEnv] plugins available =", Object.keys(plugins));
-
-    // The Swift plugin uses jsName = "NativeAudioPlayer"
-    NativeAudioPlayer = plugins.NativeAudioPlayer || null;
-
-    console.log("[NativeEnv] NativeAudioPlayer =", NativeAudioPlayer);
-
-    // We only consider ourselves "native iOS" when:
-    //  - platform is "ios"
-    //  - and the plugin object actually exists
-    isNativeIOS = platform === "ios" && !!NativeAudioPlayer;
-
-    console.log("[NativeEnv] setup complete", {
-      isNativeIOS,
-      hasNativeAudioPlayer: !!NativeAudioPlayer,
-    });
-  } catch (err) {
-    console.error("[NativeEnv] setupNativePlugins failed:", err);
-    isNativeIOS = false;
-    NativeAudioPlayer = null;
-  }
-}
-// Re-check once the bridge is ready (iOS timing fix)
-window.addEventListener("capacitorNativeBridgeReady", () => {
-  console.log("[NativeEnv] capacitorNativeBridgeReady -> re-setup plugins");
-  setupNativePlugins();
-});
-
-// Also re-check on DOM ready just in case
-document.addEventListener("DOMContentLoaded", () => {
-  setupNativePlugins();
-});
-
-// run once at boot
-setupNativePlugins();
-window.setupNativePlugins = setupNativePlugins;
+// Native audio/player logic removed. All platforms now use browser speechSynthesis for TTS.
 
 // Simple in-memory cache so we don’t call TTS twice
 
@@ -1174,30 +1122,9 @@ async function getOrGenerateAudioForText(text, opts = {}) {
     return null;
   }
 }
+
 async function playPromptAudio(text, onEnd) {
-  // ✅ iOS native path: generate MP3 and play via NativeAudioPlayer - NO WEB FALLBACK
-  if (isNativeIOS && NativeAudioPlayer) {
-    try {
-      const url = await getOrGenerateAudioForText(text, { purpose: "prompt" });
-      if (!url) {
-        console.error("[Prompt] Failed to generate audio URL");
-        onEnd && onEnd();
-        return;
-      }
-
-      const ok = await nativePlaySingleUrl(url, onEnd);
-      if (ok) return;
-
-      console.error("[Prompt] nativePlaySingleUrl returned false");
-      onEnd && onEnd();
-    } catch (e) {
-      console.error("[Prompt] Native path failed:", e);
-      onEnd && onEnd();
-    }
-    return;
-  }
-
-  // Web fallback (desktop/browser only)
+  // All platforms: use browser speechSynthesis
   speak(text, onEnd);
 }
 
@@ -1301,53 +1228,18 @@ async function nativePlaySingleUrl(url, onEnd) {
   return true;
 }
 
+
 async function playCardSideAudio(card, side, onEnd) {
   const plainText = getPlainTextFromCard(
     side === "question" ? card.question : card.answer
   );
-
-  // iOS native path: use MP3 + NativeAudioPlayer
-  if (isNativeIOS && NativeAudioPlayer) {
-    try {
-      const url = await getOrGenerateAudio(card, side);
-      if (!url) throw new Error("No audio_url from TTS function");
-
-      const ok = await nativePlaySingleUrl(url, onEnd);
-      if (ok) return;
-    } catch (err) {
-      console.error("[NativeAudio] failed, falling back to WEB TTS:", err);
-      // fall through
-    }
-  }
-
-  // Web fallback only (speechSynthesis)
+  // All platforms: use browser speechSynthesis
   speakWithWebTts(plainText, onEnd);
 }
 
 
 
-// ---- NativeAudioPlayer plugin detection (for background audio) ----
-// === Native iOS / plugin detection ===
-
-async function playWithNativeAudioPlayer(cards) {
-  console.log(
-    "[NativeAudio] playWithNativeAudioPlayer called. isNativeIOS =",
-    isNativeIOS,
-    "cards.length =",
-    cards ? cards.length : 0
-  );
-
-  // If plugin isn't actually available, bail out and let caller fall back
-  if (!isNativeIOS || !NativeAudioPlayer) {
-    console.warn(
-      "[NativeAudio] NativeAudioPlayer not available; cannot use background queue."
-    );
-    return false;
-  }
-
-  // Build initial batch (e.g., first 10 cards)
-  const BATCH_SIZE = 10;
-  const initialCards = cards.slice(0, BATCH_SIZE);
+// Native background audio queue removed. All platforms use browser speechSynthesis for TTS.
 
   const urls = [];
   for (const card of initialCards) {
