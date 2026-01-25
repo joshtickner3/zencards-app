@@ -353,22 +353,19 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
             do {
                 let session = AVAudioSession.sharedInstance()
                 
-                // Use .playAndRecord with defaultToSpeaker (required for speaker routing)
-                print("🔊 [NativeAudioPlayer] Setting audio session to .playAndRecord with defaultToSpeaker")
+                // Set category to .playback and route to speaker
+                             print("🔊 [NativeAudioPlayer] Setting audio session to .playback with defaultToSpeaker + duckOthers")
                 try session.setCategory(
-                    .playAndRecord,
+                    .playback,
                     mode: .default,
                     options: [
                         .duckOthers,                        // Lower other app audio
-                        .defaultToSpeaker,                  // Route to speaker NOT receiver
-                        .allowBluetooth                     // Allow Bluetooth audio
-                        // NOTE: .playAndRecord allows simultaneous recording (mic) and playback (speaker)
-                        // even though we're only using playback here
+                        .defaultToSpeaker
                     ]
                 )
                 
                 try session.setActive(true, options: .notifyOthersOnDeactivation)
-                print("✅ [NativeAudioPlayer] Audio session configured for speaker output")
+                print("✅ [NativeAudioPlayer] Audio session configured to route to speaker")
             } catch {
                 print("⚠️ [NativeAudioPlayer] Audio session setup failed: \(error)")
             }
