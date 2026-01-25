@@ -3893,7 +3893,7 @@ function speakAnswerThenAskDifficulty() {
   setCardContent(voiceAnswerText, currentCard.answer);
 
   // 🔊 NEW: use background-capable audio helper instead of speak(...)
-  speakWithWebTts(getPlainTextFromCard(currentCard.answer), () => {
+  speakWithWebTts(getPlainTextFromCard(currentCard.answer), async () => {
     if (isPaused) return;
 
     // ===== STUDY-AHEAD HANDS-FREE: always respect the study-ahead gap and never ask for rating =====
@@ -3940,11 +3940,12 @@ function speakAnswerThenAskDifficulty() {
       ? "How was that? Say again, hard, good, or easy."
       : "How was that?";
 
-   setStatus(promptText);
+    setStatus(promptText);
 
-playPromptAudio(promptText, () => {
-  if (!isPaused) listenForCommand(handleVoiceTranscript);
-});
+    // Use TTS to ask the prompt, then listen
+    speakWithWebTts(promptText, () => {
+      if (!isPaused) listenForCommand(handleVoiceTranscript);
+    });
   });
 }
 
