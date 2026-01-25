@@ -3,7 +3,9 @@
 // Expects: { user_id: string, email: string }
 // Requires: STRIPE_SECRET_KEY env var set in Supabase project
 
-import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY");
 const STRIPE_API = "https://api.stripe.com/v1";
