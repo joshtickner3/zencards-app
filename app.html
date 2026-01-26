@@ -2046,7 +2046,7 @@ function rebuildDeckUI() {
       updateCardBtn.disabled = true;
       if (!deck) return;
 
-      deck.cards.forEach(card => {
+      [...deck.cards].reverse().forEach(card => {
         const row = document.createElement("div");
         row.className = "cardRow";
 
