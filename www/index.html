@@ -933,37 +933,39 @@ a:hover{
 
     <!-- HOW IT WORKS -->
     <div class="card">
-      <h2>How it works</h2>
-      <div class="row">
-        <div>
-          <h3 style="margin-top:0;">1) Add cards</h3>
-          <p class="muted">
-            Create decks, add questions + answers, or import from Anki.
-            (You can also include images + math equations, as ZenCards is designed for reading math equations)
-          </p>
+      <h2 class="collapsible-header" id="howWorksHeader" tabindex="0" style="cursor:pointer;user-select:none;">How it works <span class="collapsible-arrow">▼</span></h2>
+      <div class="collapsible-content" id="howWorksContent" style="display:none;">
+        <div class="row">
+          <div>
+            <h3 style="margin-top:0;">1) Add cards</h3>
+            <p class="muted">
+              Create decks, add questions + answers, or import from Anki.
+              (You can also include images + math equations, as ZenCards is designed for reading math equations)
+            </p>
 
-          <h3>2) Choose your study style</h3>
-          <p class="muted" style="margin-bottom:0.35rem;">
-            ZenCards supports multiple hands-free behaviors through the use of text-to-speech and responds to spoken commands (STT)when you answer, as well as spaced repetition scheduling to prioritize information you don't currently know over things you have mastered. ZenCards uses your spoken difficulty ratings to determine when you will see your cards again.
-          </p>
-          <ul>
-            <li><strong>Play answer after you speak</strong> (hands and eyes-free flow)</li>
-            <li><strong>Play answer after X seconds, perfect for studying in discreet settings. </strong> </li>
-            <li><strong>Study-ahead mode</strong>: keep going through the deck without changing your schedule, perfect for cramming the night before an exam with no time to study.</li>
-          </ul>
-        </div>
+            <h3>2) Choose your study style</h3>
+            <p class="muted" style="margin-bottom:0.35rem;">
+              ZenCards supports multiple hands-free behaviors through the use of text-to-speech and responds to spoken commands (STT)when you answer, as well as spaced repetition scheduling to prioritize information you don't currently know over things you have mastered. ZenCards uses your spoken difficulty ratings to determine when you will see your cards again.
+            </p>
+            <ul>
+              <li><strong>Play answer after you speak</strong> (hands and eyes-free flow)</li>
+              <li><strong>Play answer after X seconds, perfect for studying in discreet settings. </strong> </li>
+              <li><strong>Study-ahead mode</strong>: keep going through the deck without changing your schedule, perfect for cramming the night before an exam with no time to study.</li>
+            </ul>
+          </div>
 
-        <div>
-          <h3 style="margin-top:0;">3) Rate the card (spaced repetition)</h3>
-          <p class="muted">
-            After you see the answer, you rate it:
-            <strong>Again / Hard / Good / Easy, entirely with your voice commands.</strong>. ZenCards uses that rating to schedule when you see it next.
-             <li><strong>Automatic mode</strong>: auto-assign the same rating to every card (no voice commands needed)</li>
-          </p>
+          <div>
+            <h3 style="margin-top:0;">3) Rate the card (spaced repetition)</h3>
+            <p class="muted">
+              After you see the answer, you rate it:
+              <strong>Again / Hard / Good / Easy, entirely with your voice commands.</strong>. ZenCards uses that rating to schedule when you see it next.
+               <li><strong>Automatic mode</strong>: auto-assign the same rating to every card (no voice commands needed)</li>
+            </p>
 
-          <div class="note" style="margin-top:0.75rem;">
-            <strong>Pro tip:</strong> Use hands-free mode while moving, then do quick silent sessions when you’re sitting.
-            Same decks, same progress.
+            <div class="note" style="margin-top:0.75rem;">
+              <strong>Pro tip:</strong> Use hands-free mode while moving, then do quick silent sessions when you’re sitting.
+              Same decks, same progress.
+            </div>
           </div>
         </div>
       </div>
@@ -1034,6 +1036,7 @@ a:hover{
     }
     setupCollapsible('pricingHeader', 'pricingContent');
     setupCollapsible('whyWorksHeader', 'whyWorksContent');
+    setupCollapsible('howWorksHeader', 'howWorksContent');
   </script>
 
     <!-- FAQ -->
