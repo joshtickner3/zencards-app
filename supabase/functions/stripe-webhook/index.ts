@@ -30,7 +30,10 @@ Deno.serve(async (req) => {
   // ✅ raw body exactly once
   const rawBody = await req.text();
 
-  const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2023-10-16" });
+ const stripe = new Stripe(STRIPE_SECRET_KEY, {
+  apiVersion: "2023-10-16",
+  httpClient: Stripe.createFetchHttpClient(),
+});
 
   let event: Stripe.Event;
   try {
