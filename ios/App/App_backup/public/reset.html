@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Reset Password — ZenCards</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Supabase JS v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(circle at top, #1f2937 0, #020617 55%);
+      color: #e5e7eb;
+      margin: 0;
+      padding: 1.5rem;
+      line-height: 1.5;
+    }
+    .card {
+      max-width: 420px;
+      margin: 0 auto;
+      background: #020617cc;
+      border-radius: 0.9rem;
+      padding: 1.25rem 1.5rem;
+      border: 1px solid #1f2937;
+      box-shadow:
+        0 18px 35px rgba(0,0,0,0.55),
+        0 0 0 1px rgba(15,23,42,0.7);
+    }
+    h1 {
+      margin-top: 0;
+      font-size: 1.4rem;
+      text-align: center;
+    }
+    label {
+      display: block;
+      margin: 0.5rem 0 0.25rem;
+      font-size: 0.9rem;
+    }
+    input[type="password"] {
+      width: 100%;
+      padding: 0.55rem 0.65rem;
+      border-radius: 0.6rem;
+      border: 1px solid #374151;
+      background: #020617;
+      color: #e5e7eb;
+      box-sizing: border-box;
+      font-size: 0.9rem;
+    }
+    input[type="password"]:focus {
+      outline: none;
+      border-color: #22c55e;
+      box-shadow: 0 0 0 1px rgba(34,197,94,0.35);
+    }
+    button {
+      margin-top: 0.75rem;
+      width: 100%;
+      padding: 0.6rem 1.2rem;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      background: #10b981;
+      color: #020617;
+      font-weight: 600;
+      font-size: 0.95rem;
+      transition:
+        background 0.15s ease,
+        transform 0.08s ease,
+        box-shadow 0.12s ease;
+      box-shadow: 0 8px 18px rgba(16,185,129,0.28);
+    }
+    button:hover:not(:disabled) {
+      background: #22c55e;
+      transform: translateY(-1px);
+      box-shadow: 0 10px 22px rgba(34,197,94,0.35);
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: default;
+      box-shadow: none;
+    }
+    #status {
+      margin-top: 0.75rem;
+      font-size: 0.9rem;
+      color: #9ca3af;
+      min-height: 1.2em;
+    }
+    a {
+      color: #22c55e;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Reset your password</h1>
+    <p id="status">Checking your reset link…</p>
+
+    <div id="formContainer" style="display:none;">
+  <form id="resetForm">
+    <label for="newPassword">New password</label>
+    <input
+      id="newPassword"
+      type="password"
+      placeholder="Enter a new password"
+      autocomplete="new-password"
+    />
+
+    <button id="resetBtn" type="submit">Set new password</button>
+  </form>
+</div>
+
+    <p id="doneMessage" style="display:none;margin-top:0.75rem;">
+      Password updated. You can now
+     <a href="https://zencardstudy.com/">open ZenCards</a>
+      and log in with your new password.
+    </p>
+  </div>
+
+ <script>
+  const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
+
+   const statusEl = document.getElementById("status");
+  const formContainer = document.getElementById("formContainer");
+  const doneMessage = document.getElementById("doneMessage");
+
+  function setStatus(msg) { statusEl.textContent = msg; }
+
+  function hashParams() {
+    const h = (window.location.hash || "").replace(/^#/, "");
+    return new URLSearchParams(h);
+  }
+
+  async function main() {
+    setStatus("Verifying reset link…");
+
+    if (!window.supabase?.createClient) {
+      setStatus("Supabase failed to load.");
+      return;
+    }
+
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: false,        // IMPORTANT: keep reset isolated
+        autoRefreshToken: false,
+        detectSessionInUrl: false,    // IMPORTANT: we do it manually
+      }
+    });
+
+    // --- Force session from hash ---
+    const hp = hashParams();
+    const type = hp.get("type");
+    const access_token = hp.get("access_token");
+    const refresh_token = hp.get("refresh_token");
+
+    console.log("[reset] type:", type);
+    console.log("[reset] has access_token:", !!access_token);
+    console.log("[reset] has refresh_token:", !!refresh_token);
+
+    if (type !== "recovery" || !access_token || !refresh_token) {
+      setStatus("Reset link is missing required tokens. Request a new reset email.");
+      return;
+    }
+
+    const { data: sessData, error: sessErr } =
+      await sb.auth.setSession({ access_token, refresh_token });
+
+    console.log("[reset] setSession:", { sessErr, sessData });
+
+    if (sessErr || !sessData?.session) {
+      setStatus("This reset link is invalid or expired. Request a new reset email.");
+      return;
+    }
+
+    // ✅ Session is valid -> show form
+    setStatus("Link verified. Enter a new password below.");
+    formContainer.style.display = "block";
+
+    document.getElementById("resetForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const newPw = document.getElementById("newPassword").value.trim();
+      if (!newPw || newPw.length < 8) {
+        setStatus("Please enter a new password (8+ characters).");
+        return;
+      }
+
+      setStatus("Updating password…");
+
+      const { error: upErr } = await sb.auth.updateUser({ password: newPw });
+      console.log("[reset] updateUser:", { upErr });
+
+      if (upErr) {
+        setStatus("Error updating password: " + upErr.message);
+        return;
+      }
+
+      setStatus("");
+      formContainer.style.display = "none";
+      doneMessage.style.display = "block";
+    });
+  }
+
+  main();
+</script>
+</body>
+</html>

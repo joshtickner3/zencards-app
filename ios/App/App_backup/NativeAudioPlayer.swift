@@ -1,0 +1,496 @@
+import Foundation
+import Capacitor
+import AVFoundation
+import MediaPlayer
+
+@objc(NativeAudioPlayerPlugin)
+public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
+
+    // MARK: - Capacitor 7 bridge metadata
+
+    public let identifier = "NativeAudioPlayerPlugin"
+    public let jsName = "NativeAudioPlayer"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "setQueue",   returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "enqueue",    returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "play",       returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "pause",      returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "skipToNext", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stop",       returnType: CAPPluginReturnPromise),
+        // simple debug method to prove the bridge works
+        CAPPluginMethod(name: "debugPing",  returnType: CAPPluginReturnPromise)
+    ]
+
+
+    // MARK: - State
+
+    private var player: AVQueuePlayer?
+    private var currentIndex: Int = 0
+    private var updateNowPlayingTimer: Timer?
+    private var playbackKeepaliveTimer: DispatchSourceTimer?  // Changed: GCD timer that works in background
+    private let playbackKeepaliveQueue = DispatchQueue(label: "com.zencards.playbackKeepalive", qos: .userInitiated)
+
+    // MARK: - Lifecycle
+    public override func load() {
+        super.load()
+        print("🎧 [NativeAudioPlayer] load() – plugin constructed and added to bridge")
+
+        // Do NOT change the global audio session here.
+        setupRemoteCommandCenter()
+        registerPlayerObservers()
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+        print("🧹 [NativeAudioPlayer] deinit – observers removed")
+    }
+
+    // MARK: - Remote controls
+
+    private func setupRemoteCommandCenter() {
+        let commandCenter = MPRemoteCommandCenter.shared()
+
+        commandCenter.playCommand.addTarget { [weak self] _ in
+            print("▶️ [NativeAudioPlayer] Remote playCommand")
+            self?.player?.play()
+            self?.notifyListeners("remoteCommand", data: ["type": "play"])
+            return .success
+        }
+
+        commandCenter.pauseCommand.addTarget { [weak self] _ in
+            print("⏸ [NativeAudioPlayer] Remote pauseCommand")
+            self?.player?.pause()
+            self?.notifyListeners("remoteCommand", data: ["type": "pause"])
+            return .success
+        }
+
+        commandCenter.nextTrackCommand.addTarget { [weak self] _ in
+            print("⏭ [NativeAudioPlayer] Remote nextTrackCommand")
+            self?.skipToNextInternal()
+            self?.notifyListeners("remoteCommand", data: ["type": "next"])
+            return .success
+        }
+
+        print("🎛 [NativeAudioPlayer] RemoteCommandCenter configured")
+    }
+
+    // MARK: - Notifications
+
+    private func registerPlayerObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(itemDidFinishPlaying(_:)),
+            name: .AVPlayerItemDidPlayToEndTime,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(itemFailedToPlayToEnd(_:)),
+            name: .AVPlayerItemFailedToPlayToEndTime,
+            object: nil
+        )
+        
+        // Observe when player is ready to play (for URL loading diagnostics)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(playerItemBecameReadyToPlay(_:)),
+            name: AVPlayerItem.newAccessLogEntryNotification,
+            object: nil
+        )
+
+        print("🔔 [NativeAudioPlayer] Registered AVPlayerItem notifications")
+    }
+    
+    @objc private func playerItemBecameReadyToPlay(_ notification: Notification) {
+        if let item = notification.object as? AVPlayerItem {
+            print("✅ [NativeAudioPlayer] AVPlayerItem ready to play (log available)")
+            if let accessLog = item.accessLog(), let lastEvent = accessLog.events.last {
+                print("   ↳ URL: \(lastEvent.uri ?? "unknown")")
+                print("   ↳ Server Address: \(lastEvent.serverAddress ?? "unknown")")
+                print("   ↳ Downloaded duration: \(lastEvent.durationWatched)s")
+            }
+            
+            // CRITICAL: Update Now Playing info now that item is ready
+            DispatchQueue.main.async {
+                self.updateNowPlayingInfo()
+                print("📍 [NativeAudioPlayer] Now Playing info updated after item became ready")
+            }
+        }
+    }
+
+    @objc private func itemDidFinishPlaying(_ notification: Notification) {
+        currentIndex += 1
+        print("✅ [NativeAudioPlayer] Item finished – new index: \(currentIndex)")
+        // DON'T stop Now Playing updates here - let timer continue in case next item queues
+        // This keeps Control Center responsive
+        notifyListeners("trackEnded", data: ["index": currentIndex])
+    }
+
+    @objc private func itemFailedToPlayToEnd(_ notification: Notification) {
+        if let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error {
+            print("❌ [NativeAudioPlayer] Item failed to play: \(error.localizedDescription)")
+        } else {
+            print("❌ [NativeAudioPlayer] Item failed to play (no error info)")
+        }
+    }
+
+    private func skipToNextInternal() {
+        guard let player = player else {
+            print("⚠️ [NativeAudioPlayer] skipToNextInternal called but player is nil")
+            return
+        }
+
+        player.advanceToNextItem()
+        currentIndex += 1
+        print("⏭ [NativeAudioPlayer] skipToNextInternal – index now \(currentIndex)")
+        updateNowPlayingInfo()
+        notifyListeners("trackEnded", data: ["index": currentIndex])
+    }
+
+    // MARK: - Now Playing Info (for Control Center & Lock Screen)
+
+    private func startNowPlayingUpdates() {
+        updateNowPlayingInfo()
+        
+        // Update every 0.5 seconds while playing
+        updateNowPlayingTimer?.invalidate()
+        updateNowPlayingTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            self?.updateNowPlayingInfo()
+        }
+        print("📍 [NativeAudioPlayer] Now Playing updates started")
+    }
+
+    private func stopNowPlayingUpdates() {
+        updateNowPlayingTimer?.invalidate()
+        updateNowPlayingTimer = nil
+        print("📍 [NativeAudioPlayer] Now Playing updates stopped")
+    }
+    
+    private func startPlaybackKeepalive() {
+        // Stop any existing keepalive timer
+        playbackKeepaliveTimer?.cancel()
+        playbackKeepaliveTimer = nil
+        
+        // Create GCD timer that CONTINUES IN BACKGROUND (unlike NSTimer)
+        let timer = DispatchSource.makeTimerSource(queue: playbackKeepaliveQueue)
+        timer.schedule(deadline: .now(), repeating: 1.0)  // Fire every 1 second
+        
+        timer.setEventHandler { [weak self] in
+            guard let self = self, let player = self.player else { return }
+            
+            // If player was supposed to be playing but got paused, restart it
+            if player.timeControlStatus != .playing && player.currentItem != nil {
+                DispatchQueue.main.async {
+                    print("🚨 [NativeAudioPlayer] Keepalive: Playback was suspended! Restarting...")
+                    print("   ↳ Previous status: \(player.timeControlStatus.rawValue)")
+                    player.play()
+                    print("   ↳ Play() called again, new status: \(player.timeControlStatus.rawValue)")
+                }
+            }
+        }
+        
+        timer.resume()
+        playbackKeepaliveTimer = timer
+        print("🔄 [NativeAudioPlayer] GCD-based playback keepalive monitor started (checks every 1s in background)")
+    }
+    
+    private func stopPlaybackKeepalive() {
+        playbackKeepaliveTimer?.cancel()
+        playbackKeepaliveTimer = nil
+        print("🔄 [NativeAudioPlayer] Playback keepalive monitor stopped")
+    }
+
+    private func updateNowPlayingInfo() {
+        guard let player = player else { return }
+        guard let currentItem = player.currentItem else { return }
+        
+        // If there's no item or duration is invalid, skip (don't set with garbage data)
+        let duration = CMTimeGetSeconds(currentItem.asset.duration)
+        if duration.isNaN || duration.isInfinite || duration == 0 {
+            return
+        }
+        
+        let infoCenter = MPNowPlayingInfoCenter.default()
+        
+        // Get current playback time
+        let currentTime = CMTimeGetSeconds(player.currentTime())
+        let playbackTime = currentTime.isNaN || currentTime.isInfinite ? 0 : currentTime
+        
+        var nowPlayingInfo: [String: Any] = [
+            MPMediaItemPropertyTitle: "ZenCards Study Session",
+            MPMediaItemPropertyArtist: "ZenCards",
+            MPNowPlayingInfoPropertyIsLiveStream: false,
+            MPMediaItemPropertyPlaybackDuration: duration,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: playbackTime,
+            MPNowPlayingInfoPropertyPlaybackRate: player.rate
+        ]
+        
+        infoCenter.nowPlayingInfo = nowPlayingInfo
+        print("📍 [NativeAudioPlayer] Now Playing info updated: duration=\(duration)s, elapsed=\(playbackTime)s, rate=\(player.rate)")
+    }
+
+    // MARK: - Plugin methods (called from JS)
+
+    /// Simple "are we alive?" method
+    @objc func debugPing(_ call: CAPPluginCall) {
+        print("🔔 [NativeAudioPlayer] debugPing() from JS")
+        call.resolve([
+            "ok": true,
+            "message": "NativeAudioPlayer is reachable from JS"
+        ])
+    }
+
+    @objc func setQueue(_ call: CAPPluginCall) {
+        guard let urls = call.getArray("urls", String.self), !urls.isEmpty else {
+            print("⚠️ [NativeAudioPlayer] setQueue: missing or empty urls")
+            call.reject("Missing or empty urls")
+            return
+        }
+
+        print("🎧 [NativeAudioPlayer] setQueue() called with \(urls.count) urls")
+        urls.forEach { print("   ↳ queue URL: \($0)") }
+
+        DispatchQueue.main.async {
+            self.currentIndex = 0
+
+            var items: [AVPlayerItem] = []
+
+            for urlString in urls {
+                if let u = URL(string: urlString) {
+                    print("   ↳ enqueue URL: \(u)")
+                    items.append(AVPlayerItem(url: u))
+                } else {
+                    print("⚠️ [NativeAudioPlayer] Bad URL in setQueue: \(urlString)")
+                }
+            }
+
+            guard !items.isEmpty else {
+                print("❌ [NativeAudioPlayer] No valid URLs after parsing")
+                call.reject("No valid URLs to play")
+                return
+            }
+
+            let player = AVQueuePlayer(items: items)
+            player.actionAtItemEnd = .advance
+            player.automaticallyWaitsToMinimizeStalling = false
+            player.volume = 1.0  // Ensure volume is not muted
+            self.player = player
+
+            // CRITICAL: Ensure player is configured for background playback
+            // These must be set BEFORE calling play()
+            player.preventsDisplaySleepDuringVideoPlayback = false
+            
+            // Now Playing info (for Control Center tile)
+            if let first = items.first {
+                let infoCenter = MPNowPlayingInfoCenter.default()
+                let duration = CMTimeGetSeconds(first.asset.duration)
+                infoCenter.nowPlayingInfo = [
+                    MPMediaItemPropertyTitle: "ZenCards Study Session",
+                    MPNowPlayingInfoPropertyIsLiveStream: false,
+                    MPMediaItemPropertyPlaybackDuration: duration,
+                    MPNowPlayingInfoPropertyElapsedPlaybackTime: 0
+                ]
+            }
+            
+            // CRITICAL: Add KVO observers to track item status changes (for diagnosing URL loading failures)
+            for (index, item) in items.enumerated() {
+                item.addObserver(self, forKeyPath: "status", options: [.new, .old], context: nil)
+                item.addObserver(self, forKeyPath: "error", options: [.new], context: nil)
+                print("📊 [NativeAudioPlayer] KVO observers added to item \(index)")
+            }
+            
+            // Log queue setup for debugging
+            print("✅ [NativeAudioPlayer] Queue created with \(items.count) AVPlayerItem(s)")
+            print("   ↳ actionAtItemEnd: advance")
+            print("   ↳ automaticallyWaitsToMinimizeStalling: false")
+            print("   ↳ player.volume: \(player.volume)")
+            call.resolve()
+        }
+    }
+
+    @objc func enqueue(_ call: CAPPluginCall) {
+        guard let urls = call.getArray("urls", String.self), !urls.isEmpty else {
+            print("⚠️ [NativeAudioPlayer] enqueue: missing or empty urls")
+            call.reject("Missing or empty urls")
+            return
+        }
+
+        print("🎧 [NativeAudioPlayer] enqueue() called with \(urls.count) urls")
+
+        DispatchQueue.main.async {
+            guard let player = self.player else {
+                print("⚠️ [NativeAudioPlayer] enqueue called but player is nil – call setQueue first")
+                call.reject("Queue not initialized. Call setQueue first.")
+                return
+            }
+
+            for urlString in urls {
+                guard let url = URL(string: urlString) else {
+                    print("⚠️ [NativeAudioPlayer] Invalid URL string in enqueue: \(urlString)")
+                    continue
+                }
+                print("   ↳ enqueue URL: \(url.absoluteString)")
+                let item = AVPlayerItem(url: url)
+                player.insert(item, after: nil)
+            }
+
+            call.resolve()
+        }
+    }
+
+    @objc func play(_ call: CAPPluginCall) {
+        print("▶️ [NativeAudioPlayer] play() called from JS")
+
+        DispatchQueue.main.async {
+            guard let player = self.player else {
+                print("⚠️ [NativeAudioPlayer] play called but player is nil – did you call setQueue?")
+                call.reject("No queue set – call setQueue first")
+                return
+            }
+
+            // CRITICAL: Configure audio session to route to speaker
+            do {
+                let session = AVAudioSession.sharedInstance()
+                
+                // Set category to .playback and route to speaker
+                             print("🔊 [NativeAudioPlayer] Setting audio session to .playback with defaultToSpeaker + duckOthers")
+                try session.setCategory(
+                    .playback,
+                    mode: .default,
+                    options: [
+                        .duckOthers,                        // Lower other app audio
+                        .defaultToSpeaker
+                    ]
+                )
+                
+                try session.setActive(true, options: .notifyOthersOnDeactivation)
+                print("✅ [NativeAudioPlayer] Audio session configured to route to speaker")
+            } catch {
+                print("⚠️ [NativeAudioPlayer] Audio session setup failed: \(error)")
+            }
+
+            // Verify player state before playing
+            print("📊 [NativeAudioPlayer] Player state BEFORE play():")
+            print("   ↳ volume: \(player.volume)")
+            print("   ↳ rate: \(player.rate)")
+            let statusBefore = player.timeControlStatus.rawValue
+            print("   ↳ timeControlStatus: \(statusBefore) (0=paused, 1=waitingToPlayAtSpecifiedRate, 2=playing)")
+            
+            if let currentItem = player.currentItem {
+                let durationSeconds = CMTimeGetSeconds(currentItem.asset.duration)
+                print("   ↳ currentItem duration: \(durationSeconds)s")
+                print("   ↳ currentItem status: \(currentItem.status.rawValue) (0=unknown, 1=ready, 2=failed)")
+                if let error = currentItem.error {
+                    print("   ↳ ❌ ERROR on item: \(error.localizedDescription)")
+                }
+            } else {
+                print("   ↳ ⚠️ currentItem is nil!")
+            }
+            
+            player.volume = 1.0
+            player.play()
+            self.startNowPlayingUpdates()
+            self.startPlaybackKeepalive()  // NEW: Monitor for suspension and restart if needed
+            
+            print("✅ [NativeAudioPlayer] player.play() called")
+            print("📊 [NativeAudioPlayer] Player state AFTER play():")
+            let statusAfter = player.timeControlStatus.rawValue
+            print("   ↳ rate: \(player.rate)")
+            print("   ↳ timeControlStatus: \(statusAfter) (0=paused, 1=waitingToPlayAtSpecifiedRate, 2=playing)")
+            
+            if statusAfter == 2 {
+                print("   ✅ Player is PLAYING")
+            } else if statusAfter == 1 {
+                print("   ⏳ Player is WAITING (likely buffering audio from URL)")
+            } else if statusAfter == 0 {
+                print("   ⚠️ Player is still PAUSED – something prevented playback!")
+            }
+            
+            call.resolve()
+        }
+    }
+
+    @objc func pause(_ call: CAPPluginCall) {
+        print("⏸ [NativeAudioPlayer] pause() called from JS")
+
+        DispatchQueue.main.async {
+            self.player?.pause()
+            self.stopNowPlayingUpdates()
+            self.stopPlaybackKeepalive()
+            call.resolve()
+        }
+    }
+
+    @objc func skipToNext(_ call: CAPPluginCall) {
+        print("⏭ [NativeAudioPlayer] skipToNext() called from JS")
+
+        DispatchQueue.main.async {
+            self.skipToNextInternal()
+            call.resolve()
+        }
+    }
+
+    @objc func stop(_ call: CAPPluginCall) {
+        print("⏹ [NativeAudioPlayer] stop() called from JS")
+
+        DispatchQueue.main.async {
+            guard let player = self.player else {
+                print("⚠️ [NativeAudioPlayer] stop called but player is nil")
+                call.resolve()
+                return
+            }
+
+            player.pause()
+            player.removeAllItems()
+            self.currentIndex = 0
+            self.stopNowPlayingUpdates()
+            self.stopPlaybackKeepalive()
+            
+            // CRITICAL: Clear Now Playing info so Control Center doesn't show stale/zero data
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+            
+            print("✅ [NativeAudioPlayer] player stopped and queue cleared")
+            call.resolve()
+        }
+    }
+    
+    // MARK: - KVO Observation for diagnostics
+    
+    override public func observeValue(
+        forKeyPath keyPath: String?,
+        of object: Any?,
+        change: [NSKeyValueChangeKey : Any]?,
+        context: UnsafeMutableRawPointer?
+    ) {
+        guard let item = object as? AVPlayerItem else { return }
+        
+        if keyPath == "status" {
+            switch item.status {
+            case .unknown:
+                print("📊 [NativeAudioPlayer] Item status changed to: UNKNOWN")
+            case .readyToPlay:
+                print("✅ [NativeAudioPlayer] Item status changed to: READY TO PLAY")
+                if let accessLog = item.accessLog(), let lastEvent = accessLog.events.last {
+                    print("   ↳ URL loaded from: \(lastEvent.serverAddress ?? "unknown")")
+                }
+            case .failed:
+                print("❌ [NativeAudioPlayer] Item status changed to: FAILED")
+                if let error = item.error {
+                    print("   ↳ Error: \(error.localizedDescription)")
+                    print("   ↳ Error code: \((error as NSError).code)")
+                    print("   ↳ Error domain: \((error as NSError).domain)")
+                }
+            @unknown default:
+                print("? [NativeAudioPlayer] Item status changed to: UNKNOWN VALUE")
+            }
+        } else if keyPath == "error" {
+            if let error = item.error {
+                print("❌ [NativeAudioPlayer] Item error detected: \(error.localizedDescription)")
+                print("   ↳ Code: \((error as NSError).code)")
+                print("   ↳ Domain: \((error as NSError).domain)")
+            }
+        }
+    }
+}
+
