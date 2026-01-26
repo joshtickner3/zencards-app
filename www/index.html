@@ -734,56 +734,54 @@ a:hover{
       <!-- ===== Student pain strip (NEW) ===== -->
 <div class="painStrip">
   <div class="painTitle">
-    <h3>The student trap: Either grades, finances, or your social life suffers</h3>
+    <h3 class="collapsible-header" id="studentTrapHeader" tabindex="0" style="cursor:pointer;user-select:none;">The student trap: Either grades, finances, or your social life suffers <span class="collapsible-arrow">▼</span></h3>
     <div class="muted"></div>
   </div>
-
-  <div class="painGrid">
-    <div class="painItem">
-      <div class="painItemTop">
-        <div class="painIcon">⏱</div>
-        <h4>Grades slip</h4>
+  <div class="collapsible-content" id="studentTrapContent" style="display:none;">
+    <div class="painGrid">
+      <div class="painItem">
+        <div class="painItemTop">
+          <div class="painIcon">⏱</div>
+          <h4>Grades slip</h4>
+        </div>
+        <p>In working a full time job and maintaining a social life, there’s often not enough time to study, so performance drops and post-graduation opportunities close, limiting your options and wasting your educational opportunity.</p>
       </div>
-      <p>In working a full time job and maintaining a social life, there’s often not enough time to study, so performance drops and post-graduation opportunities close, limiting your options and wasting your educational opportunity.</p>
-    </div>
-
-    <div class="painItem">
-      <div class="painItemTop">
-        <div class="painIcon">💸</div>
-        <h4>Money stays tight</h4>
+      <div class="painItem">
+        <div class="painItemTop">
+          <div class="painIcon">💸</div>
+          <h4>Money stays tight</h4>
+        </div>
+        <p>In prioritizing studying and relationships over work, studying eats your schedule, leaving little time to work, save, and build wealth early in life when it is most beneficial to be doing so to prevent financial stagnation early and ultimately later in life.</p>
       </div>
-      <p>In prioritizing studying and relationships over work, studying eats your schedule, leaving little time to work, save, and build wealth early in life when it is most beneficial to be doing so to prevent financial stagnation early and ultimately later in life.</p>
-    </div>
-
-    <div class="painItem">
-      <div class="painItemTop">
-        <div class="painIcon">😶</div>
-        <h4>No free time</h4>
+      <div class="painItem">
+        <div class="painItemTop">
+          <div class="painIcon">😶</div>
+          <h4>No free time</h4>
+        </div>
+        <p>School + work kills your social life, causing loneliness, burnout, stress, and unhappiness. Working as a student does not need to feature sacrificing your social life.</p>
       </div>
-      <p>School + work kills your social life, causing loneliness, burnout, stress, and unhappiness. Working as a student does not need to feature sacrificing your social life.</p>
     </div>
   </div>
 </div>
 <!-- ===== When to use ZenCards (NEW) ===== -->
 <div class="useStrip">
   <div class="useTitle">
-    <div>
-      <h3>Use ZenCards anywhere</h3>
-      <p>We designed ZenCards to work in <strong>any</strong> setting.</p>
-    </div>
+    <h3 class="collapsible-header" id="useAnywhereHeader" tabindex="0" style="cursor:pointer;user-select:none;">Use ZenCards anywhere <span class="collapsible-arrow">▼</span></h3>
     <div class="muted" style="font-size:0.9rem;">If you can listen, you can review.</div>
   </div>
-
-  <div class="pillRow">
-    <span class="pill"><span class="dot"></span>Commuting</span>
-    <span class="pill"><span class="dot"></span>Walking to class</span>
-    <span class="pill"><span class="dot"></span>Eating</span>
-    <span class="pill"><span class="dot"></span>Between lectures</span>
-    <span class="pill"><span class="dot"></span>In class (silent mode)</span>
-    <span class="pill"><span class="dot"></span>Doing chores</span>
-    <span class="pill"><span class="dot"></span>At the gym</span>
-    <span class="pill"><span class="dot"></span>Waiting in line</span>
-    <span class="pill"><span class="dot"></span>Anywhere you have 2 minutes</span>
+  <div class="collapsible-content" id="useAnywhereContent" style="display:none;">
+    <p>We designed ZenCards to work in <strong>any</strong> setting.</p>
+    <div class="pillRow">
+      <span class="pill"><span class="dot"></span>Commuting</span>
+      <span class="pill"><span class="dot"></span>Walking to class</span>
+      <span class="pill"><span class="dot"></span>Eating</span>
+      <span class="pill"><span class="dot"></span>Between lectures</span>
+      <span class="pill"><span class="dot"></span>In class (silent mode)</span>
+      <span class="pill"><span class="dot"></span>Doing chores</span>
+      <span class="pill"><span class="dot"></span>At the gym</span>
+      <span class="pill"><span class="dot"></span>Waiting in line</span>
+      <span class="pill"><span class="dot"></span>Anywhere you have 2 minutes</span>
+    </div>
   </div>
 </div>
 
@@ -1037,6 +1035,8 @@ a:hover{
     setupCollapsible('pricingHeader', 'pricingContent');
     setupCollapsible('whyWorksHeader', 'whyWorksContent');
     setupCollapsible('howWorksHeader', 'howWorksContent');
+    setupCollapsible('studentTrapHeader', 'studentTrapContent');
+    setupCollapsible('useAnywhereHeader', 'useAnywhereContent');
   </script>
 
     <!-- FAQ -->
