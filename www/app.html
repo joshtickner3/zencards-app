@@ -698,6 +698,13 @@ input[type="number"]:focus{
             <span class="badge">New</span>
           </label>
         </div>
+        <div style="margin-top:0.5rem;">
+          <label class="inline" for="handsFreeNextDelaySeconds">
+            Hands-free: delay after rating before next question
+          </label>
+          <input type="number" id="handsFreeNextDelaySeconds" min="0" max="30" value="2" style="width:60px;" />
+          <span>seconds</span>
+        </div>
                 <!-- NEW: auto study-ahead options -->
         <div style="margin-top:0.5rem;">
           <label class="inline">
@@ -2815,6 +2822,7 @@ function speakWithWebTts(text, onEnd) {
     const answerModeDelayRadio = document.getElementById("answerModeDelay");
     const answerModeVoiceRadio = document.getElementById("answerModeVoice");
     const answerDelaySecondsInput = document.getElementById("answerDelaySeconds");
+      const handsFreeNextDelaySecondsInput = document.getElementById("handsFreeNextDelaySeconds");
     const studyAheadGapSecondsInput = document.getElementById("studyAheadGapSeconds");
 const autoEnterStudyAheadCheckbox = document.getElementById("autoEnterStudyAhead");
 const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
@@ -2901,6 +2909,20 @@ let loopStudyAhead = false;       // from Study Options
     let answerMode = "delay";
     let answerDelayMs = 4000;
     let autoGoodMode = false;
+    let handsFreeNextDelayMs = 2000;
+    // Disable handsFreeNextDelaySecondsInput when autoGood is enabled
+    if (handsFreeNextDelaySecondsInput && autoGoodToggle) {
+      function updateHandsFreeDelayEnabled() {
+        handsFreeNextDelaySecondsInput.disabled = autoGoodToggle.checked;
+      }
+      autoGoodToggle.addEventListener('change', updateHandsFreeDelayEnabled);
+      updateHandsFreeDelayEnabled();
+      handsFreeNextDelaySecondsInput.addEventListener('input', () => {
+        handsFreeNextDelayMs = Math.max(0, Math.min(30, Number(handsFreeNextDelaySecondsInput.value))) * 1000;
+      });
+      // Initialize value
+      handsFreeNextDelayMs = Math.max(0, Math.min(30, Number(handsFreeNextDelaySecondsInput.value))) * 1000;
+    }
     let autoModeBehavior = "good"; // again | hard | good | easy | tomorrow
 
     let studyAheadGapMs = 4000;
@@ -4507,7 +4529,6 @@ setCardContent(voiceAnswerText, currentCard.answer);
 
     await stopAllAudio();
 
-
     if (!noScheduleChanges) {
       const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
       if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
@@ -4517,7 +4538,14 @@ setCardContent(voiceAnswerText, currentCard.answer);
 
     voiceRatingButtons.classList.add("hidden");
     setStudyState(StudyState.IDLE);
-    runVoiceLoop();
+    // If autoGood is not enabled, delay before next question
+    if (!autoGoodToggle.checked && handsFreeNextDelayMs > 0) {
+      setTimeout(() => {
+        runVoiceLoop();
+      }, handsFreeNextDelayMs);
+    } else {
+      runVoiceLoop();
+    }
   });
 }
 
