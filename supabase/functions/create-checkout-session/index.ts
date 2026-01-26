@@ -85,20 +85,38 @@ Deno.serve(async (req) => {
     // 1) Trial eligibility (DB is your fast gate)
     // Make sure you added:
     // alter table public.users add column if not exists trial_used boolean not null default false;
-    const { data: userRow, error: userRowErr } = await supabase
-      .from("users")
-      .select("trial_used")
-      .eq("id", userId)
-      .single();
+    // 1) Trial eligibility (DB is your fast gate)
+// IMPORTANT: brand-new users may not have a row in public.users yet.
+// Use maybeSingle + create row if missing.
+const { data: userRow, error: userRowErr } = await supabase
+  .from("users")
+  .select("trial_used")
+  .eq("id", userId)
+  .maybeSingle();
 
-    if (userRowErr) {
-      return jsonResponse(origin, 500, {
-        error: "Failed to load user trial status",
-        details: userRowErr.message,
-      });
-    }
+if (userRowErr) {
+  return jsonResponse(origin, 500, {
+    error: "Failed to load user trial status",
+    details: userRowErr.message,
+  });
+}
 
-    let trialEligible = !userRow?.trial_used;
+// If no row exists yet, create it (trial_used defaults false)
+if (!userRow) {
+  const { error: insErr } = await supabase
+    .from("users")
+    .upsert({ id: userId }, { onConflict: "id" });
+
+  if (insErr) {
+    return jsonResponse(origin, 500, {
+      error: "Failed to initialize public user row",
+      details: insErr.message,
+    });
+  }
+}
+
+let trialEligible = !(userRow?.trial_used ?? false);
+
 
     // 2) Reuse/create customer (your existing logic)
     const existing = await stripe.customers.list({ email, limit: 1 });
