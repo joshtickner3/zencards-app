@@ -162,9 +162,15 @@ Deno.serve(async (req) => {
         const sub = await stripe.subscriptions.retrieve(subscriptionId);
 
         // ✅ If trial started, mark it used
-        if (sub.trial_start) {
-          await markTrialUsed(userId);
-        }
+       // ✅ Permanently mark trial as used once the user has a real subscription start
+// (trialing or active). This covers both:
+// - first-time trial
+// - paid signup with no trial
+// and prevents ever getting a trial again later.
+if (sub.status === "trialing" || sub.status === "active") {
+  await markTrialUsed(userId);
+}
+
 
         const priceId = sub.items.data?.[0]?.price?.id ?? null;
         const currentPeriodEnd = sub.current_period_end
@@ -207,10 +213,14 @@ Deno.serve(async (req) => {
 
       await ensurePublicUserRow(userId);
 
-      // ✅ If a trial started (trial_start exists), permanently mark trial as used
-      if (sub.trial_start) {
-        await markTrialUsed(userId);
-      }
+      /// ✅ Permanently mark trial as used once the user has a real subscription start
+// (trialing or active). This covers both:
+// - first-time trial
+// - paid signup with no trial
+// and prevents ever getting a trial again later.
+if (sub.status === "trialing" || sub.status === "active") {
+  await markTrialUsed(userId);
+}
 
       const priceId = sub.items.data?.[0]?.price?.id ?? null;
       const currentPeriodEnd = sub.current_period_end

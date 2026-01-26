@@ -1,6 +1,6 @@
 // supabase/functions/create-checkout-session/index.ts
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import Stripe from "https://esm.sh/stripe@16.12.0?target=deno";
+import Stripe from "npm:stripe@16.12.0";
 
 const allowedOrigins = new Set([
   "https://zencardstudy.com",
@@ -69,7 +69,6 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({} as Record<string, unknown>));
 
-    // IMPORTANT: keep success on app.html so it can immediately re-check access
     const success_url =
       typeof body?.success_url === "string"
         ? body.success_url
@@ -80,75 +79,86 @@ Deno.serve(async (req) => {
         ? body.cancel_url
         : "https://zencardstudy.com/app.html?checkout=canceled";
 
-    const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2023-10-16" });
-
-    // 1) Trial eligibility (DB is your fast gate)
-    // Make sure you added:
-    // alter table public.users add column if not exists trial_used boolean not null default false;
-    // 1) Trial eligibility (DB is your fast gate)
-// IMPORTANT: brand-new users may not have a row in public.users yet.
-// Use maybeSingle + create row if missing.
-const { data: userRow, error: userRowErr } = await supabase
-  .from("users")
-  .select("trial_used")
-  .eq("id", userId)
-  .maybeSingle();
-
-if (userRowErr) {
-  return jsonResponse(origin, 500, {
-    error: "Failed to load user trial status",
-    details: userRowErr.message,
-  });
-}
-
-// If no row exists yet, create it (trial_used defaults false)
-if (!userRow) {
-  const { error: insErr } = await supabase
-    .from("users")
-    .upsert({ id: userId }, { onConflict: "id" });
-
-  if (insErr) {
-    return jsonResponse(origin, 500, {
-      error: "Failed to initialize public user row",
-      details: insErr.message,
+    // ✅ Edge-safe Stripe client (prevents Deno.core.runMicrotasks issues)
+    const stripe = new Stripe(STRIPE_SECRET_KEY, {
+      apiVersion: "2023-10-16",
+      httpClient: Stripe.createFetchHttpClient(),
     });
-  }
-}
 
-let trialEligible = !(userRow?.trial_used ?? false);
+    // -----------------------------
+    // 1) Get / create Stripe customer
+    // -----------------------------
+    // Prefer mapping table if it exists (less error-prone than searching by email)
+    let customerId: string | null = null;
 
+    try {
+      const { data: mapping } = await supabase
+        .from("stripe_customers")
+        .select("stripe_customer_id")
+        .eq("user_id", userId)
+        .maybeSingle();
 
-    // 2) Reuse/create customer (your existing logic)
-    const existing = await stripe.customers.list({ email, limit: 1 });
-    const customer =
-      existing.data?.[0] ??
-      (await stripe.customers.create({
-        email,
-        metadata: { supabase_user_id: userId },
-      }));
-
-    // 3) Stronger gate: if Stripe has ever seen a trial for this customer, block trial
-    // (covers cases where DB flag wasn't set due to earlier iterations)
-    if (trialEligible) {
-      const subs = await stripe.subscriptions.list({
-        customer: customer.id,
-        status: "all",
-        limit: 100,
-      });
-
-      const everHadTrial = subs.data.some((s) => !!s.trial_start);
-      if (everHadTrial) trialEligible = false;
+      if (mapping?.stripe_customer_id) customerId = mapping.stripe_customer_id;
+    } catch {
+      // ignore; fallback to email lookup below
     }
 
-    // 4) Build Checkout Session params; only include trial when eligible
+    if (!customerId) {
+      const existing = await stripe.customers.list({ email, limit: 1 });
+      const customer =
+        existing.data?.[0] ??
+        (await stripe.customers.create({
+          email,
+          metadata: { supabase_user_id: userId },
+        }));
+      customerId = customer.id;
+    }
+
+    // -----------------------------------------
+    // 2) Decide trial eligibility (NO DB INSERTS)
+    // -----------------------------------------
+    // We DO NOT upsert into public.users here because RLS blocks it.
+    // Instead:
+    // - If we can read users.trial_used, use it
+    // - Always enforce with Stripe history:
+    //    trial only if customer has NEVER had ANY subscription before
+    let trialEligible = true;
+
+    // DB hint (optional; if blocked by RLS or row missing, we just ignore)
+    try {
+      const { data: userRow } = await supabase
+        .from("users")
+        .select("trial_used")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (userRow?.trial_used === true) trialEligible = false;
+    } catch {
+      // ignore; Stripe history below is still authoritative
+    }
+
+    // Stripe authoritative gate:
+    // If customer has EVER had a subscription (trialing/active/canceled/etc), no trial.
+    const subs = await stripe.subscriptions.list({
+      customer: customerId,
+      status: "all",
+      limit: 100,
+    });
+
+    const hasAnySubscriptionHistory = subs.data.length > 0;
+    if (hasAnySubscriptionHistory) {
+      trialEligible = false;
+    }
+
+    // -----------------------------------------
+    // 3) Create Checkout Session
+    // -----------------------------------------
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: "subscription",
-      customer: customer.id,
+      customer: customerId,
 
-      // Your price
       line_items: [{ price: STRIPE_PRICE_ID, quantity: 1 }],
 
-      // Put supabase_user_id in BOTH places so every webhook can map back to user
       client_reference_id: userId,
       metadata: {
         supabase_user_id: userId,
@@ -156,7 +166,7 @@ let trialEligible = !(userRow?.trial_used ?? false);
         price_id: STRIPE_PRICE_ID,
       },
 
-      // Always attach subscription metadata (even if no trial)
+      // Always attach subscription metadata
       subscription_data: {
         metadata: {
           supabase_user_id: userId,
@@ -170,9 +180,10 @@ let trialEligible = !(userRow?.trial_used ?? false);
       allow_promotion_codes: true,
     };
 
+    // Only include trial when eligible
     if (trialEligible) {
       sessionParams.subscription_data = {
-        trial_period_days: 3, // <-- your trial length
+        trial_period_days: 3,
         metadata: {
           supabase_user_id: userId,
           email,
@@ -183,10 +194,16 @@ let trialEligible = !(userRow?.trial_used ?? false);
 
     const session = await stripe.checkout.sessions.create(sessionParams);
 
-    // Return eligibility too (helps you debug in console)
-    return jsonResponse(origin, 200, { url: session.url, trial_eligible: trialEligible });
+    return jsonResponse(origin, 200, {
+      url: session.url,
+      trial_eligible: trialEligible,
+      has_any_subscription_history: hasAnySubscriptionHistory,
+    });
   } catch (e) {
     console.error("create-checkout-session error:", e);
-    return jsonResponse(origin, 500, { error: "Internal error", details: (e as any)?.message || String(e) });
+    return jsonResponse(origin, 500, {
+      error: "Internal error",
+      details: (e as any)?.message || String(e),
+    });
   }
 });
