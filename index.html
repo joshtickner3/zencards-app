@@ -866,7 +866,7 @@ a:hover{
 
       <button class="btn" id="lpGoBtn" type="button" disabled
         style="background:#334155;color:#94a3b8;box-shadow:none;cursor:not-allowed;">
-        Go to ZenCards (locked)
+        Study Now (locked)
       </button>
     </div>
   </div>
@@ -1439,14 +1439,14 @@ const signedInManageBillingBtn = document.getElementById("signedInManageBillingB
 function setLpGoButton(unlocked) {
   if (unlocked) {
     lpGoBtn.disabled = false;
-    lpGoBtn.textContent = "Go to ZenCards";
+    lpGoBtn.textContent = "Study Now";
     lpGoBtn.style.background = "var(--green)";
     lpGoBtn.style.color = "#020617";
     lpGoBtn.style.cursor = "pointer";
     lpGoBtn.style.boxShadow = "0 8px 18px rgba(16,185,129,0.28)";
   } else {
     lpGoBtn.disabled = true;
-    lpGoBtn.textContent = "Go to ZenCards (locked)";
+    lpGoBtn.textContent = "Study Now (locked)";
     lpGoBtn.style.background = "#334155";
     lpGoBtn.style.color = "#94a3b8";
     lpGoBtn.style.cursor = "not-allowed";
