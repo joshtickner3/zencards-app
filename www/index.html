@@ -710,7 +710,6 @@ a:hover{
     <button class="btn secondary small" id="signedOutLogoutBtn" type="button">Log out</button>
     <button class="btn small" id="signedInManageBillingBtn" type="button">Manage Billing</button>
     <button class="btn danger small" id="deleteAccountBtn" type="button" style="background:#dc2626;color:#fff;">Delete Account</button>
-    .btn.danger { background: #dc2626 !important; color: #fff !important; border: none; }
   </div>
 </div>
 
@@ -1312,15 +1311,22 @@ a:hover{
         if (!confirm('Are you sure you want to permanently delete your account and cancel your subscription? This cannot be undone.')) return;
         // Call Supabase Edge Function to delete account and cancel subscription
         try {
+          console.log('[DeleteAccount] Attempting to call edge function...');
+          const { data: sessionData } = await supabaseClient.auth.getSession();
+          const accessToken = sessionData?.session?.access_token || '';
           const resp = await fetch('https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/delete-account', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${supabaseClient.auth.session()?.access_token || ''}`
+              'Authorization': `Bearer ${accessToken}`
             },
             body: JSON.stringify({ user_id: user.id, email: user.email })
           });
-          const result = await resp.json();
+          console.log('[DeleteAccount] Response status:', resp.status);
+          const text = await resp.text();
+          console.log('[DeleteAccount] Raw response:', text);
+          let result = {};
+          try { result = JSON.parse(text); } catch (err) { result = { error: 'Invalid JSON response', raw: text }; }
           if (!resp.ok || result.error) {
             errorDiv.textContent = result.error || 'Failed to delete account. Please contact support.';
             errorDiv.style.display = 'block';
@@ -1331,6 +1337,7 @@ a:hover{
           alert('Your account and subscription have been deleted.');
           window.location.reload();
         } catch (e) {
+          console.error('[DeleteAccount] Exception:', e);
           errorDiv.textContent = 'Failed to delete account. Please contact support.';
           errorDiv.style.display = 'block';
         }
