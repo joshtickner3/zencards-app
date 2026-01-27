@@ -1,5 +1,12 @@
 {
   "appId": "com.zencards.app",
   "appName": "ZenCards",
-  "webDir": "www"
+  "webDir": "www",
+  "ios": {
+    "allowLinkPreviews": true,
+    "scrollEnabled": true,
+    "allowsLinkPreview": true,
+    "allowsBackForwardNavigationGestures": true,
+    "allowsViewportScale": true
+  }
 }
