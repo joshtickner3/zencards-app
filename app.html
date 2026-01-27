@@ -2856,6 +2856,39 @@ function speakWithWebTts(text, onEnd) {
       if (dueCards.length === 0) return null;
       return dueCards[0];
     }
+    // ===================== STUDY PREFS (persist across sessions) =====================
+const STUDY_PREFS_KEY = "zc_studyPrefs";
+
+function getStudyPrefs() {
+  let p = {};
+  try { p = JSON.parse(localStorage.getItem(STUDY_PREFS_KEY) || "{}"); } catch { p = {}; }
+
+  // Defaults (match your current defaults)
+  if (typeof p.skipInstructionsAfterFirst !== "boolean") p.skipInstructionsAfterFirst = true;
+  if (typeof p.answerMode !== "string") p.answerMode = "delay"; // "delay" | "voice"
+  if (typeof p.answerDelaySec !== "number") p.answerDelaySec = 4;
+  if (typeof p.autoGoodMode !== "boolean") p.autoGoodMode = false;
+  if (typeof p.autoModeBehavior !== "string") p.autoModeBehavior = "good"; // again|hard|good|easy|tomorrow
+  if (typeof p.handsFreeNextDelaySec !== "number") p.handsFreeNextDelaySec = 2;
+  if (typeof p.studyAheadGapSec !== "number") p.studyAheadGapSec = 4;
+  if (typeof p.autoEnterStudyAhead !== "boolean") p.autoEnterStudyAhead = false;
+  if (typeof p.loopStudyAhead !== "boolean") p.loopStudyAhead = false;
+
+  // Clamp numeric values
+  p.answerDelaySec = Math.max(1, Math.min(60, Math.floor(p.answerDelaySec)));
+  p.handsFreeNextDelaySec = Math.max(0, Math.min(30, Math.floor(p.handsFreeNextDelaySec)));
+  p.studyAheadGapSec = Math.max(1, Math.min(60, Math.floor(p.studyAheadGapSec)));
+
+  return p;
+}
+
+function saveStudyPrefs(patch = {}) {
+  const cur = getStudyPrefs();
+  const next = { ...cur, ...patch };
+  localStorage.setItem(STUDY_PREFS_KEY, JSON.stringify(next));
+  return next;
+}
+
 
     // ===================== STUDY SESSION STATE =====================
     const mainMenuDiv = document.getElementById("mainMenu");
@@ -2930,6 +2963,138 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
     let currentMode = null;
     let currentDeckId = null;
     let currentCard = null;
+
+    function applyStudyPrefsToUIAndState() {
+  const p = getStudyPrefs();
+
+  // UI controls
+  if (skipInstructionsAfterFirstCheckbox) skipInstructionsAfterFirstCheckbox.checked = !!p.skipInstructionsAfterFirst;
+
+  if (answerModeVoiceRadio && answerModeDelayRadio) {
+    answerModeVoiceRadio.checked = (p.answerMode === "voice");
+    answerModeDelayRadio.checked = (p.answerMode !== "voice");
+  }
+
+  if (answerDelaySecondsInput) answerDelaySecondsInput.value = String(p.answerDelaySec);
+
+  if (autoGoodToggle) autoGoodToggle.checked = !!p.autoGoodMode;
+
+  if (autoRatingSelect) autoRatingSelect.value = p.autoModeBehavior || "good";
+
+  if (handsFreeNextDelaySecondsInput) handsFreeNextDelaySecondsInput.value = String(p.handsFreeNextDelaySec);
+
+  if (studyAheadGapSecondsInput) studyAheadGapSecondsInput.value = String(p.studyAheadGapSec);
+
+  if (autoEnterStudyAheadCheckbox) autoEnterStudyAheadCheckbox.checked = !!p.autoEnterStudyAhead;
+  if (loopStudyAheadCheckbox) loopStudyAheadCheckbox.checked = !!p.loopStudyAhead;
+
+  // Make auto rating select enabled/disabled correctly
+  if (autoRatingSelect && autoGoodToggle) {
+    autoRatingSelect.disabled = !autoGoodToggle.checked;
+  }
+
+  // Hands-free next delay disabled when autoGoodMode is enabled (your existing behavior)
+  if (handsFreeNextDelaySecondsInput && autoGoodToggle) {
+    handsFreeNextDelaySecondsInput.disabled = autoGoodToggle.checked;
+  }
+
+  // State variables (these are what your runtime uses)
+  skipInstructionsAfterFirst = !!p.skipInstructionsAfterFirst;
+  answerMode = p.answerMode === "voice" ? "voice" : "delay";
+  answerDelayMs = p.answerDelaySec * 1000;
+
+  autoGoodMode = !!p.autoGoodMode;
+  autoModeBehavior = p.autoModeBehavior || "good";
+
+  handsFreeNextDelayMs = p.handsFreeNextDelaySec * 1000;
+  studyAheadGapMs = p.studyAheadGapSec * 1000;
+
+  autoEnterStudyAhead = !!p.autoEnterStudyAhead;
+  loopStudyAhead = !!p.loopStudyAhead;
+}
+function wireStudyPrefsListeners() {
+  if (skipInstructionsAfterFirstCheckbox) {
+    skipInstructionsAfterFirstCheckbox.addEventListener("change", () => {
+      const next = saveStudyPrefs({ skipInstructionsAfterFirst: !!skipInstructionsAfterFirstCheckbox.checked });
+      applyStudyPrefsToUIAndState();
+    });
+  }
+
+  if (answerModeVoiceRadio) {
+    answerModeVoiceRadio.addEventListener("change", () => {
+      if (answerModeVoiceRadio.checked) {
+        saveStudyPrefs({ answerMode: "voice" });
+        applyStudyPrefsToUIAndState();
+      }
+    });
+  }
+
+  if (answerModeDelayRadio) {
+    answerModeDelayRadio.addEventListener("change", () => {
+      if (answerModeDelayRadio.checked) {
+        saveStudyPrefs({ answerMode: "delay" });
+        applyStudyPrefsToUIAndState();
+      }
+    });
+  }
+
+  if (answerDelaySecondsInput) {
+    answerDelaySecondsInput.addEventListener("change", () => {
+      const sec = Math.max(1, Math.min(60, parseInt(answerDelaySecondsInput.value, 10) || 4));
+      answerDelaySecondsInput.value = String(sec);
+      saveStudyPrefs({ answerDelaySec: sec });
+      applyStudyPrefsToUIAndState();
+    });
+  }
+
+  if (autoGoodToggle) {
+    autoGoodToggle.addEventListener("change", () => {
+      saveStudyPrefs({ autoGoodMode: !!autoGoodToggle.checked });
+      applyStudyPrefsToUIAndState();
+    });
+  }
+
+  if (autoRatingSelect) {
+    autoRatingSelect.addEventListener("change", () => {
+      saveStudyPrefs({ autoModeBehavior: autoRatingSelect.value || "good" });
+      applyStudyPrefsToUIAndState();
+    });
+  }
+
+  if (handsFreeNextDelaySecondsInput) {
+    handsFreeNextDelaySecondsInput.addEventListener("change", () => {
+      const sec = Math.max(0, Math.min(30, parseInt(handsFreeNextDelaySecondsInput.value, 10) || 0));
+      handsFreeNextDelaySecondsInput.value = String(sec);
+      saveStudyPrefs({ handsFreeNextDelaySec: sec });
+      applyStudyPrefsToUIAndState();
+    });
+  }
+
+  if (studyAheadGapSecondsInput) {
+    studyAheadGapSecondsInput.addEventListener("change", () => {
+      const sec = Math.max(1, Math.min(60, parseInt(studyAheadGapSecondsInput.value, 10) || 4));
+      studyAheadGapSecondsInput.value = String(sec);
+      saveStudyPrefs({ studyAheadGapSec: sec });
+      applyStudyPrefsToUIAndState();
+    });
+  }
+
+  if (autoEnterStudyAheadCheckbox) {
+    autoEnterStudyAheadCheckbox.addEventListener("change", () => {
+      saveStudyPrefs({ autoEnterStudyAhead: !!autoEnterStudyAheadCheckbox.checked });
+      applyStudyPrefsToUIAndState();
+    });
+  }
+
+  if (loopStudyAheadCheckbox) {
+    loopStudyAheadCheckbox.addEventListener("change", () => {
+      saveStudyPrefs({ loopStudyAhead: !!loopStudyAheadCheckbox.checked });
+      applyStudyPrefsToUIAndState();
+    });
+  }
+}
+
+
 
     // ***** STATE MACHINE FOR CARD FLOW *****
     const StudyState = {
@@ -4830,6 +4995,8 @@ startVoiceBtn.addEventListener("click", async () => {
     console.error("init remote load failed", e);
     hasLoadedRemote = false;
   }
+   applyStudyPrefsToUIAndState();
+  wireStudyPrefsListeners();
 }
 
 init();
