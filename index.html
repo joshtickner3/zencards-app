@@ -727,41 +727,6 @@ a:hover{
     <button class="btn secondary small" id="signedOutLogoutBtn" type="button">Log out</button>
     <button class="btn small" id="signedInManageBillingBtn" type="button">Manage Billing</button>
     <button class="btn danger small" id="deleteAccountBtn" type="button" style="background:#dc2626;color:#fff;">Delete Account</button>
-    <label style="display:flex;align-items:center;gap:0.4em;font-size:0.95em;margin-left:0.5em;cursor:pointer;">
-      <input type="checkbox" id="autoStartStudyToggle" style="accent-color:#22c55e;vertical-align:middle;" />
-      <span>Automatically start studying</span>
-    </label>
-  // --- Auto Start Study Logic ---
-  function setAutoStartStudyToggle() {
-    const toggle = document.getElementById('autoStartStudyToggle');
-    if (!toggle) return;
-    const val = localStorage.getItem('autoStartStudy') === 'true';
-    toggle.checked = val;
-    toggle.addEventListener('change', () => {
-      localStorage.setItem('autoStartStudy', toggle.checked ? 'true' : 'false');
-    });
-  }
-
-  // On page load, if logged in, has access, and autoStartStudy is enabled, redirect
-  document.addEventListener('DOMContentLoaded', () => {
-    setAutoStartStudyToggle();
-    // Wait for Supabase and user check
-    setTimeout(() => {
-      const autoStart = localStorage.getItem('autoStartStudy') === 'true';
-      // Check if user is logged in and has access
-      if (autoStart && window.supabase && window.checkUserAccess) {
-        window.supabase.auth.getUser().then(({ data }) => {
-          if (data && data.user && data.user.id) {
-            window.checkUserAccess(data.user.id).then((access) => {
-              if (access === 'active' || access === 'trialing') {
-                window.location.href = 'app.html';
-              }
-            });
-          }
-        });
-      }
-    }, 400);
-  });
   </div>
 </div>
 
