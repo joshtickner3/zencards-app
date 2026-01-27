@@ -8,6 +8,19 @@
   content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes, maximum-scale=5.0"
 />
   <title>ZenCards — Hands-Free Flashcards (3-Day Free Trial)</title>
+  <script>
+    // Prevent double-tap to zoom on iOS
+    (function() {
+      let lastTouchEnd = 0;
+      document.addEventListener('touchend', function(event) {
+        const now = Date.now();
+        if (now - lastTouchEnd <= 350) {
+          event.preventDefault();
+        }
+        lastTouchEnd = now;
+      }, { passive: false });
+    })();
+  </script>
   <style>
     .brandLogo{
   height: clamp(56px, 7vw, 92px);
