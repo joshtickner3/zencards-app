@@ -707,13 +707,81 @@ a:hover{
     font-size: 0.82rem;
   }
 }
+/* ===== Loading Overlay ===== */
+.loadingOverlay{
+  position: fixed;
+  inset: 0;
+  z-index: 40000; /* higher than all your modals */
+  background: rgba(2,6,23,0.72);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
 
+.loadingOverlay.show{ display:flex; }
 
+.loadingCard{
+  width: min(420px, 92vw);
+  background: rgba(15,23,42,0.92);
+  border: 1px solid rgba(30,41,59,0.8);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  padding: 16px 16px;
+  text-align: center;
+}
+
+.loadingRow{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap: 12px;
+}
+
+.spinner{
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 3px solid rgba(148,163,184,0.35);
+  border-top-color: rgba(34,197,94,0.95);
+  animation: spin 0.75s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loadingTitle{
+  font-weight: 900;
+  color: var(--text);
+  letter-spacing: 0.01em;
+  margin: 0;
+  font-size: 1.02rem;
+}
+
+.loadingSub{
+  margin: 10px 0 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
 
   </style>
 </head>
 
 <body>
+    <!-- ===== Loading Overlay ===== -->
+  <div class="loadingOverlay" id="loadingOverlay" aria-hidden="true">
+    <div class="loadingCard" role="status" aria-live="polite">
+      <div class="loadingRow">
+        <div class="spinner" aria-hidden="true"></div>
+        <p class="loadingTitle" id="loadingTitle">Loading…</p>
+      </div>
+      <p class="loadingSub" id="loadingSub">Just a moment.</p>
+    </div>
+  </div>
+
   <!-- ===== Top-right user counter ===== -->
 <div class="userCounter" aria-label="Monthly users counter">
   <span class="dot" aria-hidden="true"></span>
@@ -1426,6 +1494,21 @@ monthlyUsersEl.textContent = Number(MONTHLY_USERS).toLocaleString() + "+";
     storageKey: "zencards-auth",
   },
 });
+// ===== Loading overlay helpers =====
+const loadingOverlay = document.getElementById("loadingOverlay");
+const loadingTitleEl = document.getElementById("loadingTitle");
+const loadingSubEl = document.getElementById("loadingSub");
+
+function showLoading(title = "Loading…", sub = "Just a moment.") {
+  if (loadingTitleEl) loadingTitleEl.textContent = title;
+  if (loadingSubEl) loadingSubEl.textContent = sub;
+  if (loadingOverlay) loadingOverlay.classList.add("show");
+}
+
+function hideLoading() {
+  if (loadingOverlay) loadingOverlay.classList.remove("show");
+}
+
 // ===== Native app detection + safe navigation =====
 function isNativeApp(){
   return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
@@ -1437,10 +1520,11 @@ if (isNativeApp()) {
 
 
 function goToAppHtml(){
+  showLoading("Opening ZenCards…", "Loading your study session…");
+
   // ✅ Native app must use relative URL so it stays in the WebView
   if (isNativeApp()) {
-   window.location.replace("app.html?forceLogin=1");
-
+    window.location.replace("app.html?forceLogin=1");
   } else {
     // ✅ Website can use full domain
     window.location.replace("https://zencardstudy.com/app.html?forceLogin=1");
@@ -1604,8 +1688,9 @@ signedInManageBillingBtn?.addEventListener("click", async () => {
     const json = await resp.json().catch(() => ({}));
     if (!resp.ok) throw new Error(json.error || json.message || "Portal failed");
     if (!json.url) throw new Error("No portal URL returned");
+showLoading("Opening billing…", "Taking you to Stripe’s customer portal…");
+window.location.href = json.url;
 
-    window.location.href = json.url;
   } catch (e) {
     console.error(e);
     alert("Could not open billing portal. Check console.");
@@ -2005,6 +2090,8 @@ setTimeout(() => console.log("[Billing] still running after 5s"), 5000);
   loginMsg.textContent = "Logged in ✅";
   loginMsg.className = "modalMsg ok";
   closeLoginModal();
+  showLoading("Signing you in…", "Checking your subscription status…");
+
 
   const uid = res?.data?.user?.id;
   const access = await checkUserAccess(uid);
@@ -2081,7 +2168,8 @@ cancel_url:  "https://zencardstudy.com/?canceled=1",
   if (!res.ok) throw new Error(json.error || json.message || "Checkout failed");
   if (!json.url) throw new Error("No checkout URL returned from Edge Function");
 
-  window.location.href = json.url; // ✅ redirect to Stripe
+  showLoading("Redirecting to Stripe…", "Secure checkout is opening…");
+window.location.href = json.url; // ✅ redirect to Stripe
 }
 
 (async () => {
