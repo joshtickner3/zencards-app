@@ -6,6 +6,39 @@
   <meta charset="UTF-8" />
   <title>ZenCards — Hands-Free Audio Flashcards </title>
   <script>
+    // --- Persist and Restore Study Settings ---
+    function saveStudySettings() {
+      const settings = {
+        deck: document.getElementById('deckSelect')?.value || '',
+        ttsRate: document.getElementById('ttsRateInput')?.value || '',
+        ttsVolume: document.getElementById('ttsVolumeInput')?.value || '',
+        // Add more as needed (e.g., mode, delay)
+      };
+      localStorage.setItem('zencards_study_settings', JSON.stringify(settings));
+    }
+
+    function restoreStudySettings() {
+      const settings = JSON.parse(localStorage.getItem('zencards_study_settings') || '{}');
+      if (settings.deck && document.getElementById('deckSelect')) {
+        document.getElementById('deckSelect').value = settings.deck;
+      }
+      if (settings.ttsRate && document.getElementById('ttsRateInput')) {
+        document.getElementById('ttsRateInput').value = settings.ttsRate;
+      }
+      if (settings.ttsVolume && document.getElementById('ttsVolumeInput')) {
+        document.getElementById('ttsVolumeInput').value = settings.ttsVolume;
+      }
+      // Add more as needed
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      restoreStudySettings();
+      // Save on change
+      ['deckSelect','ttsRateInput','ttsVolumeInput'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', saveStudySettings);
+      });
+    });
     // Prevent double-tap to zoom on iOS
     (function() {
       let lastTouchEnd = 0;
