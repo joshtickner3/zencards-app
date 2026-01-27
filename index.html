@@ -1533,11 +1533,13 @@ async function refreshLandingGate() {
     lpStatus.textContent = access?.hasAccess ? "Subscription status: ok" : "No active/trial subscription found.";
   }
 
-  setLpGoButton(!!access?.hasAccess);
-  if (access?.hasAccess) {
+ setLpGoButton(!!access?.hasAccess);
+if (access?.hasAccess) {
   focusGoToZenCardsBtn();
+  autoEnterIfHasAccess(); // <-- add this
 }
 }
+
 function setSignedInBoxVisible(visible){
   if (!signedInBox) return;
   signedInBox.style.display = visible ? "block" : "none";
@@ -1632,14 +1634,11 @@ lpLogoutBtn?.addEventListener("click", async () => {
 });
 
 // Keep UI in sync when auth changes
-supabaseClient.auth.onAuthStateChange(() => {
-  refreshLandingGate();
-  refreshSignedInBox();
-  autoEnterIfHasAccess();
+supabaseClient.auth.onAuthStateChange(async () => {
+  await refreshLandingGate();
+  await refreshSignedInBox();
+  await autoEnterIfHasAccess();
 });
-
-// Initial draw
-refreshLandingGate();
 
 
 async function checkUserAccess(userIdFromLogin) {
@@ -1684,44 +1683,47 @@ return { hasAccess, reason: hasAccess ? "ok" : "no_active_or_trialing_row", rows
 let __autoEnterRan = false;
 
 async function autoEnterIfHasAccess() {
-  // prevent double-runs (auth change events, refreshLandingGate, etc.)
-  if (__autoEnterRan) return;
-  __autoEnterRan = true;
-
-  // Never auto-redirect if we’re already on app.html (paranoia safety)
+  // Never auto-redirect if we’re already on app.html
   if (String(window.location.pathname).includes("app.html")) return;
 
   try {
-    // 1) allow Supabase a moment to restore session from localStorage
-    // (especially inside native WebView)
-    await new Promise(r => setTimeout(r, 50));
+    // Give Supabase time to restore session from storage (this is the key fix)
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const { data: sessionData, error: sessErr } = await supabaseClient.auth.getSession();
+      if (sessErr) console.warn("[AUTOENTER] getSession error:", sessErr);
 
-    const { data: sessionData, error: sessErr } = await supabaseClient.auth.getSession();
-    if (sessErr) console.warn("[AUTOENTER] getSession error:", sessErr);
+      const session = sessionData?.session || null;
 
-    const session = sessionData?.session || null;
-    if (!session?.user) {
-      console.log("[AUTOENTER] no session; staying on index");
+      // If session isn't ready yet, wait and try again
+      if (!session?.user) {
+        await new Promise(r => setTimeout(r, 150));
+        continue;
+      }
+
+      // Session exists → only now do we lock out future runs
+      if (__autoEnterRan) return;
+      __autoEnterRan = true;
+
+      const uid = session.user.id;
+
+      const access = await checkUserAccess(uid);
+      console.log("[AUTOENTER] access result:", access);
+
+      if (access?.hasAccess) {
+        console.log("[AUTOENTER] has access -> redirecting to app.html");
+        goToAppHtml();
+      } else {
+        console.log("[AUTOENTER] logged in but no access; staying on index");
+      }
       return;
     }
 
-    const uid = session.user.id;
-
-    // 2) check access
-    const access = await checkUserAccess(uid);
-    console.log("[AUTOENTER] access result:", access);
-
-    if (access?.hasAccess) {
-      console.log("[AUTOENTER] has access -> redirecting to app.html");
-      goToAppHtml();
-      return;
-    }
-
-    console.log("[AUTOENTER] logged in but no access; staying on index");
+    console.log("[AUTOENTER] session never hydrated; staying on index");
   } catch (e) {
     console.warn("[AUTOENTER] failed:", e);
   }
 }
+
 
 function focusGoToZenCardsBtn(){
   if (!lpGoBtn) return;
