@@ -57,5 +57,7 @@
 	<true/>
 	<key>VoiceCommands</key>
 	<string>VoiceCommands</string>
+	<key>WKWebViewAllowViewportScale</key>
+	<true/>
 </dict>
 </plist>
