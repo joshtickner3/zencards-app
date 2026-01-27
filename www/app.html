@@ -247,7 +247,7 @@ document.addEventListener('visibilitychange', function() {
   background:#0b1220;
   color:var(--text);
   box-sizing:border-box;
-  font-size:16px;
+  font-size:0.9rem;
 }
     input[type="text"]:focus,
 textarea:focus,
@@ -453,6 +453,10 @@ input[type="number"]:focus{
   position: fixed;
   inset: 0;
   z-index: 9999;
+}
+/* Prevent iOS zoom on input focus in modals */
+.modal input, .modal select, .modal textarea {
+  font-size: 16px !important;
 }
 
 .modalBackdrop {

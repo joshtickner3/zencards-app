@@ -454,6 +454,10 @@ input[type="number"]:focus{
   inset: 0;
   z-index: 9999;
 }
+/* Prevent iOS zoom on input focus in modals */
+.modal input, .modal select, .modal textarea {
+  font-size: 16px !important;
+}
 
 .modalBackdrop {
   position: absolute;
