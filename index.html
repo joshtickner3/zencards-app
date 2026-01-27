@@ -1439,10 +1439,11 @@ if (isNativeApp()) {
 function goToAppHtml(){
   // ✅ Native app must use relative URL so it stays in the WebView
   if (isNativeApp()) {
-    window.location.href = "app.html?forceLogin=1";
+   window.location.replace("app.html?forceLogin=1");
+
   } else {
     // ✅ Website can use full domain
-    window.location.href = "https://zencardstudy.com/app.html?forceLogin=1";
+    window.location.replace("https://zencardstudy.com/app.html?forceLogin=1");
   }
 }
 
@@ -1634,6 +1635,7 @@ lpLogoutBtn?.addEventListener("click", async () => {
 supabaseClient.auth.onAuthStateChange(() => {
   refreshLandingGate();
   refreshSignedInBox();
+  autoEnterIfHasAccess();
 });
 
 // Initial draw
@@ -1678,6 +1680,49 @@ const hasAccess =
 
 return { hasAccess, reason: hasAccess ? "ok" : "no_active_or_trialing_row", rows: data || [] };
 }
+
+let __autoEnterRan = false;
+
+async function autoEnterIfHasAccess() {
+  // prevent double-runs (auth change events, refreshLandingGate, etc.)
+  if (__autoEnterRan) return;
+  __autoEnterRan = true;
+
+  // Never auto-redirect if we’re already on app.html (paranoia safety)
+  if (String(window.location.pathname).includes("app.html")) return;
+
+  try {
+    // 1) allow Supabase a moment to restore session from localStorage
+    // (especially inside native WebView)
+    await new Promise(r => setTimeout(r, 50));
+
+    const { data: sessionData, error: sessErr } = await supabaseClient.auth.getSession();
+    if (sessErr) console.warn("[AUTOENTER] getSession error:", sessErr);
+
+    const session = sessionData?.session || null;
+    if (!session?.user) {
+      console.log("[AUTOENTER] no session; staying on index");
+      return;
+    }
+
+    const uid = session.user.id;
+
+    // 2) check access
+    const access = await checkUserAccess(uid);
+    console.log("[AUTOENTER] access result:", access);
+
+    if (access?.hasAccess) {
+      console.log("[AUTOENTER] has access -> redirecting to app.html");
+      goToAppHtml();
+      return;
+    }
+
+    console.log("[AUTOENTER] logged in but no access; staying on index");
+  } catch (e) {
+    console.warn("[AUTOENTER] failed:", e);
+  }
+}
+
 function focusGoToZenCardsBtn(){
   if (!lpGoBtn) return;
 
@@ -2039,6 +2084,8 @@ cancel_url:  "https://zencardstudy.com/?canceled=1",
 
 (async () => {
   await refreshLandingGate();
+  await refreshSignedInBox();
+  await autoEnterIfHasAccess();
 })();
 
 document.getElementById("startTrialTopBtn")
