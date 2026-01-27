@@ -1897,6 +1897,10 @@ if (subtitleEl) {
 toggleAuthModeBtn?.addEventListener("click", () => {
   setAuthMode(authMode === "login" ? "signup" : "login");
 });
+function resetLoginButton() {
+  loginSubmitBtn.disabled = false;
+  loginSubmitBtn.textContent = (authMode === "signup") ? "Create account" : "Log in";
+}
 
 
         // ===== Billing modal logic =====
@@ -2008,13 +2012,16 @@ setTimeout(() => console.log("[Billing] still running after 5s"), 5000);
       }
     });
 
-    function openLoginModal(mode = "login"){
+   function openLoginModal(mode = "login"){
   setAuthMode(mode);
+  resetLoginButton();        // ✅ add
+  hideLoading();             // ✅ add (prevents overlay “sticking”)
   loginMsg.textContent = "";
   loginMsg.className = "modalMsg";
   loginModal.classList.add("show");
   setTimeout(() => loginEmail.focus(), 50);
 }
+
     function closeLoginModal(){
       loginModal.classList.remove("show");
     }
@@ -2106,8 +2113,16 @@ setTimeout(() => console.log("[Billing] still running after 5s"), 5000);
   console.error(e);
   loginMsg.textContent = "Something went wrong. Check console.";
   loginMsg.className = "modalMsg error";
-}
-    });
+
+ } finally {
+    // ✅ THIS IS THE FIX
+    // If the page is still visible, we didn’t navigate away
+    if (document.visibilityState === "visible") {
+      resetLoginButton();
+    }
+  }
+});
+    
 
     forgotPwBtn.addEventListener("click", async () => {
       const email = (loginEmail.value || "").trim();
@@ -2180,6 +2195,18 @@ window.location.href = json.url; // ✅ redirect to Stripe
 
 document.getElementById("startTrialTopBtn")
   ?.addEventListener("click", () => window.startFreeTrial());
+
+  window.addEventListener("pageshow", async (e) => {
+  // BFCache restore: page is resumed with old JS/UI state
+  if (e.persisted) {
+    hideLoading();
+    resetLoginButton();
+    __autoEnterRan = false;          // so auto-enter can work again if needed
+    await refreshLandingGate();
+    await refreshSignedInBox();
+  }
+});
+
 
   </script>
 
