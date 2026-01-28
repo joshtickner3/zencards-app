@@ -1617,6 +1617,21 @@ async function refreshLandingGate() {
     lpStatus.textContent = access?.hasAccess ? "Subscription status: ok" : "No active/trial subscription found.";
   }
 
+   // ✅ past_due -> auto-open portal
+if (access?.isPastDue) {
+  lpStatus.textContent = "Payment failed — redirecting you to update your card…";
+  setLpGoButton(false);
+
+  // prevent double-redirect loops
+  if (!window.__openedPortalOnce) {
+    window.__openedPortalOnce = true;
+
+    // use the same return_url style you already use
+    await openPortalFromLanding("https://zencardstudy.com/");
+  }
+  return; // stop normal flow; we're leaving the page
+}
+
  setLpGoButton(!!access?.hasAccess);
 if (access?.hasAccess) {
   focusGoToZenCardsBtn();
@@ -1700,6 +1715,33 @@ window.location.href = json.url;
   }
 });
 
+async function openPortalFromLanding(returnUrl = window.location.origin + "/") {
+  const { data } = await supabaseClient.auth.getSession();
+  const token = data?.session?.access_token;
+  if (!token) throw new Error("No session token found.");
+
+  const resp = await fetch(
+    "https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/create-portal-link",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+        "apikey": SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ return_url: returnUrl }),
+    }
+  );
+
+  const json = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(json.error || json.message || "Portal failed");
+  if (!json.url) throw new Error("No portal URL returned");
+
+  showLoading("Opening billing…", "Update your payment method in Stripe…");
+  window.location.href = json.url;
+}
+
+
 
 lpGoBtn?.addEventListener("click", async () => {
   // safety re-check on click
@@ -1758,11 +1800,21 @@ if (error) {
   return { hasAccess: false, reason: "subs_read_failed", error: error.message };
 }
 
-const hasAccess =
-  Array.isArray(data) &&
-  data.some(r => ["active", "trialing"].includes(String(r?.status || "").toLowerCase()));
+const statuses =
+  Array.isArray(data)
+    ? data.map(r => String(r?.status || "").toLowerCase())
+    : [];
 
-return { hasAccess, reason: hasAccess ? "ok" : "no_active_or_trialing_row", rows: data || [] };
+const hasAccess = statuses.some(s => ["active", "trialing"].includes(s));
+const isPastDue = statuses.includes("past_due");
+
+return {
+  hasAccess,
+  isPastDue,
+  reason: hasAccess ? "ok" : (isPastDue ? "past_due" : "no_active_or_trialing_row"),
+  rows: data || [],
+  statuses,
+};
 }
 
 let __autoEnterRan = false;
@@ -1842,14 +1894,22 @@ window.startFreeTrial = async function startFreeTrial() {
   const session = raw ? JSON.parse(raw) : null;
 
   if (session?.access_token) {
-    const access = await checkUserAccess();
-    if (access.hasAccess) {
-      window.location.href = "app.html";
-      return;
-    }
-    await startCheckoutFromLanding();
+  const access = await checkUserAccess();
+
+  if (access?.hasAccess) {
+    window.location.href = "app.html";
     return;
   }
+
+  // ✅ NEW: past_due -> portal
+  if (access?.isPastDue) {
+    await openPortalFromLanding("https://zencardstudy.com/");
+    return;
+  }
+
+  await startCheckoutFromLanding();
+  return;
+}
 
   openLoginModal("signup");
 };
@@ -2104,11 +2164,18 @@ setTimeout(() => console.log("[Billing] still running after 5s"), 5000);
   const access = await checkUserAccess(uid);
 
   if (access?.hasAccess === true || access?.hasAccess === "true") {
-    await refreshLandingGate();
-    return;
-  }
+  await refreshLandingGate();
+  return;
+}
 
-  await startCheckoutFromLanding();
+// ✅ NEW: past_due -> portal
+if (access?.isPastDue) {
+  await openPortalFromLanding("https://zencardstudy.com/");
+  return;
+}
+
+await startCheckoutFromLanding();
+
 } catch (e) {
   console.error(e);
   loginMsg.textContent = "Something went wrong. Check console.";
