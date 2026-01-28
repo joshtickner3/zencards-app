@@ -1101,6 +1101,11 @@ const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
     storageKey: "zencards-auth",
   },
 });
+// ✅ Prevent double-init on iOS BFCache / pageshow
+window.__zc_app_inited = window.__zc_app_inited || false;
+window.__zc_auth_sub = window.__zc_auth_sub || null;
+window.__zc_last_healthcheck_ms = window.__zc_last_healthcheck_ms || 0;
+
 
 window.setSyncLock = window.setSyncLock || function () {};
 window.lockUI = window.lockUI || function () {};
@@ -1535,28 +1540,97 @@ function restoreLastDeckSelection() {
     if (deckSelect) deckSelect.value = lastDeckId;
   }
 }
+async function ensureSessionHealthy({ reason = "unknown", redirectOnFail = true } = {}) {
+  // throttle: don't spam refresh calls
+  const now = Date.now();
+  if (now - (window.__zc_last_healthcheck_ms || 0) < 1500) return true;
+  window.__zc_last_healthcheck_ms = now;
+
+  try {
+    // Try to refresh tokens (safe even if already fresh)
+    try { await supabaseClient.auth.refreshSession(); } catch (_) {}
+
+    const { data: sessData } = await supabaseClient.auth.getSession();
+    const session = sessData?.session || null;
+
+    if (!session) {
+      console.warn("[AUTH] ensureSessionHealthy: no session", { reason });
+      if (redirectOnFail) window.location.replace("index.html");
+      return false;
+    }
+
+    const { data: userData, error: userErr } = await supabaseClient.auth.getUser();
+    if (userErr || !userData?.user) {
+      console.warn("[AUTH] ensureSessionHealthy: getUser failed", {
+        reason,
+        userErr: userErr ? { message: userErr.message, name: userErr.name, status: userErr.status } : null
+      });
+
+      // If the session is present but user lookup fails, it's usually a broken token state.
+      // Clear auth storage and force relogin.
+      try { localStorage.removeItem("zencards-auth"); } catch (_) {}
+      try { await supabaseClient.auth.signOut(); } catch (_) {}
+
+      if (redirectOnFail) window.location.replace("index.html");
+      return false;
+    }
+
+    // Good state: keep globals aligned
+    currentUser = userData.user;
+    return true;
+  } catch (e) {
+    console.warn("[AUTH] ensureSessionHealthy crashed", { reason, e });
+    if (redirectOnFail) window.location.replace("index.html");
+    return false;
+  }
+}
 
 async function initAppSession() {
+    // ✅ install auth listener once
+  if (!window.__zc_auth_sub) {
+    const { data } = supabaseClient.auth.onAuthStateChange((event, session) => {
+      console.log("[AUTH] event:", event, { hasSession: !!session });
+
+      if (event === "SIGNED_OUT") {
+         if (isSigningOut) return; 
+        currentUser = null;
+        hasLoadedRemote = false;
+        window.location.replace("index.html");
+        return;
+      }
+
+      if (session?.user) {
+        currentUser = session.user;
+        if (userEmailLabel) userEmailLabel.textContent = currentUser.email || "";
+        if (authLoggedIn) authLoggedIn.classList.remove("hidden");
+      }
+    });
+
+    window.__zc_auth_sub = data?.subscription || null;
+  }
+
   console.log("[BOOT] initAppSession()");
  
   // 1) Check session first (fast)
-  const { data: sessionData, error: sessErr } = await supabaseClient.auth.getSession();
-  const session = sessionData?.session || null;
+  // ✅ Heal / verify session before deciding
+const ok = await ensureSessionHealthy({ reason: "boot", redirectOnFail: false });
+if (!ok) {
+  console.warn("[BOOT] Session not healthy. Redirecting to index.html");
+  window.location.replace("index.html");
+  return;
+}
 
-  console.log("[BOOT] getSession()", {
-    hasSession: !!session,
-    sessErr: sessErr ? { message: sessErr.message, name: sessErr.name } : null
-  });
+// Session is healthy here
+const { data: sessionData } = await supabaseClient.auth.getSession();
+const session = sessionData?.session || null;
 
-  // 2) If no session → go back to landing/login page
-  if (!session) {
-    console.warn("[BOOT] No session. Redirecting to index.html");
-    window.location.replace("index.html");
-    return;
-  }
+if (!session?.user) {
+  console.warn("[BOOT] No session user after healthy check. Redirecting to index.html");
+  window.location.replace("index.html");
+  return;
+}
 
-  // 3) Set currentUser + show UI
-  currentUser = session.user;
+currentUser = session.user;
 
   if (userEmailLabel) userEmailLabel.textContent = currentUser.email || "";
   if (authLoggedIn) authLoggedIn.classList.remove("hidden");

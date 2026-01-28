@@ -1761,10 +1761,21 @@ lpLogoutBtn?.addEventListener("click", async () => {
 });
 
 // Keep UI in sync when auth changes
-supabaseClient.auth.onAuthStateChange(async () => {
-  await refreshLandingGate();
-  await refreshSignedInBox();
-  await autoEnterIfHasAccess();
+// Keep UI in sync when auth changes (INIT ONCE)
+if (!window.__zen_auth_sub) {
+  const { data } = supabaseClient.auth.onAuthStateChange(async () => {
+    await refreshLandingGate();
+    await refreshSignedInBox();
+    await autoEnterIfHasAccess();
+  });
+
+  window.__zen_auth_sub = data; // store subscription
+}
+
+// Unsubscribe when page is being put into bfcache / hidden
+window.addEventListener("pagehide", () => {
+  try { window.__zen_auth_sub?.subscription?.unsubscribe?.(); } catch (_) {}
+  window.__zen_auth_sub = null;
 });
 
 
@@ -2254,6 +2265,9 @@ cancel_url:  "https://zencardstudy.com/?canceled=1",
 window.location.href = json.url; // ✅ redirect to Stripe
 }
 
+hideLoading();
+resetLoginButton();
+
 (async () => {
   await refreshLandingGate();
   await refreshSignedInBox();
@@ -2263,15 +2277,45 @@ window.location.href = json.url; // ✅ redirect to Stripe
 document.getElementById("startTrialTopBtn")
   ?.addEventListener("click", () => window.startFreeTrial());
 
-  window.addEventListener("pageshow", async (e) => {
-  // BFCache restore: page is resumed with old JS/UI state
+window.addEventListener("pageshow", (e) => {
+  // If this page was restored from back-forward cache, force a clean boot
   if (e.persisted) {
-    hideLoading();
-    resetLoginButton();
-    __autoEnterRan = false;          // so auto-enter can work again if needed
-    await refreshLandingGate();
-    await refreshSignedInBox();
+    window.location.reload();
   }
+});
+async function recoverAuthIfStuck() {
+  try {
+    // Try to refresh; if refresh token is bad, wipe local auth so next login is clean
+    const { data, error } = await supabaseClient.auth.refreshSession();
+
+    if (!error && data?.session) return true;
+
+    console.warn("[AuthRecover] refresh failed; clearing local auth", error);
+    try { await supabaseClient.auth.signOut({ scope: "local" }); } catch (_) {}
+    try { localStorage.removeItem("zencards-auth"); } catch (_) {}
+    return false;
+
+  } catch (e) {
+    console.warn("[AuthRecover] exception; clearing local auth", e);
+    try { await supabaseClient.auth.signOut({ scope: "local" }); } catch (_) {}
+    try { localStorage.removeItem("zencards-auth"); } catch (_) {}
+    return false;
+  }
+}
+
+// On resume/foreground in the native app, heal auth + reset UI
+document.addEventListener("visibilitychange", async () => {
+  if (document.visibilityState !== "visible") return;
+  if (!isNativeApp()) return;
+
+  hideLoading();
+  resetLoginButton();
+  __autoEnterRan = false;
+
+  await recoverAuthIfStuck();
+  await refreshLandingGate();
+  await refreshSignedInBox();
+  await autoEnterIfHasAccess();
 });
 
 
