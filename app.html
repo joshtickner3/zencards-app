@@ -1101,6 +1101,22 @@ const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
     storageKey: "zencards-auth",
   },
 });
+// ===================== BFCache SAFETY (Safari/iOS, back button) =====================
+// If Safari restores this page from BFCache, JS state can be stale.
+// Force a hard reload so auth + UI + listeners re-bootstrap cleanly.
+window.addEventListener("pageshow", (event) => {
+  const nav = performance.getEntriesByType?.("navigation")?.[0];
+  const isBFCache =
+    event.persisted === true ||
+    (nav && nav.type === "back_forward") ||
+    (performance && performance.navigation && performance.navigation.type === 2);
+
+  if (isBFCache) {
+    console.warn("[BFCache] pageshow restore detected -> hard reload");
+    window.location.reload();
+  }
+});
+
 // ✅ Prevent double-init on iOS BFCache / pageshow
 window.__zc_app_inited = window.__zc_app_inited || false;
 window.__zc_auth_sub = window.__zc_auth_sub || null;

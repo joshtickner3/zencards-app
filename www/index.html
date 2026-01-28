@@ -1772,13 +1772,6 @@ if (!window.__zen_auth_sub) {
   window.__zen_auth_sub = data; // store subscription
 }
 
-// Unsubscribe when page is being put into bfcache / hidden
-window.addEventListener("pagehide", () => {
-  try { window.__zen_auth_sub?.subscription?.unsubscribe?.(); } catch (_) {}
-  window.__zen_auth_sub = null;
-});
-
-
 async function checkUserAccess(userIdFromLogin) {
   // Prefer uid from login response
   let uid = userIdFromLogin;
@@ -2277,12 +2270,17 @@ resetLoginButton();
 document.getElementById("startTrialTopBtn")
   ?.addEventListener("click", () => window.startFreeTrial());
 
+// ✅ Robust fix for Back button / BFCache restoring stale auth state
 window.addEventListener("pageshow", (e) => {
-  // If this page was restored from back-forward cache, force a clean boot
-  if (e.persisted) {
+  const nav = performance.getEntriesByType?.("navigation")?.[0];
+  const isBackForward = nav?.type === "back_forward";
+
+  if (e.persisted || isBackForward) {
+    console.warn("[BFCache] restored via back/forward → forcing clean reload");
     window.location.reload();
   }
 });
+
 async function recoverAuthIfStuck() {
   try {
     // Try to refresh; if refresh token is bad, wipe local auth so next login is clean
