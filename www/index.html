@@ -1483,18 +1483,66 @@ monthlyUsersEl.textContent = Number(MONTHLY_USERS).toLocaleString() + "+";
     document.getElementById("year").textContent = String(new Date().getFullYear());
 
     // ===== Supabase client (same anon key as app.html) =====
+    // Clear all Supabase auth tokens before initializing the client
+    try {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && (k.endsWith("-auth-token") || k === "zencards-auth")) {
+          localStorage.removeItem(k);
+        }
+      }
+    } catch (e) { console.warn("[Startup] localStorage cleanup failed", e); }
+
     const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
     const { createClient } = window.supabase;
-    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    // ✅ Safe storage wrapper so a corrupted auth blob can’t brick logins
+function makeSafeStorage(ls, key) {
+  return {
+    getItem(k) {
+      const v = ls.getItem(k);
+      if (!v) return null;
+
+      // Only validate the key we care about
+      if (k !== key) return v;
+
+      // Supabase expects JSON. If it’s corrupted, nuke it.
+      try {
+        JSON.parse(v);
+        return v;
+      } catch (e) {
+        console.warn("[AuthStorage] Corrupt auth JSON in storageKey; clearing:", e);
+        try { ls.removeItem(k); } catch (_) {}
+        return null;
+      }
+    },
+    setItem(k, v) {
+      // Prevent accidental non-string writes
+      try {
+        ls.setItem(k, String(v));
+      } catch (e) {
+        console.warn("[AuthStorage] setItem failed:", e);
+      }
+    },
+    removeItem(k) {
+      try { ls.removeItem(k); } catch (_) {}
+    },
+  };
+}
+
+const AUTH_KEY = "zencards-auth";
+const safeStorage = makeSafeStorage(window.localStorage, AUTH_KEY);
+
+   const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    storage: window.localStorage,
-    storageKey: "zencards-auth",
+    storage: safeStorage,      // ✅ IMPORTANT
+    storageKey: AUTH_KEY,      // ✅
   },
 });
+
 // ===== Loading overlay helpers =====
 const loadingOverlay = document.getElementById("loadingOverlay");
 const loadingTitleEl = document.getElementById("loadingTitle");
@@ -1887,37 +1935,29 @@ function focusGoToZenCardsBtn(){
     
     // Expose it on window so it's not "undefined" in console
 window.startFreeTrial = async function startFreeTrial() {
-  // Prefer the shared storageKey
-  let raw = localStorage.getItem("zencards-auth");
-
-  // Fallback to old default key if needed
-  if (!raw) {
-    const authKey = Object.keys(localStorage).find(k => k.endsWith("-auth-token"));
-    raw = authKey ? localStorage.getItem(authKey) : null;
-  }
-
-  const session = raw ? JSON.parse(raw) : null;
+  const { data: sessionData } = await supabaseClient.auth.getSession();
+  const session = sessionData?.session;
 
   if (session?.access_token) {
-  const access = await checkUserAccess();
+    const access = await checkUserAccess(session.user.id);
 
-  if (access?.hasAccess) {
-    window.location.href = "app.html";
+    if (access?.hasAccess) {
+      goToAppHtml();
+      return;
+    }
+
+    if (access?.isPastDue) {
+      await openPortalFromLanding("https://zencardstudy.com/");
+      return;
+    }
+
+    await startCheckoutFromLanding();
     return;
   }
-
-  // ✅ NEW: past_due -> portal
-  if (access?.isPastDue) {
-    await openPortalFromLanding("https://zencardstudy.com/");
-    return;
-  }
-
-  await startCheckoutFromLanding();
-  return;
-}
 
   openLoginModal("signup");
 };
+
 
     // ===== Login modal logic =====
     const loginModal = document.getElementById("loginModal");
@@ -2091,7 +2131,7 @@ setTimeout(() => console.log("[Billing] still running after 5s"), 5000);
       loginModal.classList.remove("show");
     }
 
-    loginBtn?.addEventListener("click", openLoginModal);
+loginBtn?.addEventListener("click", () => openLoginModal("login"));
     loginCloseBtn.addEventListener("click", closeLoginModal);
     loginCancelBtn.addEventListener("click", closeLoginModal);
 
@@ -2111,101 +2151,111 @@ setTimeout(() => console.log("[Billing] still running after 5s"), 5000);
 let loginInFlight = false;
 let loginAbortController = null;
     loginSubmitBtn.addEventListener("click", async () => {
-  if (loginInFlight) return;
-  loginInFlight = true;
+      if (loginInFlight) return;
+      loginInFlight = true;
 
-  // kill any previous in-flight login
-  try { loginAbortController?.abort(); } catch (_) {}
-  loginAbortController = new AbortController();
+      // kill any previous in-flight login
+      try { loginAbortController?.abort(); } catch (_) {}
+      loginAbortController = new AbortController();
 
-  const email = (loginEmail.value || "").trim();
-  const password = loginPassword.value || "";
+      const email = (loginEmail.value || "").trim();
+      const password = loginPassword.value || "";
 
-  if (!email || !password) {
-    loginMsg.textContent = "Please enter your email and password.";
-    loginMsg.className = "modalMsg error";
-    loginInFlight = false;
-    return;
-  }
-
-  loginSubmitBtn.disabled = true;
-  loginSubmitBtn.textContent = (authMode === "signup") ? "Creating…" : "Logging in…";
-  loginMsg.textContent = "";
-  loginMsg.className = "modalMsg";
-
-  try {
-    if (authMode === "signup") {
-      const res = await supabaseClient.auth.signUp({
-        email,
-        password,
-        options: { emailRedirectTo: "https://zencardstudy.com/confirm.html" }
-      });
-
-      console.log("[SIGNUP RESULT]", res);
-
-      if (res.error) {
-        loginMsg.textContent = res.error.message;
+      if (!email || !password) {
+        loginMsg.textContent = "Please enter your email and password.";
         loginMsg.className = "modalMsg error";
+        loginInFlight = false;
         return;
       }
 
-      loginMsg.textContent =
-        "Account created ✅ Check your email to confirm, then you'll be sent to Stripe. Once you start your trial, come back to this page to log in.";
-      loginMsg.className = "modalMsg ok";
-      return;
-    }
+      loginSubmitBtn.disabled = true;
+      loginSubmitBtn.textContent = (authMode === "signup") ? "Creating…" : "Logging in…";
+      loginMsg.textContent = "";
+      loginMsg.className = "modalMsg";
 
-    // LOGIN
-    // NOTE: supabase-js doesn't accept AbortController directly here, but the lock prevents double submits
-    const res = await supabaseClient.auth.signInWithPassword({ email, password });
-    console.log("[LOGIN RESULT]", res);
+      try {
+        if (authMode === "signup") {
+          const res = await supabaseClient.auth.signUp({
+            email,
+            password,
+            options: { emailRedirectTo: "https://zencardstudy.com/confirm.html" }
+          });
 
-    if (res.error) {
-      loginMsg.textContent = res.error.message;
-      loginMsg.className = "modalMsg error";
-      return;
-    }
+          console.log("[SIGNUP RESULT]", res);
 
-    // ✅ Ensure session is actually hydrated before you do anything else
-    const { data: sess } = await supabaseClient.auth.getSession();
-    if (!sess?.session?.user) {
-      throw new Error("Session not ready after login. Try again.");
-    }
+          if (res.error) {
+            loginMsg.textContent = res.error.message;
+            loginMsg.className = "modalMsg error";
+            return;
+          }
 
-    closeLoginModal();
-    showLoading("Signing you in…", "Checking your subscription status…");
+          loginMsg.textContent =
+            "Account created ✅ Check your email to confirm, then you'll be sent to Stripe. Once you start your trial, come back to this page to log in.";
+          loginMsg.className = "modalMsg ok";
+          return;
+        }
 
-    const uid = sess.session.user.id;
-    const access = await checkUserAccess(uid);
+        // LOGIN
+        // NOTE: supabase-js doesn't accept AbortController directly here, but the lock prevents double submits
+        const res = await supabaseClient.auth.signInWithPassword({ email, password });
+        console.log("[LOGIN RESULT]", res);
 
-    if (access?.hasAccess) {
-      // IMPORTANT: do not startCheckout / portal in parallel with auth events
-      await refreshLandingGate();
-      hideLoading();
-      return;
-    }
+        if (res.error) {
+          // If login fails, clear session/localStorage and show error
+          try { await supabaseClient.auth.signOut(); } catch (e) { console.warn("[LOGIN] signOut failed", e); }
+          try {
+            for (let i = localStorage.length - 1; i >= 0; i--) {
+              const k = localStorage.key(i);
+              if (k && (k.endsWith("-auth-token") || k === "zencards-auth")) {
+                localStorage.removeItem(k);
+              }
+            }
+          } catch (e) { console.warn("[LOGIN] localStorage cleanup failed", e); }
+          loginMsg.textContent = res.error.message;
+          loginMsg.className = "modalMsg error";
+          return;
+        }
 
-    if (access?.isPastDue) {
-      await openPortalFromLanding("https://zencardstudy.com/");
-      return;
-    }
+        // ✅ Ensure session is actually hydrated before you do anything else
+        const { data: sess } = await supabaseClient.auth.getSession();
+        if (!sess?.session?.user) {
+          throw new Error("Session not ready after login. Try again.");
+        }
 
-    await startCheckoutFromLanding();
+        closeLoginModal();
+        showLoading("Signing you in…", "Checking your subscription status…");
 
-  } catch (e) {
-    console.error("[LOGIN] exception:", e);
-    hideLoading();
-    loginMsg.textContent = "Something went wrong. Check console.";
-    loginMsg.className = "modalMsg error";
-  } finally {
-    loginInFlight = false;
+        const uid = sess.session.user.id;
+        const access = await checkUserAccess(uid);
 
-    // If we didn’t navigate away, re-enable the button
-    if (document.visibilityState === "visible") {
-      resetLoginButton();
-    }
-  }
-});
+        if (access?.hasAccess) {
+          // IMPORTANT: do not startCheckout / portal in parallel with auth events
+          await refreshLandingGate();
+          hideLoading();
+          return;
+        }
+
+        if (access?.isPastDue) {
+          await openPortalFromLanding("https://zencardstudy.com/");
+          return;
+        }
+
+        await startCheckoutFromLanding();
+
+      } catch (e) {
+        console.error("[LOGIN] exception:", e);
+        hideLoading();
+        loginMsg.textContent = (e && e.message) ? e.message : "Something went wrong. Check console.";
+        loginMsg.className = "modalMsg error";
+      } finally {
+        loginInFlight = false;
+
+        // If we didn’t navigate away, re-enable the button
+        if (document.visibilityState === "visible") {
+          resetLoginButton();
+        }
+      }
+    });
 
     forgotPwBtn.addEventListener("click", async () => {
       const email = (loginEmail.value || "").trim();
@@ -2274,8 +2324,10 @@ hideLoading();
 resetLoginButton();
 
 (async () => {
+  await recoverAuthIfStuck();     // ✅ run on web too
   await refreshLandingGate();
   await refreshSignedInBox();
+  await autoEnterIfHasAccess();   // ✅ optional but recommended
 })();
 
 document.getElementById("startTrialTopBtn")
@@ -2293,21 +2345,57 @@ window.addEventListener("pageshow", (e) => {
 });
 
 async function recoverAuthIfStuck() {
+  // Only attempt recovery if we actually have something stored.
+  // Otherwise "Auth session missing" is normal and should NOT trigger clearing.
+  const hasStoredAuth =
+    !!localStorage.getItem("zencards-auth") ||
+    Object.keys(localStorage).some(k => k.endsWith("-auth-token"));
+
+  if (!hasStoredAuth) {
+    // Normal first-load / logged-out state
+    return false;
+  }
+
   try {
-    // Try to refresh; if refresh token is bad, wipe local auth so next login is clean
     const { data, error } = await supabaseClient.auth.refreshSession();
 
     if (!error && data?.session) return true;
 
+    // Only clear for “real” token problems, not benign states
+    const msg = String(error?.message || "").toLowerCase();
+    const shouldClear =
+      msg.includes("invalid refresh token") ||
+      msg.includes("refresh token not found") ||
+      msg.includes("jwt") ||
+      msg.includes("token");
+
+    if (!shouldClear) {
+      // Don’t nuke storage for harmless “missing session” style states
+      console.warn("[AuthRecover] refresh failed but not a token corruption case:", error);
+      return false;
+    }
+
+    // Otherwise clear
     console.warn("[AuthRecover] refresh failed; clearing local auth", error);
     try { await supabaseClient.auth.signOut({ scope: "local" }); } catch (_) {}
     try { localStorage.removeItem("zencards-auth"); } catch (_) {}
+
+    // also clear any default supabase key if it exists
+    try {
+      const k = Object.keys(localStorage).find(x => x.endsWith("-auth-token"));
+      if (k) localStorage.removeItem(k);
+    } catch (_) {}
+
     return false;
 
   } catch (e) {
     console.warn("[AuthRecover] exception; clearing local auth", e);
     try { await supabaseClient.auth.signOut({ scope: "local" }); } catch (_) {}
     try { localStorage.removeItem("zencards-auth"); } catch (_) {}
+    try {
+      const k = Object.keys(localStorage).find(x => x.endsWith("-auth-token"));
+      if (k) localStorage.removeItem(k);
+    } catch (_) {}
     return false;
   }
 }
