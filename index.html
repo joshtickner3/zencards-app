@@ -1825,15 +1825,12 @@ return {
 let __autoEnterRan = false;
 
 async function autoEnterIfHasAccess() {
-  // Never auto-redirect if we're already on app.html
+  // Never auto-redirect if we’re already on app.html
   if (String(window.location.pathname).includes("app.html")) return;
 
-  // Prevent double-runs
-  if (__autoEnterRan) return;
-
   try {
-    // Give Supabase MORE time to restore session from storage
-    for (let attempt = 0; attempt < 15; attempt++) {
+    // Give Supabase time to restore session from storage (this is the key fix)
+    for (let attempt = 0; attempt < 10; attempt++) {
       const { data: sessionData, error: sessErr } = await supabaseClient.auth.getSession();
       if (sessErr) console.warn("[AUTOENTER] getSession error:", sessErr);
 
@@ -1841,11 +1838,12 @@ async function autoEnterIfHasAccess() {
 
       // If session isn't ready yet, wait and try again
       if (!session?.user) {
-        await new Promise(r => setTimeout(r, 200)); // Increased wait time
+        await new Promise(r => setTimeout(r, 150));
         continue;
       }
 
-      // Session exists → lock out future runs
+      // Session exists → only now do we lock out future runs
+      if (__autoEnterRan) return;
       __autoEnterRan = true;
 
       const uid = session.user.id;
@@ -1862,11 +1860,12 @@ async function autoEnterIfHasAccess() {
       return;
     }
 
-    console.log("[AUTOENTER] session never hydrated after 15 attempts; staying on index");
+    console.log("[AUTOENTER] session never hydrated; staying on index");
   } catch (e) {
     console.warn("[AUTOENTER] failed:", e);
   }
 }
+
 
 function focusGoToZenCardsBtn(){
   if (!lpGoBtn) return;
@@ -1910,6 +1909,7 @@ window.startFreeTrial = async function startFreeTrial() {
 
   openLoginModal("signup");
 };
+
 
     // ===== Login modal logic =====
     const loginModal = document.getElementById("loginModal");
@@ -2167,9 +2167,6 @@ let loginAbortController = null;
     closeLoginModal();
     showLoading("Signing you in…", "Checking your subscription status…");
 
-    // Give Supabase a moment to fully sync the session
-    await new Promise(r => setTimeout(r, 300));
-
     const uid = sess.session.user.id;
     const access = await checkUserAccess(uid);
 
@@ -2279,72 +2276,72 @@ document.getElementById("startTrialTopBtn")
   ?.addEventListener("click", () => window.startFreeTrial());
 
 // ✅ Robust fix for Back button / BFCache restoring stale auth state
-// ✅ Handle BFCache restoration without forcing full reload
-window.addEventListener("pageshow", async (e) => {
+window.addEventListener("pageshow", (e) => {
   const nav = performance.getEntriesByType?.("navigation")?.[0];
   const isBackForward = nav?.type === "back_forward";
 
   if (e.persisted || isBackForward) {
-    console.log("[BFCache] Page restored from cache, refreshing auth...");
-    
-    // Instead of reloading, just refresh the session and UI
-    await recoverAuthIfStuck();
-    await refreshLandingGate();
-    await refreshSignedInBox();
+    console.warn("[BFCache] restored via back/forward → forcing clean reload");
+    window.location.reload();
   }
 });
 
 async function recoverAuthIfStuck() {
+  // Only attempt recovery if we actually have something stored.
+  // Otherwise "Auth session missing" is normal and should NOT trigger clearing.
+  const hasStoredAuth =
+    !!localStorage.getItem("zencards-auth") ||
+    Object.keys(localStorage).some(k => k.endsWith("-auth-token"));
+
+  if (!hasStoredAuth) {
+    // Normal first-load / logged-out state
+    return false;
+  }
+
   try {
-    // Try to refresh the session
     const { data, error } = await supabaseClient.auth.refreshSession();
 
-    // If refresh succeeded, we're good
-    if (!error && data?.session) {
-      console.log("[AuthRecover] Session refreshed successfully");
-      return true;
-    }
+    if (!error && data?.session) return true;
 
-    // If refresh failed, check if we actually HAD stored auth
-    const hasStoredAuth =
-      !!localStorage.getItem("zencards-auth") ||
-      Object.keys(localStorage).some(k => k.endsWith("-auth-token"));
-
-    // Only clear if we had stored auth that failed to refresh
-    if (hasStoredAuth) {
-      console.warn("[AuthRecover] Had stored auth but refresh failed; clearing", error);
-      try { await supabaseClient.auth.signOut({ scope: "local" }); } catch (_) {}
-      try { localStorage.removeItem("zencards-auth"); } catch (_) {}
-      try {
-        const k = Object.keys(localStorage).find(x => x.endsWith("-auth-token"));
-        if (k) localStorage.removeItem(k);
-      } catch (_) {}
-    } else {
-      console.log("[AuthRecover] No stored auth found; normal logged-out state");
-    }
-
+    // If refresh failed AND we had stored auth, then it’s genuinely stale/bad.
+    console.warn("[AuthRecover] refresh failed; clearing local auth", error);
+    try { await supabaseClient.auth.signOut({ scope: "local" }); } catch (_) {}
+    try { localStorage.removeItem("zencards-auth"); } catch (_) {}
+    // (optional) also clear default key if present
+    try {
+      const k = Object.keys(localStorage).find(x => x.endsWith("-auth-token"));
+      if (k) localStorage.removeItem(k);
+    } catch (_) {}
     return false;
 
   } catch (e) {
-    console.warn("[AuthRecover] Exception during refresh", e);
+    console.warn("[AuthRecover] exception; clearing local auth", e);
+    try { await supabaseClient.auth.signOut({ scope: "local" }); } catch (_) {}
+    try { localStorage.removeItem("zencards-auth"); } catch (_) {}
+    try {
+      const k = Object.keys(localStorage).find(x => x.endsWith("-auth-token"));
+      if (k) localStorage.removeItem(k);
+    } catch (_) {}
     return false;
   }
 }
 
+
 // On resume/foreground in the native app, heal auth + reset UI
-// On resume/foreground, heal auth + reset UI (works for both web and native)
 document.addEventListener("visibilitychange", async () => {
   if (document.visibilityState !== "visible") return;
+  if (!isNativeApp()) return;
 
   hideLoading();
   resetLoginButton();
-  __autoEnterRan = false; // Reset so auto-enter can run again
+  __autoEnterRan = false;
 
   await recoverAuthIfStuck();
   await refreshLandingGate();
   await refreshSignedInBox();
   await autoEnterIfHasAccess();
 });
+
 
   </script>
 
