@@ -1161,7 +1161,7 @@ async function signOutFromApp() {
     pendingSaveBeforeRemote = false;
 
     console.log("[LOGOUT] done, redirecting to index.html");
-    window.location.replace("index.html");
+    window.location.replace("index.html"); // Only redirect on explicit logout
   } catch (e) {
     console.error("[LOGOUT] failed:", e);
     alert("Logout failed. Check console.");
@@ -1579,7 +1579,8 @@ async function ensureSessionHealthy({ reason = "unknown", redirectOnFail = true 
 
     if (!session) {
       console.warn("[AUTH] ensureSessionHealthy: no session", { reason });
-      if (redirectOnFail) window.location.replace("index.html");
+      // Do not redirect to index.html on app version; show message instead
+      showSessionError("No session found. Please log in again.");
       return false;
     }
 
@@ -1602,7 +1603,8 @@ async function ensureSessionHealthy({ reason = "unknown", redirectOnFail = true 
       } catch (_) {}
       try { await supabaseClient.auth.signOut(); } catch (_) {}
 
-      if (redirectOnFail) window.location.replace("index.html");
+      // Do not redirect to index.html on app version; show message instead
+      showSessionError("Session invalid or expired. Please log in again.");
       return false;
     }
 
@@ -1611,7 +1613,8 @@ async function ensureSessionHealthy({ reason = "unknown", redirectOnFail = true 
     return true;
   } catch (e) {
     console.warn("[AUTH] ensureSessionHealthy crashed", { reason, e });
-    if (redirectOnFail) window.location.replace("index.html");
+    // Do not redirect to index.html on app version; show message instead
+    showSessionError("Session error. Please log in again.");
     return false;
   }
 }
@@ -1646,8 +1649,8 @@ async function initAppSession() {
   // ✅ Heal / verify session before deciding
 const ok = await ensureSessionHealthy({ reason: "boot", redirectOnFail: false });
 if (!ok) {
-  console.warn("[BOOT] Session not healthy. Redirecting to index.html");
-  window.location.replace("index.html");
+  console.warn("[BOOT] Session not healthy. Not redirecting to index.html (app mode)");
+  // showSessionError will handle UI
   return;
 }
 
@@ -1656,8 +1659,8 @@ const { data: sessionData } = await supabaseClient.auth.getSession();
 const session = sessionData?.session || null;
 
 if (!session?.user) {
-  console.warn("[BOOT] No session user after healthy check. Redirecting to index.html");
-  window.location.replace("index.html");
+  console.warn("[BOOT] No session user after healthy check. Not redirecting to index.html (app mode)");
+  showSessionError("No user found in session. Please log in again.");
   return;
 }
 
@@ -5051,8 +5054,8 @@ startVoiceBtn.addEventListener("click", async () => {
     });
 
     if (!session) {
-      console.warn("[BOOT] No session. Redirecting to index.html");
-      window.location.replace("index.html");
+      console.warn("[BOOT] No session. Not redirecting to index.html (app mode)");
+      showSessionError("No session found. Please log in again.");
       return;
     }
 
@@ -5063,7 +5066,7 @@ startVoiceBtn.addEventListener("click", async () => {
 
   } catch (e) {
     console.error("[BOOT] Session check failed:", e);
-    window.location.replace("index.html");
+    showSessionError("Session check failed. Please log in again.");
     return;
   }
 
@@ -5080,6 +5083,31 @@ startVoiceBtn.addEventListener("click", async () => {
   } catch (e) {
     console.error("rebuildDeckUI (local) failed:", e);
   }
+
+// ===== Show session error UI =====
+function showSessionError(msg) {
+  let el = document.getElementById("sessionErrorMsg");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "sessionErrorMsg";
+    el.style.position = "fixed";
+    el.style.top = "0";
+    el.style.left = "0";
+    el.style.width = "100vw";
+    el.style.background = "#1e293b";
+    el.style.color = "#fff";
+    el.style.zIndex = "99999";
+    el.style.padding = "1.5rem 1rem";
+    el.style.textAlign = "center";
+    el.style.fontSize = "1.1rem";
+    el.style.fontWeight = "bold";
+    el.innerText = msg || "Session error. Please log in again.";
+    document.body.appendChild(el);
+  } else {
+    el.innerText = msg || "Session error. Please log in again.";
+    el.style.display = "block";
+  }
+}
 
   // 5) Load remote state (if logged in)
   try {
