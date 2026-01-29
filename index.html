@@ -2141,101 +2141,113 @@ loginBtn?.addEventListener("click", () => openLoginModal("login"));
 let loginInFlight = false;
 let loginAbortController = null;
     loginSubmitBtn.addEventListener("click", async () => {
-  if (loginInFlight) return;
-  loginInFlight = true;
+      if (loginInFlight) return;
+      loginInFlight = true;
 
-  // kill any previous in-flight login
-  try { loginAbortController?.abort(); } catch (_) {}
-  loginAbortController = new AbortController();
+      // kill any previous in-flight login
+      try { loginAbortController?.abort(); } catch (_) {}
+      loginAbortController = new AbortController();
 
-  const email = (loginEmail.value || "").trim();
-  const password = loginPassword.value || "";
+      const email = (loginEmail.value || "").trim();
+      const password = loginPassword.value || "";
 
-  if (!email || !password) {
-    loginMsg.textContent = "Please enter your email and password.";
-    loginMsg.className = "modalMsg error";
-    loginInFlight = false;
-    return;
-  }
-
-  loginSubmitBtn.disabled = true;
-  loginSubmitBtn.textContent = (authMode === "signup") ? "Creating…" : "Logging in…";
-  loginMsg.textContent = "";
-  loginMsg.className = "modalMsg";
-
-  try {
-    if (authMode === "signup") {
-      const res = await supabaseClient.auth.signUp({
-        email,
-        password,
-        options: { emailRedirectTo: "https://zencardstudy.com/confirm.html" }
-      });
-
-      console.log("[SIGNUP RESULT]", res);
-
-      if (res.error) {
-        loginMsg.textContent = res.error.message;
+      if (!email || !password) {
+        loginMsg.textContent = "Please enter your email and password.";
         loginMsg.className = "modalMsg error";
+        loginInFlight = false;
         return;
       }
 
-      loginMsg.textContent =
-        "Account created ✅ Check your email to confirm, then you'll be sent to Stripe. Once you start your trial, come back to this page to log in.";
-      loginMsg.className = "modalMsg ok";
-      return;
-    }
+      loginSubmitBtn.disabled = true;
+      loginSubmitBtn.textContent = (authMode === "signup") ? "Creating…" : "Logging in…";
+      loginMsg.textContent = "";
+      loginMsg.className = "modalMsg";
 
-    // LOGIN
-    // NOTE: supabase-js doesn't accept AbortController directly here, but the lock prevents double submits
-    const res = await supabaseClient.auth.signInWithPassword({ email, password });
-    console.log("[LOGIN RESULT]", res);
+      try {
+        // Always clear Supabase session and all auth tokens before login/signup
+        try { await supabaseClient.auth.signOut(); } catch (e) { console.warn("[LOGIN] signOut failed", e); }
+        // Remove all localStorage keys ending with -auth-token and the custom zencards-auth key
+        try {
+          for (let i = localStorage.length - 1; i >= 0; i--) {
+            const k = localStorage.key(i);
+            if (k && (k.endsWith("-auth-token") || k === "zencards-auth")) {
+              localStorage.removeItem(k);
+            }
+          }
+        } catch (e) { console.warn("[LOGIN] localStorage cleanup failed", e); }
 
-    if (res.error) {
-      loginMsg.textContent = res.error.message;
-      loginMsg.className = "modalMsg error";
-      return;
-    }
+        if (authMode === "signup") {
+          const res = await supabaseClient.auth.signUp({
+            email,
+            password,
+            options: { emailRedirectTo: "https://zencardstudy.com/confirm.html" }
+          });
 
-    // ✅ Ensure session is actually hydrated before you do anything else
-    const { data: sess } = await supabaseClient.auth.getSession();
-    if (!sess?.session?.user) {
-      throw new Error("Session not ready after login. Try again.");
-    }
+          console.log("[SIGNUP RESULT]", res);
 
-    closeLoginModal();
-    showLoading("Signing you in…", "Checking your subscription status…");
+          if (res.error) {
+            loginMsg.textContent = res.error.message;
+            loginMsg.className = "modalMsg error";
+            return;
+          }
 
-    const uid = sess.session.user.id;
-    const access = await checkUserAccess(uid);
+          loginMsg.textContent =
+            "Account created ✅ Check your email to confirm, then you'll be sent to Stripe. Once you start your trial, come back to this page to log in.";
+          loginMsg.className = "modalMsg ok";
+          return;
+        }
 
-    if (access?.hasAccess) {
-      // IMPORTANT: do not startCheckout / portal in parallel with auth events
-      await refreshLandingGate();
-      hideLoading();
-      return;
-    }
+        // LOGIN
+        // NOTE: supabase-js doesn't accept AbortController directly here, but the lock prevents double submits
+        const res = await supabaseClient.auth.signInWithPassword({ email, password });
+        console.log("[LOGIN RESULT]", res);
 
-    if (access?.isPastDue) {
-      await openPortalFromLanding("https://zencardstudy.com/");
-      return;
-    }
+        if (res.error) {
+          loginMsg.textContent = res.error.message;
+          loginMsg.className = "modalMsg error";
+          return;
+        }
 
-    await startCheckoutFromLanding();
+        // ✅ Ensure session is actually hydrated before you do anything else
+        const { data: sess } = await supabaseClient.auth.getSession();
+        if (!sess?.session?.user) {
+          throw new Error("Session not ready after login. Try again.");
+        }
 
-  } catch (e) {
-    console.error("[LOGIN] exception:", e);
-    hideLoading();
-    loginMsg.textContent = "Something went wrong. Check console.";
-    loginMsg.className = "modalMsg error";
-  } finally {
-    loginInFlight = false;
+        closeLoginModal();
+        showLoading("Signing you in…", "Checking your subscription status…");
 
-    // If we didn’t navigate away, re-enable the button
-    if (document.visibilityState === "visible") {
-      resetLoginButton();
-    }
-  }
-});
+        const uid = sess.session.user.id;
+        const access = await checkUserAccess(uid);
+
+        if (access?.hasAccess) {
+          // IMPORTANT: do not startCheckout / portal in parallel with auth events
+          await refreshLandingGate();
+          hideLoading();
+          return;
+        }
+
+        if (access?.isPastDue) {
+          await openPortalFromLanding("https://zencardstudy.com/");
+          return;
+        }
+
+        await startCheckoutFromLanding();
+
+      } catch (e) {
+        console.error("[LOGIN] exception:", e);
+        hideLoading();
+        loginMsg.textContent = "Something went wrong. Check console.";
+        loginMsg.className = "modalMsg error";
+      } finally {
+        loginInFlight = false;
+
+        // If we didn’t navigate away, re-enable the button
+        if (document.visibilityState === "visible") {
+          resetLoginButton();
+        }
+      }
+    });
 
     forgotPwBtn.addEventListener("click", async () => {
       const email = (loginEmail.value || "").trim();
