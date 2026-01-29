@@ -3,21 +3,26 @@
 <head>
     <!-- Capacitor Preferences for robust session persistence on iOS -->
     <script type="module">
-      import { Preferences } from '@capacitor/preferences';
-      // Restore Supabase session from native storage before anything else
-      (async function restoreSupabaseSession() {
-        // Only run in native app
+      async function restoreSupabaseSessionAndStartApp() {
+        let restored = false;
         const isNative = !!window.Capacitor || !!window.cordova || !!window.webkit?.messageHandlers?.bridge;
-        if (!isNative) return;
-        try {
-          const { value } = await Preferences.get({ key: 'zencards-auth' });
-          if (value) {
-            localStorage.setItem('zencards-auth', value);
+        if (isNative) {
+          try {
+            const { Preferences } = await import('@capacitor/preferences');
+            const { value } = await Preferences.get({ key: 'zencards-auth' });
+            if (value) {
+              localStorage.setItem('zencards-auth', value);
+              restored = true;
+            }
+          } catch (e) {
+            console.warn('[Capacitor] Could not restore session from Preferences:', e);
           }
-        } catch (e) {
-          console.warn('[Capacitor] Could not restore session from Preferences:', e);
         }
-      })();
+        // Now start the app logic (Supabase, etc)
+        window.__zc_session_restored = restored;
+        startAppAfterSessionRestore();
+      }
+      restoreSupabaseSessionAndStartApp();
     </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -1117,38 +1122,45 @@ window.addEventListener("pageshow", (e) => {
     // ===================== SUPABASE CONFIG =====================
 const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
-    const { createClient } = window.supabase;
-    window.supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-        storage: window.localStorage,
-        storageKey: "zencards-auth",
-      },
-    });
+    function startAppAfterSessionRestore() {
+      const { createClient } = window.supabase;
+      window.supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+          storage: window.localStorage,
+          storageKey: "zencards-auth",
+        },
+      });
 
-    // On every session change, sync to Capacitor Preferences (native only)
-    (async function setupSessionSync() {
-      const isNative = !!window.Capacitor || !!window.cordova || !!window.webkit?.messageHandlers?.bridge;
-      if (!isNative) return;
-      try {
-        const { Preferences } = await import('@capacitor/preferences');
-        window.supabaseClient.auth.onAuthStateChange(async (_event, session) => {
-          try {
-            if (session) {
-              await Preferences.set({ key: 'zencards-auth', value: localStorage.getItem('zencards-auth') || '' });
-            } else {
-              await Preferences.remove({ key: 'zencards-auth' });
+      // On every session change, sync to Capacitor Preferences (native only)
+      (async function setupSessionSync() {
+        const isNative = !!window.Capacitor || !!window.cordova || !!window.webkit?.messageHandlers?.bridge;
+        if (!isNative) return;
+        try {
+          const { Preferences } = await import('@capacitor/preferences');
+          window.supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+            try {
+              if (session) {
+                await Preferences.set({ key: 'zencards-auth', value: localStorage.getItem('zencards-auth') || '' });
+              } else {
+                await Preferences.remove({ key: 'zencards-auth' });
+              }
+            } catch (e) {
+              console.warn('[Capacitor] Could not sync session to Preferences:', e);
             }
-          } catch (e) {
-            console.warn('[Capacitor] Could not sync session to Preferences:', e);
-          }
-        });
-      } catch (e) {
-        console.warn('[Capacitor] Could not set up Preferences sync:', e);
+          });
+        } catch (e) {
+          console.warn('[Capacitor] Could not set up Preferences sync:', e);
+        }
+      })();
+      // ...existing code that depends on SupabaseClient...
+      if (typeof window.__zc_app_inited === 'undefined' || !window.__zc_app_inited) {
+        // Call your app's main init logic here if needed
+        if (typeof init === 'function') init();
       }
-    })();
+    }
 // ===================== BFCache SAFETY (Safari/iOS, back button) =====================
 // If Safari restores this page from BFCache, JS state can be stale.
 // Force a hard reload so auth + UI + listeners re-bootstrap cleanly.
