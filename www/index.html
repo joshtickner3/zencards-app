@@ -1382,6 +1382,14 @@ a:hover{
 
 
   <script>
+    // ✅ Fix BFCache (Back button) issues: force a clean reload when restored
+window.addEventListener("pageshow", (e) => {
+  if (e.persisted) {
+    console.log("[BFCache] Restored from back/forward cache -> reloading");
+    window.location.reload();
+  }
+});
+
     // ===== Delete Account Modal =====
     function showDeleteAccountModal() {
       const modal = document.createElement('div');

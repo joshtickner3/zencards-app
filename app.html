@@ -1088,6 +1088,14 @@ input[type="number"]:focus{
 </div>
 
   <script>
+    // ✅ Fix BFCache (Back button) issues: force a clean reload when restored
+window.addEventListener("pageshow", (e) => {
+  if (e.persisted) {
+    console.log("[BFCache] Restored from back/forward cache -> reloading");
+    window.location.reload();
+  }
+});
+
     // ===================== SUPABASE CONFIG =====================
 const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
