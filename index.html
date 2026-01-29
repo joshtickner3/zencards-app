@@ -1486,15 +1486,53 @@ monthlyUsersEl.textContent = Number(MONTHLY_USERS).toLocaleString() + "+";
     const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
     const { createClient } = window.supabase;
-    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    // ✅ Safe storage wrapper so a corrupted auth blob can’t brick logins
+function makeSafeStorage(ls, key) {
+  return {
+    getItem(k) {
+      const v = ls.getItem(k);
+      if (!v) return null;
+
+      // Only validate the key we care about
+      if (k !== key) return v;
+
+      // Supabase expects JSON. If it’s corrupted, nuke it.
+      try {
+        JSON.parse(v);
+        return v;
+      } catch (e) {
+        console.warn("[AuthStorage] Corrupt auth JSON in storageKey; clearing:", e);
+        try { ls.removeItem(k); } catch (_) {}
+        return null;
+      }
+    },
+    setItem(k, v) {
+      // Prevent accidental non-string writes
+      try {
+        ls.setItem(k, String(v));
+      } catch (e) {
+        console.warn("[AuthStorage] setItem failed:", e);
+      }
+    },
+    removeItem(k) {
+      try { ls.removeItem(k); } catch (_) {}
+    },
+  };
+}
+
+const AUTH_KEY = "zencards-auth";
+const safeStorage = makeSafeStorage(window.localStorage, AUTH_KEY);
+
+   const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    storage: window.localStorage,
-    storageKey: "zencards-auth",
+    storage: safeStorage,      // ✅ IMPORTANT
+    storageKey: AUTH_KEY,      // ✅
   },
 });
+
 // ===== Loading overlay helpers =====
 const loadingOverlay = document.getElementById("loadingOverlay");
 const loadingTitleEl = document.getElementById("loadingTitle");
@@ -2303,15 +2341,31 @@ async function recoverAuthIfStuck() {
 
     if (!error && data?.session) return true;
 
-    // If refresh failed AND we had stored auth, then it’s genuinely stale/bad.
+    // Only clear for “real” token problems, not benign states
+    const msg = String(error?.message || "").toLowerCase();
+    const shouldClear =
+      msg.includes("invalid refresh token") ||
+      msg.includes("refresh token not found") ||
+      msg.includes("jwt") ||
+      msg.includes("token");
+
+    if (!shouldClear) {
+      // Don’t nuke storage for harmless “missing session” style states
+      console.warn("[AuthRecover] refresh failed but not a token corruption case:", error);
+      return false;
+    }
+
+    // Otherwise clear
     console.warn("[AuthRecover] refresh failed; clearing local auth", error);
     try { await supabaseClient.auth.signOut({ scope: "local" }); } catch (_) {}
     try { localStorage.removeItem("zencards-auth"); } catch (_) {}
-    // (optional) also clear default key if present
+
+    // also clear any default supabase key if it exists
     try {
       const k = Object.keys(localStorage).find(x => x.endsWith("-auth-token"));
       if (k) localStorage.removeItem(k);
     } catch (_) {}
+
     return false;
 
   } catch (e) {
@@ -2325,7 +2379,6 @@ async function recoverAuthIfStuck() {
     return false;
   }
 }
-
 
 // On resume/foreground in the native app, heal auth + reset UI
 document.addEventListener("visibilitychange", async () => {
