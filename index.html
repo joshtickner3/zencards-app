@@ -1887,34 +1887,25 @@ function focusGoToZenCardsBtn(){
     
     // Expose it on window so it's not "undefined" in console
 window.startFreeTrial = async function startFreeTrial() {
-  // Prefer the shared storageKey
-  let raw = localStorage.getItem("zencards-auth");
-
-  // Fallback to old default key if needed
-  if (!raw) {
-    const authKey = Object.keys(localStorage).find(k => k.endsWith("-auth-token"));
-    raw = authKey ? localStorage.getItem(authKey) : null;
-  }
-
-  const session = raw ? JSON.parse(raw) : null;
+  const { data: sessionData } = await supabaseClient.auth.getSession();
+  const session = sessionData?.session;
 
   if (session?.access_token) {
-  const access = await checkUserAccess();
+    const access = await checkUserAccess(session.user.id);
 
-  if (access?.hasAccess) {
-    window.location.href = "app.html";
+    if (access?.hasAccess) {
+      goToAppHtml();
+      return;
+    }
+
+    if (access?.isPastDue) {
+      await openPortalFromLanding("https://zencardstudy.com/");
+      return;
+    }
+
+    await startCheckoutFromLanding();
     return;
   }
-
-  // ✅ NEW: past_due -> portal
-  if (access?.isPastDue) {
-    await openPortalFromLanding("https://zencardstudy.com/");
-    return;
-  }
-
-  await startCheckoutFromLanding();
-  return;
-}
 
   openLoginModal("signup");
 };
@@ -2295,24 +2286,45 @@ window.addEventListener("pageshow", (e) => {
 });
 
 async function recoverAuthIfStuck() {
+  // Only attempt recovery if we actually have something stored.
+  // Otherwise "Auth session missing" is normal and should NOT trigger clearing.
+  const hasStoredAuth =
+    !!localStorage.getItem("zencards-auth") ||
+    Object.keys(localStorage).some(k => k.endsWith("-auth-token"));
+
+  if (!hasStoredAuth) {
+    // Normal first-load / logged-out state
+    return false;
+  }
+
   try {
-    // Try to refresh; if refresh token is bad, wipe local auth so next login is clean
     const { data, error } = await supabaseClient.auth.refreshSession();
 
     if (!error && data?.session) return true;
 
+    // If refresh failed AND we had stored auth, then it’s genuinely stale/bad.
     console.warn("[AuthRecover] refresh failed; clearing local auth", error);
     try { await supabaseClient.auth.signOut({ scope: "local" }); } catch (_) {}
     try { localStorage.removeItem("zencards-auth"); } catch (_) {}
+    // (optional) also clear default key if present
+    try {
+      const k = Object.keys(localStorage).find(x => x.endsWith("-auth-token"));
+      if (k) localStorage.removeItem(k);
+    } catch (_) {}
     return false;
 
   } catch (e) {
     console.warn("[AuthRecover] exception; clearing local auth", e);
     try { await supabaseClient.auth.signOut({ scope: "local" }); } catch (_) {}
     try { localStorage.removeItem("zencards-auth"); } catch (_) {}
+    try {
+      const k = Object.keys(localStorage).find(x => x.endsWith("-auth-token"));
+      if (k) localStorage.removeItem(k);
+    } catch (_) {}
     return false;
   }
 }
+
 
 // On resume/foreground in the native app, heal auth + reset UI
 document.addEventListener("visibilitychange", async () => {
