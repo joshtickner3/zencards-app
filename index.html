@@ -2091,7 +2091,7 @@ setTimeout(() => console.log("[Billing] still running after 5s"), 5000);
       loginModal.classList.remove("show");
     }
 
-    loginBtn?.addEventListener("click", openLoginModal);
+loginBtn?.addEventListener("click", () => openLoginModal("login"));
     loginCloseBtn.addEventListener("click", closeLoginModal);
     loginCancelBtn.addEventListener("click", closeLoginModal);
 
@@ -2274,8 +2274,10 @@ hideLoading();
 resetLoginButton();
 
 (async () => {
+  await recoverAuthIfStuck();     // ✅ run on web too
   await refreshLandingGate();
   await refreshSignedInBox();
+  await autoEnterIfHasAccess();   // ✅ optional but recommended
 })();
 
 document.getElementById("startTrialTopBtn")
