@@ -10,8 +10,10 @@
           try {
             const { Preferences } = await import('@capacitor/preferences');
             const { value } = await Preferences.get({ key: 'zencards-auth' });
+            console.log('[Capacitor][Restore] Got value from Preferences:', value);
             if (value) {
               localStorage.setItem('zencards-auth', value);
+              console.log('[Capacitor][Restore] Set localStorage zencards-auth:', value);
               restored = true;
             }
           } catch (e) {
@@ -1143,9 +1145,12 @@ const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
           window.supabaseClient.auth.onAuthStateChange(async (_event, session) => {
             try {
               if (session) {
-                await Preferences.set({ key: 'zencards-auth', value: localStorage.getItem('zencards-auth') || '' });
+                const val = localStorage.getItem('zencards-auth') || '';
+                await Preferences.set({ key: 'zencards-auth', value: val });
+                console.log('[Capacitor][Save] Saved session to Preferences:', val);
               } else {
                 await Preferences.remove({ key: 'zencards-auth' });
+                console.log('[Capacitor][Save] Removed session from Preferences');
               }
             } catch (e) {
               console.warn('[Capacitor] Could not sync session to Preferences:', e);
