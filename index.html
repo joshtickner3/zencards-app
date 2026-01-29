@@ -2,19 +2,43 @@
 <html lang="en">
 <head>
     <script>
-      // If running inside the native app (Capacitor), always redirect to app.html
-      function isNativeApp() {
-        return (
-          window.Capacitor !== undefined ||
-          window.cordova !== undefined ||
-          window.webkit?.messageHandlers?.bridge !== undefined ||
-          navigator.userAgent.includes('Capacitor') ||
-          navigator.userAgent.includes('iPhone') && window.statusbar && window.screen.height < 2000 // fallback for iOS
+      // Only redirect to app.html if running in native app AND a valid Supabase session exists
+      async function redirectToAppIfLoggedIn() {
+        function isNativeApp() {
+          return (
+            window.Capacitor !== undefined ||
+            window.cordova !== undefined ||
+            window.webkit?.messageHandlers?.bridge !== undefined ||
+            navigator.userAgent.includes('Capacitor') ||
+            (navigator.userAgent.includes('iPhone') && window.statusbar && window.screen.height < 2000)
+          );
+        }
+        if (!isNativeApp() || window.location.pathname.includes('app.html')) return;
+        // Wait for Supabase to load
+        if (!window.supabase) {
+          await new Promise(r => setTimeout(r, 100));
+          if (!window.supabase) return;
+        }
+        const { createClient } = window.supabase;
+        const client = createClient(
+          'https://elpfcnnrripftxoqeckv.supabase.co',
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ',
+          {
+            auth: {
+              persistSession: true,
+              autoRefreshToken: true,
+              detectSessionInUrl: true,
+              storage: window.localStorage,
+              storageKey: 'zencards-auth',
+            },
+          }
         );
+        const { data } = await client.auth.getSession();
+        if (data?.session?.user) {
+          window.location.replace('app.html');
+        }
       }
-      if (isNativeApp() && !window.location.pathname.includes('app.html')) {
-        window.location.replace('app.html');
-      }
+      redirectToAppIfLoggedIn();
     </script>
   <meta charset="UTF-8" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
