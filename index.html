@@ -2164,18 +2164,6 @@ let loginAbortController = null;
       loginMsg.className = "modalMsg";
 
       try {
-        // Always clear Supabase session and all auth tokens before login/signup
-        try { await supabaseClient.auth.signOut(); } catch (e) { console.warn("[LOGIN] signOut failed", e); }
-        // Remove all localStorage keys ending with -auth-token and the custom zencards-auth key
-        try {
-          for (let i = localStorage.length - 1; i >= 0; i--) {
-            const k = localStorage.key(i);
-            if (k && (k.endsWith("-auth-token") || k === "zencards-auth")) {
-              localStorage.removeItem(k);
-            }
-          }
-        } catch (e) { console.warn("[LOGIN] localStorage cleanup failed", e); }
-
         if (authMode === "signup") {
           const res = await supabaseClient.auth.signUp({
             email,
@@ -2203,6 +2191,16 @@ let loginAbortController = null;
         console.log("[LOGIN RESULT]", res);
 
         if (res.error) {
+          // If login fails, clear session/localStorage and show error
+          try { await supabaseClient.auth.signOut(); } catch (e) { console.warn("[LOGIN] signOut failed", e); }
+          try {
+            for (let i = localStorage.length - 1; i >= 0; i--) {
+              const k = localStorage.key(i);
+              if (k && (k.endsWith("-auth-token") || k === "zencards-auth")) {
+                localStorage.removeItem(k);
+              }
+            }
+          } catch (e) { console.warn("[LOGIN] localStorage cleanup failed", e); }
           loginMsg.textContent = res.error.message;
           loginMsg.className = "modalMsg error";
           return;
@@ -2237,7 +2235,7 @@ let loginAbortController = null;
       } catch (e) {
         console.error("[LOGIN] exception:", e);
         hideLoading();
-        loginMsg.textContent = "Something went wrong. Check console.";
+        loginMsg.textContent = (e && e.message) ? e.message : "Something went wrong. Check console.";
         loginMsg.className = "modalMsg error";
       } finally {
         loginInFlight = false;
