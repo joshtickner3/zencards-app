@@ -1,6 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script>
+      // If running inside the native app (Capacitor), always redirect to app.html
+      function isNativeApp() {
+        return (
+          window.Capacitor !== undefined ||
+          window.cordova !== undefined ||
+          window.webkit?.messageHandlers?.bridge !== undefined ||
+          navigator.userAgent.includes('Capacitor') ||
+          navigator.userAgent.includes('iPhone') && window.statusbar && window.screen.height < 2000 // fallback for iOS
+        );
+      }
+      if (isNativeApp() && !window.location.pathname.includes('app.html')) {
+        window.location.replace('app.html');
+      }
+    </script>
   <meta charset="UTF-8" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <meta
