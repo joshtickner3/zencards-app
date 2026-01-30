@@ -2187,6 +2187,22 @@ function rebuildDeckUI() {
     deckSelect.appendChild(opt);
 
 // --- Web Speech API TTS for cards ---
+// --- Daniel voice cache ---
+window._danielVoice = null;
+function cacheDanielVoice() {
+  const voices = window.speechSynthesis.getVoices();
+  for (let v of voices) {
+    if (v.name && v.name.toLowerCase().includes('daniel')) {
+      window._danielVoice = v;
+      break;
+    }
+  }
+}
+if (typeof window.speechSynthesis !== 'undefined') {
+  window.speechSynthesis.onvoiceschanged = cacheDanielVoice;
+  cacheDanielVoice();
+}
+
 window.speakCardText = function(question, answer) {
   console.log('[TTS] speakCardText called', { question, answer });
   if (!window.speechSynthesis) {
@@ -2197,15 +2213,8 @@ window.speakCardText = function(question, answer) {
   const rateInput = document.getElementById('ttsRateInput');
   const volInput = document.getElementById('ttsVolumeInput');
 
-  // Find Daniel voice
-  let danielVoice = null;
-  const voices = window.speechSynthesis.getVoices();
-  for (let v of voices) {
-    if (v.name && v.name.toLowerCase().includes('daniel')) {
-      danielVoice = v;
-      break;
-    }
-  }
+  // Use cached Daniel voice if available
+  let danielVoice = window._danielVoice || null;
 
   // Speak question first
   if (question && question.trim()) {
@@ -2226,6 +2235,7 @@ window.speakCardText = function(question, answer) {
       }, 3000);
     }
   }
+}
 }
   });
 
