@@ -2187,7 +2187,8 @@ function rebuildDeckUI() {
     deckSelect.appendChild(opt);
 
 // --- Web Speech API TTS for cards ---
-function speakCardText(text) {
+window.speakCardText = function(question, answer) {
+  console.log('[TTS] speakCardText called', { question, answer });
   if (!window.speechSynthesis) {
     alert('Text-to-Speech not supported in this browser.');
     return;
@@ -2197,21 +2198,23 @@ function speakCardText(text) {
   const volInput = document.getElementById('ttsVolumeInput');
 
   // Speak question first
-  const utterQ = new SpeechSynthesisUtterance(question);
-  if (rateInput) utterQ.rate = parseFloat(rateInput.value) || 1.0;
-  if (volInput) utterQ.volume = parseFloat(volInput.value) || 1.0;
-  // TODO: set utterQ.lang based on card/deck language metadata
-  window.speechSynthesis.speak(utterQ);
+  if (question && question.trim()) {
+    const utterQ = new SpeechSynthesisUtterance(question);
+    if (rateInput) utterQ.rate = parseFloat(rateInput.value) || 1.0;
+    if (volInput) utterQ.volume = parseFloat(volInput.value) || 1.0;
+    // TODO: set utterQ.lang based on card/deck language metadata
+    window.speechSynthesis.speak(utterQ);
 
-  // After 3 seconds, speak answer
-  if (answer && answer.trim()) {
-    setTimeout(() => {
-      const utterA = new SpeechSynthesisUtterance(answer);
-      if (rateInput) utterA.rate = parseFloat(rateInput.value) || 1.0;
-      if (volInput) utterA.volume = parseFloat(volInput.value) || 1.0;
-      // TODO: set utterA.lang based on card/deck language metadata
-      window.speechSynthesis.speak(utterA);
-    }, 3000);
+    // After 3 seconds, speak answer
+    if (answer && answer.trim()) {
+      setTimeout(() => {
+        const utterA = new SpeechSynthesisUtterance(answer);
+        if (rateInput) utterA.rate = parseFloat(rateInput.value) || 1.0;
+        if (volInput) utterA.volume = parseFloat(volInput.value) || 1.0;
+        // TODO: set utterA.lang based on card/deck language metadata
+        window.speechSynthesis.speak(utterA);
+      }, 3000);
+    }
   }
 }
   });
@@ -2306,7 +2309,7 @@ function speakCardText(text) {
         playBtn.title = "Play card (TTS)";
         playBtn.className = "secondary small";
         playBtn.addEventListener("click", () => {
-          speakCardText(card.question, card.answer);
+          window.speakCardText(card.question, card.answer);
         });
         actionsDiv.appendChild(playBtn);
 
