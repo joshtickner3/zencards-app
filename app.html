@@ -2202,12 +2202,29 @@ function rebuildDeckUI() {
     opt.value = deck.id;
 
     const counts = getDeckPhaseCounts(deck);
-    // Format: Deck name (new / learning / review)
     opt.textContent = `${deck.name} (${counts.newCount}/${counts.learningCount}/${counts.reviewCount})`;
-
-
     deckSelect.appendChild(opt);
   });
+
+  // ✅ Preserve previously selected deck if possible
+  if (!selectedDeckId && decks.length > 0) {
+    selectedDeckId = decks[0].id;
+  }
+
+  if (currentValue && decks.some(d => d.id === currentValue)) {
+    selectedDeckId = currentValue;
+  }
+
+  if (selectedDeckId && decks.some(d => d.id === selectedDeckId)) {
+    deckSelect.value = selectedDeckId;
+  } else if (decks.length > 0) {
+    selectedDeckId = decks[0].id;
+    deckSelect.value = selectedDeckId;
+  } else {
+    selectedDeckId = null;
+  }
+
+  refreshMoveDeckSelect();
 }
 
 // --- Web Speech API TTS for cards ---
@@ -2261,24 +2278,6 @@ window.speakCardText = function(question, answer) {
   }
 }
 
-  // Preserve previously selected deck if possible
-  if (!selectedDeckId && decks.length > 0) {
-    selectedDeckId = decks[0].id;
-  }
-
-  if (currentValue && decks.some(d => d.id === currentValue)) {
-    selectedDeckId = currentValue;
-  }
-
-  if (selectedDeckId && decks.some(d => d.id === selectedDeckId)) {
-    deckSelect.value = selectedDeckId;
-  } else if (decks.length > 0) {
-    selectedDeckId = decks[0].id;
-    deckSelect.value = selectedDeckId;
-  } else {
-    selectedDeckId = null;
-  }
-  refreshMoveDeckSelect();
     // Format the next due date for a given card
     function formatDueDate(deckId, cardId) {
       const key = scheduleKey(deckId, cardId);
