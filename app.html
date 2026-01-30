@@ -2284,8 +2284,19 @@ function speakCardText(text) {
         row.appendChild(dueSpan);
 
         // Actions column (Edit / Delete)
+
         const actionsDiv = document.createElement("div");
         actionsDiv.className = "cardActions";
+
+        // Play (TTS) button
+        const playBtn = document.createElement("button");
+        playBtn.textContent = "🔊";
+        playBtn.title = "Play card (TTS)";
+        playBtn.className = "secondary small";
+        playBtn.addEventListener("click", () => {
+          speakCardText(card.question + (card.answer ? '\n' + card.answer : ''));
+        });
+        actionsDiv.appendChild(playBtn);
 
         const editBtn = document.createElement("button");
         editBtn.textContent = "Edit";
