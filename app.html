@@ -2197,12 +2197,22 @@ window.speakCardText = function(question, answer) {
   const rateInput = document.getElementById('ttsRateInput');
   const volInput = document.getElementById('ttsVolumeInput');
 
+  // Find Daniel voice
+  let danielVoice = null;
+  const voices = window.speechSynthesis.getVoices();
+  for (let v of voices) {
+    if (v.name && v.name.toLowerCase().includes('daniel')) {
+      danielVoice = v;
+      break;
+    }
+  }
+
   // Speak question first
   if (question && question.trim()) {
     const utterQ = new SpeechSynthesisUtterance(question);
     if (rateInput) utterQ.rate = parseFloat(rateInput.value) || 1.0;
     if (volInput) utterQ.volume = parseFloat(volInput.value) || 1.0;
-    // TODO: set utterQ.lang based on card/deck language metadata
+    if (danielVoice) utterQ.voice = danielVoice;
     window.speechSynthesis.speak(utterQ);
 
     // After 3 seconds, speak answer
@@ -2211,7 +2221,7 @@ window.speakCardText = function(question, answer) {
         const utterA = new SpeechSynthesisUtterance(answer);
         if (rateInput) utterA.rate = parseFloat(rateInput.value) || 1.0;
         if (volInput) utterA.volume = parseFloat(volInput.value) || 1.0;
-        // TODO: set utterA.lang based on card/deck language metadata
+        if (danielVoice) utterA.voice = danielVoice;
         window.speechSynthesis.speak(utterA);
       }, 3000);
     }
