@@ -654,6 +654,26 @@ input[type="number"]:focus{
             <label for="newDeckName">New deck name:</label>
             <input id="newDeckName" type="text" placeholder="e.g. Bio, Anatomy, etc." />
           </div>
+          <div>
+            <label for="newDeckLang">Language:</label>
+            <select id="newDeckLang">
+              <option value="en-US">English (US)</option>
+              <option value="en-GB">English (UK)</option>
+              <option value="es-ES">Spanish (Spain)</option>
+              <option value="fr-FR">French</option>
+              <option value="de-DE">German</option>
+              <option value="it-IT">Italian</option>
+              <option value="pt-PT">Portuguese</option>
+              <option value="ru-RU">Russian</option>
+              <option value="ja-JP">Japanese</option>
+              <option value="zh-CN">Chinese (Mandarin)</option>
+              <option value="ko-KR">Korean</option>
+              <option value="ar-SA">Arabic</option>
+              <option value="hi-IN">Hindi</option>
+              <option value="custom">Other (enter code)</option>
+            </select>
+            <input id="customDeckLang" type="text" placeholder="e.g. pl-PL" style="display:none;margin-top:0.25rem;" />
+          </div>
           <div style="flex:0 0 auto;">
             <button id="addDeckBtn">Add Deck</button>
             <!-- Delete deck button -->
