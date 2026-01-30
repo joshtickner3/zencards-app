@@ -705,18 +705,8 @@ input[type="number"]:focus{
   </div>
 </div>
 
-  <div style="margin-top:0.25rem;font-size:0.8rem;">
-    <button type="button"
-            class="secondary small"
-            data-insert-image
-            data-target="cardAnswer">
-      Insert image…
-    </button>
-    <span style="color:#9ca3af;">
-      (Paste URL, choose file, or drag &amp; drop an image here)
-    </span>
-  </div>
 </div>
+  <!-- Only one Insert image button for answer field -->
         </div>
         <div class="row">
           <div style="flex:0 0 auto;">
@@ -2239,7 +2229,7 @@ function fillLangSelect(selectEl, defaultValue = "en-US") {
   for (const [code, label] of ZC_LANGS) {
     const opt = document.createElement("option");
     opt.value = code;
-    opt.textContent = `${label} — ${code}`;
+    opt.textContent = label;
     selectEl.appendChild(opt);
   }
   selectEl.value = defaultValue;
@@ -2364,10 +2354,12 @@ window.speakCardText = function(questionRaw, answerRaw, deckId, cardObj) {
   const question = getPlainTextFromCard(questionRaw);
   const answer = getPlainTextFromCard(answerRaw);
 
-  // Speak question, then answer, using your unified TTS with correct languages
+  // Speak question, then answer after 3s pause, using your unified TTS with correct languages
   speakWithWebTts(question, () => {
     if (answer && answer.trim()) {
-      speakWithWebTts(answer, null, { lang: aLang });
+      setTimeout(() => {
+        speakWithWebTts(answer, null, { lang: aLang });
+      }, 3000); // 3 second pause
     }
   }, { lang: qLang });
 };

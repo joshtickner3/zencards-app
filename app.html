@@ -2229,7 +2229,7 @@ function fillLangSelect(selectEl, defaultValue = "en-US") {
   for (const [code, label] of ZC_LANGS) {
     const opt = document.createElement("option");
     opt.value = code;
-    opt.textContent = `${label} — ${code}`;
+    opt.textContent = label;
     selectEl.appendChild(opt);
   }
   selectEl.value = defaultValue;
