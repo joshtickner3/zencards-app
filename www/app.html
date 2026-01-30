@@ -2193,14 +2193,26 @@ function speakCardText(text) {
     return;
   }
   window.speechSynthesis.cancel(); // Stop any current speech
-  const utter = new SpeechSynthesisUtterance(text);
-  // Optionally: set language/voice here in future
   const rateInput = document.getElementById('ttsRateInput');
   const volInput = document.getElementById('ttsVolumeInput');
-  if (rateInput) utter.rate = parseFloat(rateInput.value) || 1.0;
-  if (volInput) utter.volume = parseFloat(volInput.value) || 1.0;
-  // TODO: set utter.lang based on card/deck language metadata
-  window.speechSynthesis.speak(utter);
+
+  // Speak question first
+  const utterQ = new SpeechSynthesisUtterance(question);
+  if (rateInput) utterQ.rate = parseFloat(rateInput.value) || 1.0;
+  if (volInput) utterQ.volume = parseFloat(volInput.value) || 1.0;
+  // TODO: set utterQ.lang based on card/deck language metadata
+  window.speechSynthesis.speak(utterQ);
+
+  // After 3 seconds, speak answer
+  if (answer && answer.trim()) {
+    setTimeout(() => {
+      const utterA = new SpeechSynthesisUtterance(answer);
+      if (rateInput) utterA.rate = parseFloat(rateInput.value) || 1.0;
+      if (volInput) utterA.volume = parseFloat(volInput.value) || 1.0;
+      // TODO: set utterA.lang based on card/deck language metadata
+      window.speechSynthesis.speak(utterA);
+    }, 3000);
+  }
 }
   });
 
@@ -2294,7 +2306,7 @@ function speakCardText(text) {
         playBtn.title = "Play card (TTS)";
         playBtn.className = "secondary small";
         playBtn.addEventListener("click", () => {
-          speakCardText(card.question + (card.answer ? '\n' + card.answer : ''));
+          speakCardText(card.question, card.answer);
         });
         actionsDiv.appendChild(playBtn);
 
