@@ -1379,7 +1379,8 @@ function getCurrentState() {
     decks = [{
       id: "deck1",
       name: "Sample Deck",
-      lang: "en-US",
+      qLang: "en-US",
+aLang: "en-US",
       cards: [
         { id: "c1", question: "What does DOMS stand for?", answer: "Delayed onset muscle soreness." },
         { id: "c2", question: "In a dumbbell incline press, what area of the chest is emphasized?", answer: "The upper chest, especially the clavicular head of the pectoralis major." }
@@ -2239,44 +2240,33 @@ function cacheDanielVoice() {
     }
   }
 }
+
+function getCardLangs(deck, card) {
+  const qLang = (card && card.qLang) || (deck && deck.qLang) || "en-US";
+  const aLang = (card && card.aLang) || (deck && deck.aLang) || "en-US";
+  return { qLang, aLang };
+}
+
 if (typeof window.speechSynthesis !== 'undefined') {
   window.speechSynthesis.onvoiceschanged = cacheDanielVoice;
   cacheDanielVoice();
 }
 
-window.speakCardText = function(question, answer) {
-  console.log('[TTS] speakCardText called', { question, answer });
-  if (!window.speechSynthesis) {
-    alert('Text-to-Speech not supported in this browser.');
-    return;
-  }
-  window.speechSynthesis.cancel(); // Stop any current speech
-  const rateInput = document.getElementById('ttsRateInput');
-  const volInput = document.getElementById('ttsVolumeInput');
+window.speakCardText = function(questionRaw, answerRaw, deckId, cardObj) {
+  const deck = deckId ? getDeckById(deckId) : null;
+  const { qLang, aLang } = getCardLangs(deck, cardObj);
 
-  // Use cached Daniel voice if available
-  let danielVoice = window._danielVoice || null;
+  const question = getPlainTextFromCard(questionRaw);
+  const answer = getPlainTextFromCard(answerRaw);
 
-  // Speak question first
-  if (question && question.trim()) {
-    const utterQ = new SpeechSynthesisUtterance(question);
-    if (rateInput) utterQ.rate = parseFloat(rateInput.value) || 1.0;
-    if (volInput) utterQ.volume = parseFloat(volInput.value) || 1.0;
-    if (danielVoice) utterQ.voice = danielVoice;
-    window.speechSynthesis.speak(utterQ);
-
-    // After 3 seconds, speak answer
+  // Speak question, then answer, using your unified TTS with correct languages
+  speakWithWebTts(question, () => {
     if (answer && answer.trim()) {
-      setTimeout(() => {
-        const utterA = new SpeechSynthesisUtterance(answer);
-        if (rateInput) utterA.rate = parseFloat(rateInput.value) || 1.0;
-        if (volInput) utterA.volume = parseFloat(volInput.value) || 1.0;
-        if (danielVoice) utterA.voice = danielVoice;
-        window.speechSynthesis.speak(utterA);
-      }, 3000);
+      speakWithWebTts(answer, null, { lang: aLang });
     }
-  }
-}
+  }, { lang: qLang });
+};
+
 
     // Format the next due date for a given card
     function formatDueDate(deckId, cardId) {
@@ -2348,9 +2338,9 @@ window.speakCardText = function(question, answer) {
         playBtn.textContent = "🔊";
         playBtn.title = "Play card (TTS)";
         playBtn.className = "secondary small";
-        playBtn.addEventListener("click", () => {
-          window.speakCardText(card.question, card.answer);
-        });
+       playBtn.addEventListener("click", () => {
+  window.speakCardText(card.question, card.answer, selectedDeckId, card);
+});
         actionsDiv.appendChild(playBtn);
 
         const editBtn = document.createElement("button");
@@ -2414,7 +2404,7 @@ window.speakCardText = function(question, answer) {
 
   console.log("Creating deck:", { id, name });
 
-  decks.push({ id, name, cards: [] });
+ decks.push({ id, name, qLang: "en-US", aLang: "en-US", cards: [] });
 
   console.log("Decks after push:", decks);
 
@@ -2469,7 +2459,7 @@ window.speakCardText = function(question, answer) {
       const deck = getDeckById(selectedDeckId);
       if (!deck) return;
       const id = "c_" + Date.now();
-      deck.cards.push({ id, question: q, answer: a });
+   deck.cards.push({ id, question: q, answer: a, qLang: null, aLang: null });
       saveDecks();
       cardQuestionInput.value = "";
       cardAnswerInput.value = "";
@@ -2597,7 +2587,7 @@ window.speakCardText = function(question, answer) {
           if (!q || !a) continue;
 
           const id = "c_" + timestamp + "_" + imported;
-          deck.cards.push({ id, question: q, answer: a });
+          deck.cards.push({ id, question: q, answer: a, qLang: null, aLang: null });
           imported++;
         }
 
@@ -2852,7 +2842,8 @@ function speakSafe(text, onEnd) {
 }
 
 // Pure browser TTS (this is basically your old speak() body)
-function speakWithWebTts(text, onEnd) {
+function speakWithWebTts(text, onEnd, opts = {}) {
+  const { lang = "en-US" } = opts;
   if (!window.speechSynthesis) {
     setStatus("Text-to-speech not supported in this browser.");
     if (onEnd) onEnd();
@@ -2888,16 +2879,35 @@ function speakWithWebTts(text, onEnd) {
   }
 
   function getPreferredVoice() {
-    const voices = window.speechSynthesis.getVoices();
-    // Only use Daniel or Daniel (Enhanced), or another English male voice, but never Samantha
-    let preferredVoice = voices.find(v => v.name === "Daniel");
-    if (!preferredVoice) preferredVoice = voices.find(v => v.name === "Daniel (Enhanced)");
-    if (!preferredVoice) preferredVoice = voices.find(v => v.lang.startsWith('en') && v.gender === 'male');
-    if (!preferredVoice) preferredVoice = voices.find(v => v.lang.startsWith('en') && v.localService && v.name.toLowerCase().includes('male'));
-    if (!preferredVoice) preferredVoice = voices.find(v => v.lang.startsWith('en') && v.localService && !v.name.toLowerCase().includes('samantha'));
-    if (!preferredVoice) preferredVoice = voices.find(v => v.lang.startsWith('en') && !v.name.toLowerCase().includes('samantha'));
+  const voices = window.speechSynthesis.getVoices();
+
+  // 1) Prefer voices that match the requested language
+  // Match either exact lang (e.g., "es-ES") or prefix (e.g., "es")
+  const langPrefix = String(lang).split("-")[0];
+
+  const matching = voices.filter(v => {
+    if (!v || !v.lang) return false;
+    const vPrefix = v.lang.split("-")[0];
+    return v.lang === lang || vPrefix === langPrefix;
+  });
+
+  // 2) If user asked for English, keep your "Daniel, not Samantha" preference
+  if (langPrefix === "en") {
+    let preferredVoice = matching.find(v => v.name === "Daniel")
+      || matching.find(v => v.name === "Daniel (Enhanced)");
+
+    // fall back to any matching English voice that isn't Samantha
+    if (!preferredVoice) preferredVoice = matching.find(v => !v.name.toLowerCase().includes("samantha"));
+    if (!preferredVoice) preferredVoice = matching[0] || null;
     return preferredVoice;
   }
+
+  // 3) For non-English, just take the first matching voice (usually best pronunciation)
+  if (matching.length > 0) return matching[0];
+
+  // 4) Fallback: any voice at all (last resort)
+  return voices[0] || null;
+}
 
   function startSpeaking() {
     const preferredVoice = getPreferredVoice();
@@ -2911,6 +2921,7 @@ function speakWithWebTts(text, onEnd) {
       }
       const seg = segments[idx++];
       const utt = new SpeechSynthesisUtterance(seg.text);
+      utt.lang = lang;
       if (preferredVoice) {
         utt.voice = preferredVoice;
       }
@@ -3724,7 +3735,7 @@ if (addCardModalSaveBtn) {
     }
 
     const id = "c_" + Date.now();
-    deck.cards.push({ id, question: q, answer: a });
+deck.cards.push({ id, question: q, answer: a, qLang: null, aLang: null });
 
     saveDecks();
     refreshDeckSelect();
@@ -4401,61 +4412,73 @@ function speakAnswerThenAskDifficulty() {
   }
   setCardContent(voiceAnswerText, currentCard.answer);
 
-  // 🔊 NEW: use background-capable audio helper instead of speak(...)
-  speakWithWebTts(getPlainTextFromCard(currentCard.answer), async () => {
-    if (isPaused) return;
+  // ✅ get language for the ANSWER
+  const deck = getDeckById(currentDeckId);
+  const { aLang } = getCardLangs(deck, currentCard);
 
-    // ===== STUDY-AHEAD HANDS-FREE: always respect the study-ahead gap and never ask for rating =====
-    if (noScheduleChanges && studyAheadSession) {
-      startStudyAheadAnswerWindow(false);
-      return;
-    }
+  // 🔊 Speak the answer in its language
+  speakWithWebTts(
+    getPlainTextFromCard(currentCard.answer),
+    async () => {
+      if (isPaused) return;
 
-    // ===== Automatic mode for pure hands-free, no commands =====
-    if (autoGoodMode) {
-      // Only schedule in normal mode; never schedule in noScheduleChanges mode
-      if (!noScheduleChanges) {
-        const behaviorRating = autoModeBehavior || "good";
-
-        if (autoModeBehavior === "tomorrow") {
-          applyTomorrowScheduling(currentDeckId, currentCard.id);
-        } else {
-          const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, behaviorRating);
-          if (
-            nextState &&
-            nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES
-          ) {
-            queueCardForAgain(currentDeckId, currentCard);
-          }
-        }
+      // ===== STUDY-AHEAD HANDS-FREE: always respect the study-ahead gap and never ask for rating =====
+      if (noScheduleChanges && studyAheadSession) {
+        startStudyAheadAnswerWindow(false);
+        return;
       }
 
-      // Just advance to the next card
-      setStudyState(StudyState.IDLE);
-      runVoiceLoop();
-      return;
-    }
+      // ===== Automatic mode for pure hands-free, no commands =====
+      if (autoGoodMode) {
+        // Only schedule in normal mode; never schedule in noScheduleChanges mode
+        if (!noScheduleChanges) {
+          const behaviorRating = autoModeBehavior || "good";
 
-    // ===== Normal hands-free flow: show rating buttons, prompt again/hard/good/easy, then listen =====
-    awaitingDifficulty = true;
-    if (voiceRatingButtons) {
-      voiceRatingButtons.classList.remove("hidden");
-    }
+          if (autoModeBehavior === "tomorrow") {
+            applyTomorrowScheduling(currentDeckId, currentCard.id);
+          } else {
+            const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, behaviorRating);
+            if (
+              nextState &&
+              nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES
+            ) {
+              queueCardForAgain(currentDeckId, currentCard);
+            }
+          }
+        }
 
-    const detailed = !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
-    hasSpokenInstructionsOnce = true;
+        // Just advance to the next card
+        setStudyState(StudyState.IDLE);
+        runVoiceLoop();
+        return;
+      }
 
-    const promptText = detailed
-      ? "How was that? Say again, hard, good, or easy."
-      : "How was that?";
+      // ===== Normal hands-free flow: show rating buttons, prompt again/hard/good/easy, then listen =====
+      awaitingDifficulty = true;
+      if (voiceRatingButtons) {
+        voiceRatingButtons.classList.remove("hidden");
+      }
 
-    setStatus(promptText);
+      const detailed = !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
+      hasSpokenInstructionsOnce = true;
 
-    // Use TTS to ask the prompt, then listen
-    speakWithWebTts(promptText, () => {
-      if (!isPaused) listenForCommand(handleVoiceTranscript);
-    });
-  });
+      const promptText = detailed
+        ? "How was that? Say again, hard, good, or easy."
+        : "How was that?";
+
+      setStatus(promptText);
+
+      // ✅ Speak the prompt in English (or change if you want)
+      speakWithWebTts(
+        promptText,
+        () => {
+          if (!isPaused) listenForCommand(handleVoiceTranscript);
+        },
+        { lang: "en-US" }
+      );
+    },
+    { lang: aLang }
+  );
 }
 
     // NEW: Study-ahead answer window – gives you time to say "repeat answer" or "main menu"
@@ -4697,35 +4720,38 @@ if (!noScheduleChanges && !autoGoodMode && voiceRatingButtons) {
 setStudyState(StudyState.SHOWING_QUESTION);
 
 // 🔊 Use the same MP3-capable helper for the question
-speakWithWebTts(getPlainTextFromCard(currentCard.question), () => {
-  if (isPaused) return;
+const { qLang } = getCardLangs(deck, currentCard);
 
-  if (answerMode === "delay") {
-    const delay = Math.max(
-      1,
-      Math.min(60, Math.floor(answerDelayMs / 1000))
-    );
+speakWithWebTts(
+  getPlainTextFromCard(currentCard.question),
+  () => {
+    if (isPaused) return;
 
-    // In auto mode we do NOT start listening here,
-    // so the mic isn't open while you're silently thinking.
-    if (!autoGoodMode) {
-      // start listening so "repeat question" etc. work before the answer
+    if (answerMode === "delay") {
+      const delay = Math.max(
+        1,
+        Math.min(60, Math.floor(answerDelayMs / 1000))
+      );
+
+      if (!autoGoodMode) {
+        listenForCommand(handleVoiceTranscript);
+      }
+
+      setStudyState(StudyState.WAITING_FOR_ANSWER);
+      questionDelayTimerId = setTimeout(() => {
+        if (!isPaused) {
+          speakAnswerThenAskDifficulty();
+        }
+      }, delay * 1000);
+    } else {
+      awaitingAnswerSignal = true;
+      setStudyState(StudyState.WAITING_FOR_ANSWER);
+      setStatus("Listening for your answer...");
       listenForCommand(handleVoiceTranscript);
     }
-
-    setStudyState(StudyState.WAITING_FOR_ANSWER);
-    questionDelayTimerId = setTimeout(() => {
-      if (!isPaused) {
-        speakAnswerThenAskDifficulty();
-      }
-    }, delay * 1000);
-  } else {
-    awaitingAnswerSignal = true;
-    setStudyState(StudyState.WAITING_FOR_ANSWER);
-    setStatus("Listening for your answer...");
-    listenForCommand(handleVoiceTranscript);
-  }
-});
+  },
+  { lang: qLang }
+);
     }
 
     // ===================== SILENT MODE =====================
