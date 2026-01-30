@@ -654,26 +654,6 @@ input[type="number"]:focus{
             <label for="newDeckName">New deck name:</label>
             <input id="newDeckName" type="text" placeholder="e.g. Bio, Anatomy, etc." />
           </div>
-          <div>
-            <label for="newDeckLang">Language:</label>
-            <select id="newDeckLang">
-              <option value="en-US">English (US)</option>
-              <option value="en-GB">English (UK)</option>
-              <option value="es-ES">Spanish (Spain)</option>
-              <option value="fr-FR">French</option>
-              <option value="de-DE">German</option>
-              <option value="it-IT">Italian</option>
-              <option value="pt-PT">Portuguese</option>
-              <option value="ru-RU">Russian</option>
-              <option value="ja-JP">Japanese</option>
-              <option value="zh-CN">Chinese (Mandarin)</option>
-              <option value="ko-KR">Korean</option>
-              <option value="ar-SA">Arabic</option>
-              <option value="hi-IN">Hindi</option>
-              <option value="custom">Other (enter code)</option>
-            </select>
-            <input id="customDeckLang" type="text" placeholder="e.g. pl-PL" style="display:none;margin-top:0.25rem;" />
-          </div>
           <div style="flex:0 0 auto;">
             <button id="addDeckBtn">Add Deck</button>
             <!-- Delete deck button -->
@@ -691,14 +671,15 @@ input[type="number"]:focus{
         <h3>Cards (Viewer & Editor)</h3>
         <div class="row">
          <div>
+  <div>
+  <label for="cardQuestionLang">Question language (TTS):</label>
+  <select id="cardQuestionLang"></select>
+
   <label for="cardQuestion">Question:</label>
   <textarea id="cardQuestion" placeholder="Enter question" spellcheck="true" autocorrect="on" autocomplete="on" autocapitalize="sentences"></textarea>
-  
+
   <div style="margin-top:0.25rem;font-size:0.8rem;">
-    <button type="button"
-            class="secondary small"
-            data-insert-image
-            data-target="cardQuestion">
+    <button type="button" class="secondary small" data-insert-image data-target="cardQuestion">
       Insert image…
     </button>
     <span style="color:#9ca3af;">
@@ -706,10 +687,24 @@ input[type="number"]:focus{
     </span>
   </div>
 </div>
+
 <div>
+  <label for="cardAnswerLang">Answer language (TTS):</label>
+  <select id="cardAnswerLang"></select>
+
   <label for="cardAnswer">Answer:</label>
   <textarea id="cardAnswer" placeholder="Enter answer" spellcheck="true" autocorrect="on" autocomplete="on" autocapitalize="sentences"></textarea>
-  
+
+  <div style="margin-top:0.25rem;font-size:0.8rem;">
+    <button type="button" class="secondary small" data-insert-image data-target="cardAnswer">
+      Insert image…
+    </button>
+    <span style="color:#9ca3af;">
+      (Paste URL, choose file, or drag &amp; drop an image here)
+    </span>
+  </div>
+</div>
+
   <div style="margin-top:0.25rem;font-size:0.8rem;">
     <button type="button"
             class="secondary small"
@@ -947,6 +942,18 @@ input[type="number"]:focus{
           <button id="voiceEditToggleBtn" class="secondary small">Edit Card</button>
         </div>
         <div id="voiceEditPanel" class="hidden" style="margin-top:0.75rem;">
+          <label for="voiceEditQuestionLang">Question language (TTS):</label>
+<select id="voiceEditQuestionLang"></select>
+
+<label for="voiceEditQuestion">Edit question:</label>
+<textarea id="voiceEditQuestion" ...></textarea>
+
+<label for="voiceEditAnswerLang">Answer language (TTS):</label>
+<select id="voiceEditAnswerLang"></select>
+
+<label for="voiceEditAnswer">Edit answer:</label>
+<textarea id="voiceEditAnswer" ...></textarea>
+
           <label for="voiceEditQuestion">Edit question:</label>
           <textarea id="voiceEditQuestion" spellcheck="true" autocorrect="on" autocomplete="on" autocapitalize="sentences"></textarea>
           <label for="voiceEditAnswer">Edit answer:</label>
@@ -982,6 +989,18 @@ input[type="number"]:focus{
         <div id="silentEditPanel" class="hidden" style="margin-top:0.75rem;">
           <label for="silentEditQuestion">Edit question:</label>
           <textarea id="silentEditQuestion" spellcheck="true" autocorrect="on" autocomplete="on" autocapitalize="sentences"></textarea>
+          <label for="silentEditQuestionLang">Question language (TTS):</label>
+<select id="silentEditQuestionLang"></select>
+
+<label for="silentEditQuestion">Edit question:</label>
+<textarea id="silentEditQuestion" ...></textarea>
+
+<label for="silentEditAnswerLang">Answer language (TTS):</label>
+<select id="silentEditAnswerLang"></select>
+
+<label for="silentEditAnswer">Edit answer:</label>
+<textarea id="silentEditAnswer" ...></textarea>
+
           <label for="silentEditAnswer">Edit answer:</label>
           <textarea id="silentEditAnswer" spellcheck="true" autocorrect="on" autocomplete="on" autocapitalize="sentences"></textarea>
           <div style="margin-top:0.5rem;">
@@ -1039,14 +1058,20 @@ input[type="number"]:focus{
     </div>
 
     <div style="margin-top:0.75rem;">
-      <label for="addCardModalQuestion">Question</label>
-      <textarea id="addCardModalQuestion" placeholder="Enter question" spellcheck="true" autocorrect="on" autocomplete="on" autocapitalize="sentences"></textarea>
-    </div>
+  <label for="addCardModalQuestionLang">Question language (TTS)</label>
+  <select id="addCardModalQuestionLang"></select>
 
-    <div style="margin-top:0.75rem;">
-      <label for="addCardModalAnswer">Answer</label>
-      <textarea id="addCardModalAnswer" placeholder="Enter answer" spellcheck="true" autocorrect="on" autocomplete="on" autocapitalize="sentences"></textarea>
-    </div>
+  <label for="addCardModalQuestion">Question</label>
+  <textarea id="addCardModalQuestion" placeholder="Enter question" spellcheck="true" autocorrect="on" autocomplete="on" autocapitalize="sentences"></textarea>
+</div>
+
+<div style="margin-top:0.75rem;">
+  <label for="addCardModalAnswerLang">Answer language (TTS)</label>
+  <select id="addCardModalAnswerLang"></select>
+
+  <label for="addCardModalAnswer">Answer</label>
+  <textarea id="addCardModalAnswer" placeholder="Enter answer" spellcheck="true" autocorrect="on" autocomplete="on" autocapitalize="sentences"></textarea>
+</div>
 
     <div class="row" style="margin-top:0.75rem;">
       <button id="addCardModalSaveBtn" type="button">Save Card</button>
@@ -1736,6 +1761,8 @@ currentUser = session.user;
   refreshDeckSelect();
   restoreLastDeckSelection();
   refreshCardsList();
+  refreshCardLanguageDropdownsForCurrentDeck(null);
+
 
   // 5) Load remote once (this will set hasLoadedRemote=true in finally)
   await loadStateFromSupabase();
@@ -1744,6 +1771,8 @@ currentUser = session.user;
   refreshDeckSelect();
   restoreLastDeckSelection();
   refreshCardsList();
+  refreshCardLanguageDropdownsForCurrentDeck(null);
+
 
   console.log("[BOOT] done", { hasLoadedRemote, userId: currentUser?.id });
 }
@@ -1998,9 +2027,42 @@ if (newDeckNameInput) {
     const updateCardBtn = document.getElementById("updateCardBtn");
     const cardsListDiv = document.getElementById("cardsList");
     const selectedCardInfo = document.getElementById("selectedCardInfo");
+    // Main editor language selects
+const cardQuestionLangSelect = document.getElementById("cardQuestionLang");
+const cardAnswerLangSelect = document.getElementById("cardAnswerLang");
+
+// Add Card Modal language selects
+const addCardModalQuestionLangSelect = document.getElementById("addCardModalQuestionLang");
+const addCardModalAnswerLangSelect = document.getElementById("addCardModalAnswerLang");
+
+// Inline edit language selects (if you added them)
+const silentEditQuestionLangSelect = document.getElementById("silentEditQuestionLang");
+const silentEditAnswerLangSelect   = document.getElementById("silentEditAnswerLang");
+const voiceEditQuestionLangSelect  = document.getElementById("voiceEditQuestionLang");
+const voiceEditAnswerLangSelect    = document.getElementById("voiceEditAnswerLang");
+
     // ===== Move card UI =====
 const moveDeckSelect = document.getElementById("moveDeckSelect");
 const moveCardBtn = document.getElementById("moveCardBtn");
+
+function refreshCardLanguageDropdownsForCurrentDeck(cardObj = null) {
+  const deck = getDeckById(selectedDeckId);
+
+  // Main editor
+  fillLangSelect(cardQuestionLangSelect, getDefaultQLangFor(deck, cardObj));
+  fillLangSelect(cardAnswerLangSelect, getDefaultALangFor(deck, cardObj));
+
+  // Add modal
+  fillLangSelect(addCardModalQuestionLangSelect, getDefaultQLangFor(deck, cardObj));
+  fillLangSelect(addCardModalAnswerLangSelect, getDefaultALangFor(deck, cardObj));
+
+  // Inline edit (optional)
+  fillLangSelect(silentEditQuestionLangSelect, getDefaultQLangFor(deck, cardObj));
+  fillLangSelect(silentEditAnswerLangSelect, getDefaultALangFor(deck, cardObj));
+  fillLangSelect(voiceEditQuestionLangSelect, getDefaultQLangFor(deck, cardObj));
+  fillLangSelect(voiceEditAnswerLangSelect, getDefaultALangFor(deck, cardObj));
+}
+
 
 function refreshMoveDeckSelect() {
   if (!moveDeckSelect) return;
@@ -2152,6 +2214,49 @@ function getLastMode() {
     function getDeckById(id) {
       return decks.find(d => d.id === id) || null;
     }
+    // ===== Languages for TTS dropdowns =====
+const ZC_LANGS = [
+  ["en-US", "English (US)"],
+  ["en-GB", "English (UK)"],
+  ["es-ES", "Spanish (Spain)"],
+  ["es-MX", "Spanish (Mexico)"],
+  ["fr-FR", "French"],
+  ["de-DE", "German"],
+  ["it-IT", "Italian"],
+  ["pt-PT", "Portuguese (Portugal)"],
+  ["pt-BR", "Portuguese (Brazil)"],
+  ["ru-RU", "Russian"],
+  ["ja-JP", "Japanese"],
+  ["zh-CN", "Chinese (Mandarin)"],
+  ["ko-KR", "Korean"],
+  ["ar-SA", "Arabic"],
+  ["hi-IN", "Hindi"],
+];
+
+function fillLangSelect(selectEl, defaultValue = "en-US") {
+  if (!selectEl) return;
+  selectEl.innerHTML = "";
+  for (const [code, label] of ZC_LANGS) {
+    const opt = document.createElement("option");
+    opt.value = code;
+    opt.textContent = `${label} — ${code}`;
+    selectEl.appendChild(opt);
+  }
+  selectEl.value = defaultValue;
+  if (selectEl.value !== defaultValue) {
+    // fallback if default isn't in list
+    selectEl.value = "en-US";
+  }
+}
+
+// returns the best default based on deck/card
+function getDefaultQLangFor(deck, card) {
+  return (card && card.qLang) || (deck && deck.qLang) || "en-US";
+}
+function getDefaultALangFor(deck, card) {
+  return (card && card.aLang) || (deck && deck.aLang) || "en-US";
+}
+
 
    // New: compute TOTAL counts per deck (new / learning / review)
 // - new: no schedule yet
@@ -2347,13 +2452,17 @@ window.speakCardText = function(questionRaw, answerRaw, deckId, cardObj) {
         editBtn.textContent = "Edit";
         editBtn.className = "secondary small";
         editBtn.addEventListener("click", () => {
-          selectedCardId = card.id;
-          cardQuestionInput.value = card.question;
-          cardAnswerInput.value = card.answer;
-          selectedCardInfo.textContent = `Editing card: ${card.id}`;
-          updateCardBtn.disabled = false;
-          refreshMoveDeckSelect();
-        });
+  selectedCardId = card.id;
+  cardQuestionInput.value = card.question;
+  cardAnswerInput.value = card.answer;
+
+  refreshCardLanguageDropdownsForCurrentDeck(card);
+
+  selectedCardInfo.textContent = `Editing card: ${card.id}`;
+  updateCardBtn.disabled = false;
+  refreshMoveDeckSelect();
+});
+
         actionsDiv.appendChild(editBtn);
 
         const deleteBtn = document.createElement("button");
@@ -2450,6 +2559,7 @@ window.speakCardText = function(questionRaw, answerRaw, deckId, cardObj) {
   selectedDeckId = deckSelect.value;
   saveLastDeckId(selectedDeckId);
   refreshCardsList();
+  refreshCardLanguageDropdownsForCurrentDeck(null);
 });
 
     addCardBtn.addEventListener("click", () => {
@@ -2459,7 +2569,11 @@ window.speakCardText = function(questionRaw, answerRaw, deckId, cardObj) {
       const deck = getDeckById(selectedDeckId);
       if (!deck) return;
       const id = "c_" + Date.now();
-   deck.cards.push({ id, question: q, answer: a, qLang: null, aLang: null });
+const qLang = cardQuestionLangSelect?.value || null;
+const aLang = cardAnswerLangSelect?.value || null;
+
+deck.cards.push({ id, question: q, answer: a, qLang, aLang });
+
       saveDecks();
       cardQuestionInput.value = "";
       cardAnswerInput.value = "";
@@ -2480,6 +2594,8 @@ window.speakCardText = function(questionRaw, answerRaw, deckId, cardObj) {
       const card = deck.cards.find(c => c.id === selectedCardId);
       if (!card) return;
       card.question = q;
+      card.qLang = cardQuestionLangSelect?.value || null;
+card.aLang = cardAnswerLangSelect?.value || null;
       card.answer = a;
       saveDecks();
       refreshCardsList();
@@ -3574,6 +3690,8 @@ async function openAddCardModal() {
   await stopAllAudio();
   clearStudyAheadGapTimer();
   clearQuestionDelayTimer();
+  refreshCardLanguageDropdownsForCurrentDeck(null);
+
 
   if (addCardModalStatus) addCardModalStatus.textContent = "";
   if (addCardModalQuestion) addCardModalQuestion.value = "";
@@ -3735,7 +3853,11 @@ if (addCardModalSaveBtn) {
     }
 
     const id = "c_" + Date.now();
-deck.cards.push({ id, question: q, answer: a, qLang: null, aLang: null });
+const qLang = cardQuestionLangSelect?.value || null;
+const aLang = cardAnswerLangSelect?.value || null;
+
+deck.cards.push({ id, question: q, answer: a, qLang, aLang });
+
 
     saveDecks();
     refreshDeckSelect();
@@ -3765,25 +3887,34 @@ document.addEventListener("keydown", (e) => {
 }
 
     // ===================== INLINE EDIT HELPERS =====================
-    function updateCardTextInDeck(deckId, cardId, newQ, newA) {
-      const deck = getDeckById(deckId);
-      if (!deck) return null;
-      const card = deck.cards.find(c => c.id === cardId);
-      if (!card) return null;
-      card.question = newQ;
-      card.answer = newA;
-      saveDecks();
-      refreshDeckSelect();
-      return card;
-    }
+    function updateCardTextInDeck(deckId, cardId, newQ, newA, newQLang = null, newALang = null) {
+  const deck = getDeckById(deckId);
+  if (!deck) return null;
+  const card = deck.cards.find(c => c.id === cardId);
+  if (!card) return null;
+
+  card.question = newQ;
+  card.answer = newA;
+
+  // Save per-card language overrides (null means “use deck default”)
+  card.qLang = newQLang;
+  card.aLang = newALang;
+
+  saveDecks();
+  refreshDeckSelect();
+  return card;
+}
 
     // Silent mode inline edit
     silentEditToggleBtn.addEventListener("click", () => {
-      if (!currentCard) return;
-      silentEditQuestion.value = currentCard.question;
-      silentEditAnswer.value = currentCard.answer;
-      silentEditPanel.classList.remove("hidden");
-    });
+  if (!currentCard) return;
+  silentEditQuestion.value = currentCard.question;
+  silentEditAnswer.value = currentCard.answer;
+
+  refreshCardLanguageDropdownsForCurrentDeck(currentCard);
+
+  silentEditPanel.classList.remove("hidden");
+});
 
     silentCancelEditBtn.addEventListener("click", () => {
       silentEditPanel.classList.add("hidden");
@@ -3794,7 +3925,10 @@ document.addEventListener("keydown", (e) => {
       const q = silentEditQuestion.value.trim();
       const a = silentEditAnswer.value.trim();
       if (!q || !a) return;
-      const updated = updateCardTextInDeck(currentDeckId, currentCard.id, q, a);
+const qLang = silentEditQuestionLangSelect?.value || null;
+const aLang = silentEditAnswerLangSelect?.value || null;
+const updated = updateCardTextInDeck(currentDeckId, currentCard.id, q, a, qLang, aLang);
+
       if (!updated) return;
       currentCard = updated;
       setCardContent(silentQuestionText, currentCard.question);
@@ -3826,7 +3960,10 @@ setCardContent(voiceAnswerText, currentCard.answer);
       const q = voiceEditQuestion.value.trim();
       const a = voiceEditAnswer.value.trim();
       if (!q || !a) return;
-      const updated = updateCardTextInDeck(currentDeckId, currentCard.id, q, a);
+const qLang = voiceEditQuestionLangSelect?.value || null;
+const aLang = voiceEditAnswerLangSelect?.value || null;
+const updated = updateCardTextInDeck(currentDeckId, currentCard.id, q, a, qLang, aLang);
+
       if (!updated) return;
       currentCard = updated;
       setCardContent(voiceQuestionText, currentCard.question);
