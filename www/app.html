@@ -2184,7 +2184,10 @@ function rebuildDeckUI() {
     // Format: Deck name (new / learning / review)
     opt.textContent = `${deck.name} (${counts.newCount}/${counts.learningCount}/${counts.reviewCount})`;
 
+
     deckSelect.appendChild(opt);
+  });
+}
 
 // --- Web Speech API TTS for cards ---
 // --- Daniel voice cache ---
@@ -2236,8 +2239,6 @@ window.speakCardText = function(question, answer) {
     }
   }
 }
-}
-  });
 
   // Preserve previously selected deck if possible
   if (!selectedDeckId && decks.length > 0) {
@@ -2257,7 +2258,6 @@ window.speakCardText = function(question, answer) {
     selectedDeckId = null;
   }
   refreshMoveDeckSelect();
-}
     // Format the next due date for a given card
     function formatDueDate(deckId, cardId) {
       const key = scheduleKey(deckId, cardId);
