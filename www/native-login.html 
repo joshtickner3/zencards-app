@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZenCards — Login</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    :root{
+      --bg:#020617;
+      --panel:#0b1224;
+      --border:#1f2937;
+      --text:#e5e7eb;
+      --muted:rgba(229,231,235,.7);
+      --accent:#22c55e;
+      --accentText:#020617;
+      --link:#93c5fd;
+    }
+    body{
+      background:var(--bg);
+      color:var(--text);
+      font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+      margin:0;
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+    }
+    .card{
+      width:100%;
+      max-width:420px;
+      border:1px solid var(--border);
+      border-radius:16px;
+      background:rgba(11,18,36,.6);
+      padding:24px;
+      box-shadow:0 10px 30px rgba(0,0,0,.35);
+    }
+    h1{
+      margin:0 0 6px 0;
+      font-size:24px;
+      letter-spacing:.2px;
+    }
+    p{ margin:8px 0; color:var(--muted); }
+    .row{ margin-top:16px; }
+    label{ display:block; font-size:13px; color:var(--muted); margin-bottom:6px; }
+    input{
+      width:100%;
+      box-sizing:border-box;
+      padding:12px 12px;
+      border-radius:10px;
+      border:1px solid var(--border);
+      background:rgba(2,6,23,.55);
+      color:var(--text);
+      outline:none;
+      font-size:15px;
+    }
+    input:focus{ border-color:#334155; }
+    .btn{
+      width:100%;
+      padding:12px 14px;
+      border:none;
+      border-radius:10px;
+      font-weight:700;
+      font-size:15px;
+      cursor:pointer;
+      margin-top:12px;
+    }
+    .btn.primary{ background:var(--accent); color:var(--accentText); }
+    .btn.secondary{
+      background:transparent;
+      color:var(--link);
+      border:1px solid var(--border);
+      font-weight:650;
+    }
+    .small{
+      margin-top:14px;
+      font-size:13px;
+      color:var(--muted);
+      line-height:1.45;
+    }
+    .status{
+      margin-top:12px;
+      font-size:13px;
+      color:var(--muted);
+      min-height:18px;
+      white-space:pre-wrap;
+    }
+    .divider{
+      height:1px;
+      background:rgba(31,41,55,.9);
+      margin:16px 0;
+    }
+    .hidden{ display:none; }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <h1>ZenCards</h1>
+    <p>Log in to continue.</p>
+
+    <div class="row" id="emailStage">
+      <label for="emailInput">Email</label>
+      <input id="emailInput" type="email" placeholder="you@example.com" autocomplete="email" />
+      <button class="btn primary" id="sendCodeBtn" type="button">Send login code</button>
+    </div>
+
+    <div class="row hidden" id="codeStage">
+      <label for="codeInput">6-digit code</label>
+      <input id="codeInput" inputmode="numeric" placeholder="123456" autocomplete="one-time-code" />
+      <button class="btn primary" id="verifyCodeBtn" type="button">Verify & continue</button>
+      <button class="btn secondary" id="backBtn" type="button">Use a different email</button>
+    </div>
+
+    <div class="status" id="status"></div>
+
+    <div class="divider"></div>
+
+    <!-- Apple-safer: informational only, no CTA button or link -->
+    <p class="small">
+      Create an account on our website.
+    </p>
+  </div>
+
+  <script>
+    // =========================
+    // ✅ CONFIG
+    // =========================
+    const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
+
+    const supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // =========================
+    // UI helpers
+    // =========================
+    const statusEl = document.getElementById("status");
+    const emailStage = document.getElementById("emailStage");
+    const codeStage = document.getElementById("codeStage");
+
+    const emailInput = document.getElementById("emailInput");
+    const codeInput = document.getElementById("codeInput");
+
+    const sendCodeBtn = document.getElementById("sendCodeBtn");
+    const verifyCodeBtn = document.getElementById("verifyCodeBtn");
+    const backBtn = document.getElementById("backBtn");
+
+    function setStatus(msg){ statusEl.textContent = msg || ""; }
+
+    function showEmailStage(){
+      emailStage.classList.remove("hidden");
+      codeStage.classList.add("hidden");
+      codeInput.value = "";
+      setStatus("");
+      emailInput.focus();
+    }
+
+    function showCodeStage(){
+      emailStage.classList.add("hidden");
+      codeStage.classList.remove("hidden");
+      setStatus("");
+      codeInput.focus();
+    }
+
+    // =========================
+    // Auto-forward if already logged in
+    // =========================
+    async function boot(){
+      const { data } = await supabase.auth.getSession();
+      if (data?.session) {
+        window.location.replace("app.html");
+        return;
+      }
+      showEmailStage();
+    }
+
+    // =========================
+    // Email OTP flow (code)
+    // =========================
+    sendCodeBtn.onclick = async () => {
+      const email = (emailInput.value || "").trim();
+      if (!email || !email.includes("@")) {
+        setStatus("Enter a valid email.");
+        return;
+      }
+
+      sendCodeBtn.disabled = true;
+      setStatus("Sending code…");
+
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: { shouldCreateUser: true },
+      });
+
+      sendCodeBtn.disabled = false;
+
+      if (error) {
+        setStatus("Could not send code.\n" + error.message);
+        return;
+      }
+
+      setStatus("Check your email for the 6-digit code.");
+      showCodeStage();
+    };
+
+    verifyCodeBtn.onclick = async () => {
+      const email = (emailInput.value || "").trim();
+      const token = (codeInput.value || "").trim();
+
+      if (!token || token.length < 6) {
+        setStatus("Enter the 6-digit code from your email.");
+        return;
+      }
+
+      verifyCodeBtn.disabled = true;
+      setStatus("Verifying…");
+
+      const { data, error } = await supabase.auth.verifyOtp({
+        email,
+        token,
+        type: "email",
+      });
+
+      verifyCodeBtn.disabled = false;
+
+      if (error || !data?.session) {
+        setStatus("Invalid code.\n" + (error?.message || "Try again."));
+        return;
+      }
+
+      setStatus("Logged in. Redirecting…");
+      window.location.replace("app.html");
+    };
+
+    backBtn.onclick = () => showEmailStage();
+
+    // Enter-to-submit
+    emailInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") sendCodeBtn.click();
+    });
+    codeInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") verifyCodeBtn.click();
+    });
+
+    boot();
+  </script>
+</body>
+</html>

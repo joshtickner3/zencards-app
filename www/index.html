@@ -1,45 +1,62 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <script>
-      // Only redirect to app.html if running in native app AND a valid Supabase session exists
-      async function redirectToAppIfLoggedIn() {
-        function isNativeApp() {
-          return (
-            window.Capacitor !== undefined ||
-            window.cordova !== undefined ||
-            window.webkit?.messageHandlers?.bridge !== undefined ||
-            navigator.userAgent.includes('Capacitor') ||
-            (navigator.userAgent.includes('iPhone') && window.statusbar && window.screen.height < 2000)
-          );
-        }
-        if (!isNativeApp() || window.location.pathname.includes('app.html')) return;
-        // Wait for Supabase to load
-        if (!window.supabase) {
-          await new Promise(r => setTimeout(r, 100));
-          if (!window.supabase) return;
-        }
-        const { createClient } = window.supabase;
-        const client = createClient(
-          'https://elpfcnnrripftxoqeckv.supabase.co',
-          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ',
-          {
-            auth: {
-              persistSession: true,
-              autoRefreshToken: true,
-              detectSessionInUrl: true,
-              storage: window.localStorage,
-              storageKey: 'zencards-auth',
-            },
-          }
-        );
-        const { data } = await client.auth.getSession();
-        if (data?.session?.user) {
-          window.location.replace('app.html');
-        }
+  <script>
+  // Native app entry routing:
+  // - If native + logged in -> app.html
+  // - If native + not logged in -> native-login.html
+  async function routeNativeEntry() {
+    function isNativeApp() {
+      return (
+        window.Capacitor !== undefined ||
+        navigator.userAgent.includes("Capacitor")
+      );
+    }
+
+    // Only route inside the native app
+    if (!isNativeApp()) return;
+
+    // Avoid loops
+    const path = window.location.pathname || "";
+    if (path.includes("app.html") || path.includes("native-login.html")) return;
+
+    // Wait for Supabase script to be available
+    if (!window.supabase) {
+      await new Promise(r => setTimeout(r, 100));
+      if (!window.supabase) {
+        // If Supabase didn't load, still show login screen
+        window.location.replace("native-login.html");
+        return;
       }
-      redirectToAppIfLoggedIn();
-    </script>
+    }
+
+    const { createClient } = window.supabase;
+    const client = createClient(
+      "https://elpfcnnrripftxoqeckv.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ",
+      {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+          storage: window.localStorage,
+          storageKey: "zencards-auth",
+        },
+      }
+    );
+
+    const { data } = await client.auth.getSession();
+
+    if (data?.session?.user) {
+      window.location.replace("app.html");
+    } else {
+      window.location.replace("native-login.html");
+    }
+  }
+
+  routeNativeEntry();
+</script>
+
   <meta charset="UTF-8" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <meta
