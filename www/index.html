@@ -1522,15 +1522,6 @@ monthlyUsersEl.textContent = Number(MONTHLY_USERS).toLocaleString() + "+";
     document.getElementById("year").textContent = String(new Date().getFullYear());
 
     // ===== Supabase client (same anon key as app.html) =====
-    // Clear all Supabase auth tokens before initializing the client
-    try {
-      for (let i = localStorage.length - 1; i >= 0; i--) {
-        const k = localStorage.key(i);
-        if (k && (k.endsWith("-auth-token") || k === "zencards-auth")) {
-          localStorage.removeItem(k);
-        }
-      }
-    } catch (e) { console.warn("[Startup] localStorage cleanup failed", e); }
 
     const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
