@@ -749,71 +749,78 @@ input[type="number"]:focus{
 
       <!-- Study options -->
       <div class="card">
-        <h3>Study Options</h3>
-        <div>
-          <label class="inline">
-            <input type="checkbox" id="skipInstructionsAfterFirst" checked />
-            Skip detailed difficulty instructions after first card
-          </label>
-        </div>
-        <!-- Automatic mode -->
-        <div>
-          <label class="inline">
-            <input type="checkbox" id="autoGoodToggle" />
-            Can't give voice commands? Enable automatic mode so each card is assigned
-            <select id="autoRatingSelect" style="width:auto;min-width:120px;">
-              <option value="again">Again</option>
-              <option value="hard">Hard</option>
-              <option value="good" selected>Good</option>
-              <option value="easy">Easy</option>
-              <option value="tomorrow">Show again tomorrow</option>
-            </select>
-            rating automatically
-            <span class="badge">New</span>
-          </label>
-        </div>
-        <div style="margin-top:0.5rem;">
-          <label class="inline" for="handsFreeNextDelaySeconds">
-            Delay after rating before next question
-          </label>
-          <input type="number" id="handsFreeNextDelaySeconds" min="0" max="30" value="2" style="width:60px;" />
-          <span>seconds</span>
-        </div>
-        <!-- NEW: auto study-ahead options -->
-        <div style="margin-top:0.5rem;">
-          <label class="inline">
-            <input type="checkbox" id="autoEnterStudyAhead" />
-            After I finish all due cards, automatically enter study-ahead mode
-          </label>
-        </div>
-        <div>
-          <label class="inline">
-            <input type="checkbox" id="loopStudyAhead" />
-            In study-ahead mode, keep looping the deck automatically
-          </label>
-        </div>
-        <div style="margin-top:0.5rem;">
-          <strong>Hands-free answer behavior:</strong>
-          <div class="row" style="margin-top:0.25rem;">
-            <div class="inline">
-              <input type="radio" name="answerMode" id="answerModeDelay" value="delay" checked />
-              <label for="answerModeDelay">Wait</label>
-              <input type="number" id="answerDelaySeconds" min="1" max="60" value="4" style="width:60px;" />
-              <span>seconds before answer</span>
-            </div>
-            <div class="inline">
-              <input type="radio" name="answerMode" id="answerModeVoice" value="voice" />
-              <label for="answerModeVoice">Play answer after I speak</label>
-            </div>
+        <div class="row" style="justify-content:space-between;align-items:center;">
+          <h3>Study Options</h3>
+          <div style="flex:0 0 auto;text-align:right;">
+            <button id="toggleStudyOptionsBtn" class="secondary small" type="button">Show</button>
           </div>
         </div>
-        <!-- NEW: study-ahead answer gap control -->
-        <div style="margin-top:0.5rem;">
-          <label class="inline" for="studyAheadGapSeconds">
-            Study-ahead: delay after answer before next question
-          </label>
-          <input type="number" id="studyAheadGapSeconds" min="1" max="60" value="4" style="width:60px;" />
-          <span>seconds</span>
+        <div id="studyOptionsPanel" class="hidden" style="margin-top:0.5rem;">
+          <div>
+            <label class="inline">
+              <input type="checkbox" id="skipInstructionsAfterFirst" checked />
+              Skip detailed difficulty instructions after first card
+            </label>
+          </div>
+          <!-- Automatic mode -->
+          <div>
+            <label class="inline">
+              <input type="checkbox" id="autoGoodToggle" />
+              Can't give voice commands? Enable automatic mode so each card is assigned
+              <select id="autoRatingSelect" style="width:auto;min-width:120px;">
+                <option value="again">Again</option>
+                <option value="hard">Hard</option>
+                <option value="good" selected>Good</option>
+                <option value="easy">Easy</option>
+                <option value="tomorrow">Show again tomorrow</option>
+              </select>
+              rating automatically
+              <span class="badge">New</span>
+            </label>
+          </div>
+          <div style="margin-top:0.5rem;">
+            <label class="inline" for="handsFreeNextDelaySeconds">
+              Delay after rating before next question
+            </label>
+            <input type="number" id="handsFreeNextDelaySeconds" min="0" max="30" value="2" style="width:60px;" />
+            <span>seconds</span>
+          </div>
+          <!-- NEW: auto study-ahead options -->
+          <div style="margin-top:0.5rem;">
+            <label class="inline">
+              <input type="checkbox" id="autoEnterStudyAhead" />
+              After I finish all due cards, automatically enter study-ahead mode
+            </label>
+          </div>
+          <div>
+            <label class="inline">
+              <input type="checkbox" id="loopStudyAhead" />
+              In study-ahead mode, keep looping the deck automatically
+            </label>
+          </div>
+          <div style="margin-top:0.5rem;">
+            <strong>Hands-free answer behavior:</strong>
+            <div class="row" style="margin-top:0.25rem;">
+              <div class="inline">
+                <input type="radio" name="answerMode" id="answerModeDelay" value="delay" checked />
+                <label for="answerModeDelay">Wait</label>
+                <input type="number" id="answerDelaySeconds" min="1" max="60" value="4" style="width:60px;" />
+                <span>seconds before answer</span>
+              </div>
+              <div class="inline">
+                <input type="radio" name="answerMode" id="answerModeVoice" value="voice" />
+                <label for="answerModeVoice">Play answer after I speak</label>
+              </div>
+            </div>
+          </div>
+          <!-- NEW: study-ahead answer gap control -->
+          <div style="margin-top:0.5rem;">
+            <label class="inline" for="studyAheadGapSeconds">
+              Study-ahead: delay after answer before next question
+            </label>
+            <input type="number" id="studyAheadGapSeconds" min="1" max="60" value="4" style="width:60px;" />
+            <span>seconds</span>
+          </div>
         </div>
       </div>
 
@@ -2912,6 +2919,8 @@ function saveTtsSettingsObj(s) {
   localStorage.setItem(TTS_SETTINGS_KEY, JSON.stringify(out));
 }
 
+    const toggleStudyOptionsBtn = document.getElementById("toggleStudyOptionsBtn");
+    const studyOptionsPanel = document.getElementById("studyOptionsPanel");
     const toggleAudioSettingsBtn = document.getElementById("toggleAudioSettingsBtn");
     const audioSettingsPanel = document.getElementById("audioSettingsPanel");
     const ttsRateInput = document.getElementById("ttsRateInput");
@@ -2954,6 +2963,19 @@ if (answerDelayAfterSpeechSecInput) {
   // keep existing value unless you set it elsewhere
   saveTtsSettingsObj(current);
 }
+
+    if (toggleStudyOptionsBtn && studyOptionsPanel) {
+      toggleStudyOptionsBtn.addEventListener("click", () => {
+        const isHidden = studyOptionsPanel.classList.contains("hidden");
+        if (isHidden) {
+          studyOptionsPanel.classList.remove("hidden");
+          toggleStudyOptionsBtn.textContent = "Hide";
+        } else {
+          studyOptionsPanel.classList.add("hidden");
+          toggleStudyOptionsBtn.textContent = "Show";
+        }
+      });
+    }
 
     if (toggleAudioSettingsBtn && audioSettingsPanel) {
       toggleAudioSettingsBtn.addEventListener("click", () => {
