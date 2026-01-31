@@ -1689,13 +1689,18 @@ async function refreshLandingGate() {
   const cameFromStripe = params.has("success") || params.has("session_id");
 
   if (!access?.hasAccess && cameFromStripe) {
+  // If trial is blocked, don't poll — it's not going to become "active/trialing"
+  if (access?.statuses?.includes("trial_blocked")) {
+    // optional: also clean URL
+    history.replaceState({}, document.title, window.location.pathname);
+  } else {
     lpStatus.textContent = "Finishing setup… (this can take a few seconds)";
     const ok = await waitForAccess({ maxMs: 30000, intervalMs: 1500 });
     if (ok) access = await checkUserAccess(user.id);
 
-    // Optional: clean the URL so refresh doesn't keep polling
     history.replaceState({}, document.title, window.location.pathname);
   }
+}
 
   // Show status info
   if (access?.rows?.length) {
@@ -1704,6 +1709,28 @@ async function refreshLandingGate() {
   } else {
     lpStatus.textContent = access?.hasAccess ? "Subscription status: ok" : "No active/trial subscription found.";
   }
+
+    // ✅ If trial was blocked (reused payment method), show clear message
+    // ✅ If trial was blocked (reused payment method), allow PAID checkout (no trial)
+  if (access?.statuses?.includes("trial_blocked")) {
+    lpStatus.textContent =
+      "Free trial already used on this payment method. You can still subscribe now (no trial).";
+
+    // ✅ Let them proceed (this button should take them to Stripe Checkout)
+    setLpGoButton(true);
+
+    // Optional: make the CTA text clearer
+    lpGoBtn.textContent = "Subscribe now";
+
+    // If you want: visually emphasize the CTA
+    lpGoBtn.style.background = "var(--green)";
+    lpGoBtn.style.color = "#020617";
+    lpGoBtn.style.cursor = "pointer";
+    lpGoBtn.style.boxShadow = "0 8px 18px rgba(16,185,129,0.28)";
+
+    return;
+  }
+
 
    // ✅ past_due -> auto-open portal
 if (access?.isPastDue) {
@@ -1832,16 +1859,33 @@ async function openPortalFromLanding(returnUrl = window.location.origin + "/") {
 
 
 lpGoBtn?.addEventListener("click", async () => {
-  // safety re-check on click
-  const { data } = await supabaseClient.auth.getUser();
-  const user = data?.user;
+  const { data: userData } = await supabaseClient.auth.getUser();
+  const user = userData?.user;
   if (!user) return;
 
   const access = await checkUserAccess(user.id);
-  if (!access?.hasAccess) return;
 
-   goToAppHtml();
+  // ✅ If they have access, go to app
+  if (access?.hasAccess) {
+    goToAppHtml();
+    return;
+  }
+
+  // ✅ If trial is blocked, send them to PAID checkout (no trial)
+  if (access?.statuses?.includes("trial_blocked")) {
+    await startCheckoutFromLanding();
+    return;
+  }
+
+  // ✅ If past due, send to portal
+  if (access?.isPastDue) {
+    await openPortalFromLanding("https://zencardstudy.com/");
+    return;
+  }
+
+  // Otherwise: do nothing (locked)
 });
+
 
 lpLogoutBtn?.addEventListener("click", async () => {
   await supabaseClient.auth.signOut();

@@ -131,6 +131,85 @@ Deno.serve(async (req) => {
     return data?.user_id ?? null;
   }
 
+    async function isReusedTrialFingerprintAndRecordFirstUse(opts: {
+    stripeCustomerId: string;
+    subscriptionId: string;
+    userId: string;
+  }): Promise<{ reused: boolean; fingerprint?: string | null }> {
+    const { stripeCustomerId, subscriptionId, userId } = opts;
+
+    // 1) Get subscription to discover default payment method if present
+    const sub = await stripe.subscriptions.retrieve(subscriptionId, {
+      expand: ["default_payment_method"],
+    });
+
+    let pmId: string | null = null;
+
+    // subscription.default_payment_method
+    const dpm = (sub as any).default_payment_method;
+    if (typeof dpm === "string") pmId = dpm;
+    else if (dpm?.id) pmId = dpm.id;
+
+    // fallback: customer.invoice_settings.default_payment_method
+    if (!pmId) {
+      const cust = await stripe.customers.retrieve(stripeCustomerId);
+      if (!("deleted" in cust)) {
+        const cpm = (cust as any).invoice_settings?.default_payment_method;
+        if (typeof cpm === "string") pmId = cpm;
+        else if (cpm?.id) pmId = cpm.id;
+      }
+    }
+
+    // final fallback: list card payment methods
+    if (!pmId) {
+      const pms = await stripe.paymentMethods.list({
+        customer: stripeCustomerId,
+        type: "card",
+        limit: 1,
+      });
+      pmId = pms.data?.[0]?.id ?? null;
+    }
+
+    if (!pmId) return { reused: false, fingerprint: null };
+
+    const pm = await stripe.paymentMethods.retrieve(pmId);
+    const fingerprint = (pm as any)?.card?.fingerprint ?? null;
+
+    if (!fingerprint) return { reused: false, fingerprint: null };
+
+    // Check if fingerprint already used
+    const { data: existing, error: lookupErr } = await supabaseAdmin
+      .from("trial_payment_fingerprints")
+      .select("fingerprint")
+      .eq("fingerprint", fingerprint)
+      .maybeSingle();
+
+    if (lookupErr) {
+      console.warn("[stripe-webhook] fingerprint lookup error:", lookupErr);
+      // fail-open (don’t block users if DB hiccups)
+      return { reused: false, fingerprint };
+    }
+
+    if (existing) {
+      return { reused: true, fingerprint };
+    }
+
+    // Record first use
+    const { error: insertErr } = await supabaseAdmin.from("trial_payment_fingerprints").insert({
+      fingerprint,
+      first_user_id: userId,
+      stripe_customer_id: stripeCustomerId,
+    });
+
+    if (insertErr) {
+      console.warn("[stripe-webhook] fingerprint insert error:", insertErr);
+      // still allow; worst case later attempt will be blocked if insert succeeded elsewhere
+    }
+
+    return { reused: false, fingerprint };
+  }
+
+
   // ---- Main handler ----
 
   try {
@@ -150,6 +229,46 @@ Deno.serve(async (req) => {
         typeof session.customer === "string" ? session.customer : (session.customer as any)?.id ?? null;
 
       // const email = session.customer_details?.email || session.metadata?.email || null; // not used
+            // ✅ Payment-method fingerprint enforcement (blocks new trials on reused cards)
+      if (userId && subscriptionId && stripeCustomerId) {
+        const fpCheck = await isReusedTrialFingerprintAndRecordFirstUse({
+          stripeCustomerId,
+          subscriptionId,
+          userId,
+        });
+
+        if (fpCheck.reused) {
+  console.warn("[stripe-webhook] Reused card fingerprint -> ending trial now", fpCheck);
+
+  // ✅ End trial immediately so Stripe attempts payment now
+  const updated = await stripe.subscriptions.update(subscriptionId, {
+    trial_end: "now",
+    cancel_at_period_end: false,
+  });
+
+  // Write the REAL status back to your DB (active / past_due / unpaid, etc.)
+  const priceId = updated.items.data?.[0]?.price?.id ?? null;
+  const currentPeriodEnd = updated.current_period_end
+    ? new Date(updated.current_period_end * 1000).toISOString()
+    : null;
+  const trialEnd = updated.trial_end ? new Date(updated.trial_end * 1000).toISOString() : null;
+  const cancelAtPeriodEnd = Boolean(updated.cancel_at_period_end);
+
+  await ensurePublicUserRow(userId);
+  await upsertSubscriptionRow({
+    userId,
+    subscriptionId,
+    status: updated.status ?? "active",
+    priceId,
+    currentPeriodEnd,
+    trialEnd,
+    cancelAtPeriodEnd,
+  });
+
+  return json(200, { ok: true, handled: type, blocked_trial: true, status: updated.status });
+}
+      }
+
 
       if (userId) {
         // ✅ Prevent FK failures
@@ -215,6 +334,41 @@ if (sub.status === "trialing" || sub.status === "active") {
       }
 
       await ensurePublicUserRow(userId);
+
+      // ✅ Enforce reused-card trial blocking here too (covers event ordering)
+if (sub.status === "trialing") {
+  const stripeCustomerId = typeof sub.customer === "string" ? sub.customer : (sub.customer as any)?.id ?? null;
+
+  if (stripeCustomerId) {
+    const fpCheck = await isReusedTrialFingerprintAndRecordFirstUse({
+      stripeCustomerId,
+      subscriptionId: sub.id,
+      userId,
+    });
+
+    if (fpCheck.reused) {
+      const updated = await stripe.subscriptions.update(sub.id, {
+        trial_end: "now",
+        cancel_at_period_end: false,
+      });
+
+      // Update DB to the real status
+      await upsertSubscriptionRow({
+        userId,
+        subscriptionId: updated.id,
+        status: updated.status ?? null,
+        priceId: updated.items.data?.[0]?.price?.id ?? null,
+        currentPeriodEnd: updated.current_period_end
+          ? new Date(updated.current_period_end * 1000).toISOString()
+          : null,
+        trialEnd: updated.trial_end ? new Date(updated.trial_end * 1000).toISOString() : null,
+        cancelAtPeriodEnd: Boolean(updated.cancel_at_period_end),
+      });
+
+      return json(200, { ok: true, handled: type, blocked_trial: true, status: updated.status });
+    }
+  }
+}
 
       /// ✅ Permanently mark trial as used once the user has a real subscription start
 // (trialing or active). This covers both:
