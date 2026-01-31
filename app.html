@@ -834,94 +834,97 @@ document.getElementById('deleteAccountBtn')?.addEventListener('click', showDelet
         </div>
       </div>
 
-      <!-- Study options -->
-      <div class="card">
-        <h3>Study Options</h3>
-        <div>
-          <label class="inline">
-            <input type="checkbox" id="skipInstructionsAfterFirst" checked />
-            Skip detailed difficulty instructions after first card
-          </label>
-        </div>
-        <!-- Automatic mode -->
-        <div>
-          <label class="inline">
-            <input type="checkbox" id="autoGoodToggle" />
-            Can't give voice commands? Enable automatic mode so each card is assigned
-            <select id="autoRatingSelect" style="width:auto;min-width:120px;">
-              <option value="again">Again</option>
-              <option value="hard">Hard</option>
-              <option value="good" selected>Good</option>
-              <option value="easy">Easy</option>
-              <option value="tomorrow">Show again tomorrow</option>
-            </select>
-            rating automatically
-            <span class="badge">New</span>
-          </label>
-        </div>
-        <div style="margin-top:0.5rem;">
-          <label class="inline" for="handsFreeNextDelaySeconds">
-            Delay after rating before next question
-          </label>
-          <input type="number" id="handsFreeNextDelaySeconds" min="0" max="30" value="2" style="width:60px;" />
-          <span>seconds</span>
-        </div>
-                <!-- NEW: auto study-ahead options -->
-        <div style="margin-top:0.5rem;">
-          <label class="inline">
-            <input type="checkbox" id="autoEnterStudyAhead" />
-            After I finish all due cards, automatically enter study-ahead mode
-          </label>
-        </div>
-        <div>
-          <label class="inline">
-            <input type="checkbox" id="loopStudyAhead" />
-            In study-ahead mode, keep looping the deck automatically
-          </label>
-        </div>
-        <div style="margin-top:0.5rem;">
-          <strong>Hands-free answer behavior:</strong>
-          <div class="row" style="margin-top:0.25rem;">
-            <div class="inline">
-              <input type="radio" name="answerMode" id="answerModeDelay" value="delay" checked />
-              <label for="answerModeDelay">Wait</label>
-              <input type="number" id="answerDelaySeconds" min="1" max="60" value="4" style="width:60px;" />
-              <span>seconds before answer</span>
-            </div>
-            <div class="inline">
-              <input type="radio" name="answerMode" id="answerModeVoice" value="voice" />
-              <label for="answerModeVoice">Play answer after I speak</label>
-            </div>
-          </div>
-        </div>
-        <!-- NEW: study-ahead answer gap control -->
-        <div style="margin-top:0.5rem;">
-          <label class="inline" for="studyAheadGapSeconds">
-            Study-ahead: delay after answer before next question
-          </label>
-          <input type="number" id="studyAheadGapSeconds" min="1" max="60" value="4" style="width:60px;" />
-          <span>seconds</span>
-        </div>
-      </div>
-
-      <!-- NEW: Audio & Voice Settings (collapsible section) -->
-      <div class="card">
-        <div class="row" style="justify-content:space-between;align-items:center;">
-          <h3>Audio &amp; Voice Settings</h3>
-          <div style="flex:0 0 auto;text-align:right;">
-            <button id="toggleAudioSettingsBtn" class="secondary small" type="button">Show</button>
-          </div>
-        </div>
-        <div id="audioSettingsPanel" class="hidden" style="margin-top:0.5rem;">
-          <div>
-            <label for="ttsRateInput">
-              TTS speed (0.5 = slower, 1.0 = normal, 2.0 = faster)
-            </label>
-            <input
-              type="number"
-              id="ttsRateInput"
               min="0.5"
+
+      <script>
+      // ===== Delete Account Modal =====
+      function showDeleteAccountModal() {
+        const modal = document.createElement('div');
+        modal.style.position = 'fixed';
+        modal.style.top = '0';
+        modal.style.left = '0';
+        modal.style.width = '100vw';
+        modal.style.height = '100vh';
+        modal.style.background = 'rgba(0,0,0,0.45)';
+        modal.style.display = 'flex';
+        modal.style.alignItems = 'center';
+        modal.style.justifyContent = 'center';
+        modal.style.zIndex = '20000';
+        modal.innerHTML = `
+          <div style="background:#1e293b;padding:2rem 2.5rem;border-radius:1rem;max-width:95vw;width:350px;box-shadow:0 8px 32px #000a;">
+            <h2 style="color:#fff;margin-bottom:1rem;">Delete Account</h2>
+            <p style="color:#f87171;margin-bottom:1rem;">This will permanently delete your account and all your data. This cannot be undone.</p>
+            <input id="deleteAccountPassword" type="password" placeholder="Enter your password" style="width:100%;padding:0.6rem;margin-bottom:1rem;border-radius:0.5rem;border:1px solid #334155;background:#0f172a;color:#fff;" />
+            <div id="deleteAccountError" style="color:#f87171;font-size:0.95em;margin-bottom:0.5rem;display:none;"></div>
+            <button id="confirmDeleteAccountBtn" class="btn danger" style="width:100%;margin-bottom:0.5rem;">Delete My Account</button>
+            <button id="cancelDeleteAccountBtn" class="btn secondary" style="width:100%;background:#334155;color:#fff;">Cancel</button>
+          </div>
+        `;
+        document.body.appendChild(modal);
+
+        document.getElementById('cancelDeleteAccountBtn').onclick = () => modal.remove();
+        document.getElementById('deleteAccountPassword').onkeydown = (e) => { if (e.key === 'Enter') document.getElementById('confirmDeleteAccountBtn').click(); };
+        document.getElementById('confirmDeleteAccountBtn').onclick = async () => {
+          const password = document.getElementById('deleteAccountPassword').value;
+          const errorDiv = document.getElementById('deleteAccountError');
+          errorDiv.style.display = 'none';
+          if (!password) {
+            errorDiv.textContent = 'Password required.';
+            errorDiv.style.display = 'block';
+            return;
+          }
+          // Re-authenticate user
+          const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+          if (!user || userError) {
+            errorDiv.textContent = 'Could not verify user.';
+            errorDiv.style.display = 'block';
+            return;
+          }
+          const { error: signInError } = await supabaseClient.auth.signInWithPassword({ email: user.email, password });
+          if (signInError) {
+            errorDiv.textContent = 'Incorrect password.';
+            errorDiv.style.display = 'block';
+            return;
+          }
+          // Confirm deletion
+          if (!confirm('Are you sure you want to permanently delete your account and cancel your subscription? This cannot be undone.')) return;
+          // Call Supabase Edge Function to delete account and cancel subscription
+          try {
+            console.log('[DeleteAccount] Attempting to call edge function...');
+            const { data: sessionData } = await supabaseClient.auth.getSession();
+            const accessToken = sessionData?.session?.access_token || '';
+            const resp = await fetch('https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/delete-account', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`
+              },
+              body: JSON.stringify({ user_id: user.id, email: user.email })
+            });
+            console.log('[DeleteAccount] Response status:', resp.status);
+            const text = await resp.text();
+            console.log('[DeleteAccount] Raw response:', text);
+            let result = {};
+            try { result = JSON.parse(text); } catch (err) { result = { error: 'Invalid JSON response', raw: text }; }
+            if (!resp.ok || result.error) {
+              errorDiv.textContent = result.error || 'Failed to delete account. Please contact support.';
+              errorDiv.style.display = 'block';
+              return;
+            }
+            await supabaseClient.auth.signOut();
+            modal.remove();
+            alert('Your account and subscription have been deleted.');
+            window.location.reload();
+          } catch (e) {
+            console.error('[DeleteAccount] Exception:', e);
+            errorDiv.textContent = 'Failed to delete account. Please contact support.';
+            errorDiv.style.display = 'block';
+          }
+        };
+      }
+
               max="2"
+      </script>
               step="0.1"
               value="1.0"
             />
