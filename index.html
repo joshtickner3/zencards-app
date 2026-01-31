@@ -695,6 +695,7 @@ a:hover{
 .legalModalBody ul{
   margin: 0.5rem 0 0 1.15rem;
 }
+
 /* ===== iOS app portrait safe-area fix (website unchanged) ===== */
 .nativeApp .userCounter{
   top: calc(env(safe-area-inset-top, 0px) + 10px) !important;
@@ -2062,15 +2063,22 @@ function setAuthMode(mode) {
   const titleEl = document.getElementById("loginTitle");
   const subtitleEl = titleEl?.nextElementSibling; // the small muted text under title (in your HTML)
 
-  if (mode === "signup") {
-    titleEl.textContent = "Create account";
-if (subtitleEl) {
-  subtitleEl.innerHTML =
-    `Enter an email + password. We'll email you a confirmation link. ` +
-    `In starting your free trial, you hereby acknowledge and agree to our ` +
-    `<a href="#terms" class="legalLink" id="tosInlineLink">Terms of Service</a> ` +
-    `and <a href="#privacy" class="legalLink">Privacy Policy</a>.`;
-}
+ if (mode === "signup") {
+  titleEl.textContent = "Create account";
+
+  if (subtitleEl) {
+    subtitleEl.innerHTML =
+      `Enter an email + password. We'll email you a confirmation link. ` +
+      `In starting your free trial, you hereby acknowledge and agree to our ` +
+      `<a href="#terms" class="legalLink" id="tosInlineLink">Terms of Service</a> ` +
+      `and <a href="#privacy" class="legalLink">Privacy Policy</a>.` +
+      `<br><br>` +
+      `<strong style="color:#bbf7d0;">` +
+      `Upon creation of your free trial, navigate back to zencardstudy.com to log in. ` +
+      `Happy studying!` +
+      `</strong>`;
+  }
+
     loginSubmitBtn.textContent = "Create account";
     forgotPwBtn.style.display = "none";
     if (toggleAuthModeBtn) toggleAuthModeBtn.textContent = "Already have an account? Log in";
