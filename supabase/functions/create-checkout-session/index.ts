@@ -137,19 +137,6 @@ Deno.serve(async (req) => {
       // ignore; Stripe history below is still authoritative
     }
 
-    // Stripe authoritative gate:
-    // If customer has EVER had a subscription (trialing/active/canceled/etc), no trial.
-    const subs = await stripe.subscriptions.list({
-      customer: customerId,
-      status: "all",
-      limit: 100,
-    });
-
-    const hasAnySubscriptionHistory = subs.data.length > 0;
-    if (hasAnySubscriptionHistory) {
-      trialEligible = false;
-    }
-
     // -----------------------------------------
     // 3) Create Checkout Session
     // -----------------------------------------
@@ -196,10 +183,9 @@ Deno.serve(async (req) => {
     const session = await stripe.checkout.sessions.create(sessionParams);
 
     return jsonResponse(origin, 200, {
-      url: session.url,
-      trial_eligible: trialEligible,
-      has_any_subscription_history: hasAnySubscriptionHistory,
-    });
+  url: session.url,
+  trial_eligible: trialEligible,
+});
   } catch (e) {
     console.error("create-checkout-session error:", e);
     return jsonResponse(origin, 500, {
