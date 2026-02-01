@@ -536,6 +536,25 @@ a:hover{
   border: 1px solid #111827;
 }
 
+/* ===== "ZenCards is Your Solution" wrapper (NEW) ===== */
+.solutionStrip{
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding: 0.85rem;
+  border-radius: 0.95rem;
+  background: linear-gradient(180deg, rgba(2,6,23,0.86), rgba(2,6,23,0.62));
+  border: 1px solid #111827;
+}
+
+.solutionTitle{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+
 .useTitle{
   display:flex;
   align-items:flex-start;
@@ -858,7 +877,7 @@ a:hover{
       <!-- ===== Student pain strip (NEW) ===== -->
 <div class="painStrip">
   <div class="painTitle">
-    <h3 class="collapsible-header" id="studentTrapHeader" tabindex="0" style="cursor:pointer;user-select:none;">The trap plaguing ambitious students <span class="collapsible-arrow">▼</span></h3>
+    <h3 class="collapsible-header" id="studentTrapHeader" tabindex="0" style="cursor:pointer;user-select:none;">The Trap Plaguing Ambitious Students <span class="collapsible-arrow">▼</span></h3>
     <div class="muted"></div>
   </div>
   <div class="collapsible-content" id="studentTrapContent" style="display:none;">
@@ -868,21 +887,28 @@ a:hover{
           <div class="painIcon">⏱</div>
           <h4>Grades slip</h4>
         </div>
-        <p>I was working full time during my freshman year while refusing to sacrifice seeing friends and family which stressed me out in trying to maintain my slipping grades because of no time to study, as I felt like I was wasting my educational opportunity and burning my chances for post-graduation scholarships, grad school admissions, job opportunities and internships. I knew changing my habits rapidly was essential as each day that passed lowered my chances for success.</p>
+        <p>I was working full time during my freshman year while refusing to sacrifice seeing friends and family. I was stressed out in trying to maintain my slipping grades because of no time to study, as I felt like I was wasting my educational opportunity and burning my chances for post-graduation scholarships, grad school admissions, job opportunities and internships. I knew changing my habits rapidly was essential as each day that passed lowered my chances for success in the future.</p>
       </div>
       <div class="painItem">
         <div class="painItemTop">
           <div class="painIcon">💸</div>
           <h4>Money stays tight</h4>
         </div>
-        <p> So during my sophomore year of college, I decided to forego my full time job in pursuit of heavy studying for academic success and a social life, however I was being burned financially and was saving no money at all for my future. I dreamt of financial freedom and knew saving as early as possible was critical to do so, otherwise I would be stuck after college working around the clock to survive.</p>
+        <p> So during my sophomore year of college, I decided to forego my full time job in pursuit of heavy studying for academic success and a social life, however I was being burned financially and was saving no money at all for my future. I dreamt of financial freedom and knew saving as early as possible was critical to do so, otherwise I would be stuck after college with no money to invest into a business or assets and be working around the clock to survive. I always thought I required more time in the day to maintain a balance.</p>
+      </div>
+      <div class="painItem">
+        <div class="painItemTop">
+          <div class="painIcon">💤</div>
+          <h4>Health can suffer</h4>
+        </div>
+        <p> Throughout college, I would slip into periods where I neglected my well-being in attempting to maintain all three areas of my life as a student as I felt like it was the only way to have the time I needed to do so, leaving me out of shape from neglecting the gym and dissatisfied with my personal appearance while feeling lethargic from inconsistent sleep patterns.</p>
       </div>
       <div class="painItem">
         <div class="painItemTop">
           <div class="painIcon">😶</div>
           <h4>No free time</h4>
         </div>
-        <p>My latter two years of college featured significant devotion to my studies and a full time job, yielding progress from previous years, however I was highly socially isolated, lonely and burnt out from never seeing my friends and family. I was saving money and had a high gpa, however I knew that if I couldn't enjoy my final years in college I would be left feeling regretful that I didn't enjoy my college experience. </p>
+        <p>My latter two years of college featured significant devotion to my studies and a full time job, yielding progress from previous years, however I was highly socially isolated, lonely and burnt out from never seeing my friends and family. I was saving money and had a high gpa, however I knew that if I couldn't enjoy my final years in college I would be left feeling regretful that I didn't enjoy my college experience. During my final year, I realized that the root of my problems was not a lack of time, rather the inability to maximize the time I was given. </p>
       </div>
     </div>
   </div>
@@ -935,34 +961,102 @@ a:hover{
   </div>
 </div>
 
-  <!-- ===== Trust strip (NEW) ===== -->
-<div class="kpiRow" style="margin-top:0.75rem;">
-  <div class="kpi">
-    <p class="big">Effortless integration with airpods and headphones</p>
-    <p class="small">
-      ZenCards was designed to be used in quiet settings like classrooms and libraries. Just connect your headphones or AirPods and start studying.
-    </p>
+ <!-- ===== ZenCards is Your Solution (NEW wrapper dropdown) ===== -->
+<div class="solutionStrip">
+  <div class="solutionTitle">
+    <h3 class="collapsible-header" id="solutionHeader" tabindex="0" style="cursor:pointer;user-select:none;">
+      ZenCards is Your Solution. <span class="collapsible-arrow">▼</span>
+    </h3>
+    <div class="muted" style="font-size:0.9rem;"></div>
   </div>
 
-  <div class="kpi">
-    <p class="big">Secure payments by Stripe</p>
-    <p class="small">
-      Payments are processed securely by our partner Stripe. ZenCards never sees or stores your card details.
-    </p>
-  </div>
+  <div class="collapsible-content" id="solutionContent" style="display:none;">
 
-  <div class="kpi">
-    <p class="big">Works on iPhone + web</p>
-    <p class="small">
-      One account works across the web app and the iPhone app — your access follows your email.
-    </p>
-  </div>
+    <!-- ✅ Move "Use ZenCards anywhere" UNDER the new header -->
+    <div class="useStrip" style="margin-top:0.75rem;">
+      <div class="useTitle">
+        <h3 class="collapsible-header" id="useAnywhereHeader" tabindex="0" style="cursor:pointer;user-select:none;">
+          Use ZenCards anywhere <span class="collapsible-arrow">▼</span>
+        </h3>
+        <div class="muted" style="font-size:0.9rem;">If you can listen, you can review.</div>
+      </div>
 
-  <div class="kpi">
-    <p class="big">Cancel anytime in 2 clicks</p>
-    <p class="small">
-      Cancel from “Manage Billing” — no emails required. Email us at support@zencardstudy.com if having any difficulties. We respond within 24 hours at most, if not significantly sooner.
-    </p>
+      <div class="collapsible-content" id="useAnywhereContent" style="display:none;">
+        <p>We designed ZenCards to work in <strong>any</strong> setting.</p>
+        <div class="pillRow">
+          <span class="pill"><span class="dot"></span>Commuting</span>
+          <span class="pill"><span class="dot"></span>Walking to class</span>
+          <span class="pill"><span class="dot"></span>Eating</span>
+          <span class="pill"><span class="dot"></span>Between lectures</span>
+          <span class="pill"><span class="dot"></span>In class (silent mode)</span>
+          <span class="pill"><span class="dot"></span>Doing chores</span>
+          <span class="pill"><span class="dot"></span>At the gym</span>
+          <span class="pill"><span class="dot"></span>Waiting in line</span>
+          <span class="pill"><span class="dot"></span>Anywhere you have 2 minutes</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ✅ The 8 boxes now live inside the solution dropdown -->
+    <div class="kpiRow">
+      <div class="kpi">
+        <p class="big">Roughly 3 hours/day</p>
+        <p class="small">Of study time gained or saved by converting unproductive time into review time.</p>
+      </div>
+
+      <div class="kpi">
+        <p class="big">≈ 33¢/day</p>
+        <p class="small">
+          <span style="text-decoration:line-through;color:#b91c1c;">$19.99</span>
+          <span style="color:#22c55e;font-weight:700;">$9.99/month</span>
+          for a massive upgrade in the student lifestyle experience, potentially hundreds if not thousands of dollars saved per month by being able to now take on more hours working and bolstered memory retention.
+          <span style="color:#f59e42;font-weight:600;">Limited time: 50% off for life. Deal ends soon.</span>
+        </p>
+      </div>
+
+      <div class="kpi">
+        <p class="big">Hands-free + Silent</p>
+        <p class="small">Choose audio mode or traditional flashcards depending on your setting and current activity.</p>
+      </div>
+
+      <div class="kpi">
+        <p class="big">Built by a student, for students</p>
+        <p class="small">
+          ZenCards was created to solve the exact problem I faced in wanting to work full time while maintaining a 4.0 gpa as a pre-med student and refusing to sacrifice my social life.
+        </p>
+      </div>
+    </div>
+
+    <div class="kpiRow" style="margin-top:0.75rem;">
+      <div class="kpi">
+        <p class="big">Effortless integration with airpods and headphones</p>
+        <p class="small">
+          ZenCards was designed to be used in quiet settings like classrooms and libraries. Just connect your headphones or AirPods and start studying.
+        </p>
+      </div>
+
+      <div class="kpi">
+        <p class="big">Secure payments by Stripe</p>
+        <p class="small">
+          Payments are processed securely by our partner Stripe. ZenCards never sees or stores your card details.
+        </p>
+      </div>
+
+      <div class="kpi">
+        <p class="big">Works on iPhone + web</p>
+        <p class="small">
+          One account works across the web app and the iPhone app — your access follows your email.
+        </p>
+      </div>
+
+      <div class="kpi">
+        <p class="big">Cancel anytime in 2 clicks</p>
+        <p class="small">
+          Cancel from “Manage Billing” — no emails required. Email us at support@zencardstudy.com if having any difficulties. We respond within 24 hours at most, if not significantly sooner.
+        </p>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -1167,6 +1261,7 @@ a:hover{
     setupCollapsible('whyWorksHeader', 'whyWorksContent');
     setupCollapsible('howWorksHeader', 'howWorksContent');
     setupCollapsible('studentTrapHeader', 'studentTrapContent');
+    setupCollapsible('solutionHeader', 'solutionContent');
     setupCollapsible('useAnywhereHeader', 'useAnywhereContent');
   </script>
 
