@@ -409,11 +409,11 @@ a:hover{
 
 .painGrid{
   display:grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
 }
 
-@media (max-width: 860px){
+@media (max-width: 680px){
   .painGrid{ grid-template-columns: 1fr; }
 }
 
@@ -422,6 +422,8 @@ a:hover{
   border:1px solid #111827;
   border-radius:0.85rem;
   padding:0.85rem;
+
+  height: 100%;
 }
 
 .painItemTop{
@@ -919,7 +921,7 @@ a:hover{
 <div class="solutionStrip">
   <div class="solutionTitle">
     <h3 class="collapsible-header" id="solutionHeader" tabindex="0" style="cursor:pointer;user-select:none;">
-      ZenCards is Your Solution. <span class="collapsible-arrow">▼</span>
+      ZenCards is Your Solution <span class="collapsible-arrow">▼</span>
     </h3>
     <div class="muted" style="font-size:0.9rem;"></div>
   </div>
@@ -936,7 +938,7 @@ a:hover{
       </div>
 
       <div class="collapsible-content" id="useAnywhereContent" style="display:none;">
-        <p>We designed ZenCards to work in <strong>any</strong> setting.</p>
+        <p>We designed ZenCards so you can study in <strong>any</strong> setting.</p>
         <div class="pillRow">
           <span class="pill"><span class="dot"></span>Commuting</span>
           <span class="pill"><span class="dot"></span>Walking to class</span>
