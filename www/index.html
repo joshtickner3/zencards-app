@@ -851,7 +851,7 @@ a:hover{
       <span class="badge">3-Day Free Trial</span>
       <span class="badge"><span style="text-decoration:line-through;color:#b91c1c;">$19.99</span> $9.99/month</span>
 
-      <h1> ZenCards is the world's first study tool designed for fully hands and eyes-free studying on the go.</h1>
+      <h1> The hours in the day are your most valuable asset as a goal driven ambitious student. Stop throwing it away with ZenCards.</h1>
       <p>
         For dedicated full time students or working professionals taking some classes on the side who wish to have it all: an impressive GPA, strong finances, and an active social life, ZenCards is your solution.
       </p>
@@ -1185,14 +1185,7 @@ a:hover{
       <details>
         <summary>How does ZenCards differ from quizlet and anki?</summary>
         <p class="muted" style="margin:0.5rem 0 0 0;">
-          Anki and Quizlet are phenomenal tools for traditional studying, however they cannot be used when you are occupied with everyday tasks, so you must dedicate specific study time in order to review with them which overloads your schedule. ZenCards is designed specifically to allow you to study during activities where traditional studying is impossible, and we put a massive emphasis on the quality of this study time as well by giving you a range of different modes to use depending on the context.  
-        </p>
-      </details>
-
-       <details>
-        <summary>How many free trials may I get?</summary>
-        <p class="muted" style="margin:0.5rem 0 0 0;">
-         Users are limited to one free trial.  
+          Anki and Quizlet are phenomenal tools for traditional studying, however they cannot be used when you are occupied with everyday tasks, so you must dedicate specific study time in order to review with them which overloads your schedule. ZenCards is designed specifically to allow you to study during activities where traditional studying is impossible, and we put a massive emphasis on the quality of this study time as well by giving you a range of different modes to use depending on your setting.  
         </p>
       </details>
 
@@ -1367,9 +1360,9 @@ a:hover{
         By using ZenCards (“the Service”), you agree to these Terms. If you do not agree, do not use ZenCards.
       </p>
 
-      <h4>1) If I cancel and subscribe again later on, will all of my old cards still be there?</h4>
+      <h4>1) What ZenCards is</h4>
       <p class="muted">
-        ZenCards retains your flashcards and study content even if you cancel your subscription. When you resubscribe, your data will still be available.
+        ZenCards is a study tool that helps users review flashcards using hands-free audio and silent study modes.
       </p>
 
       <h4>2) Accounts (no sharing)</h4>
@@ -1382,7 +1375,7 @@ a:hover{
 
       <h4>3) Subscriptions & billing</h4>
       <p class="muted">
-        ZenCards may offer free trials and paid subscriptions. Billing and subscription management are handled by our payment provider (such as Stripe). Members are prohibitted from attempting to solicit multiple free trials.
+        ZenCards may offer free trials and paid subscriptions. Billing and subscription management are handled by our payment provider (such as Stripe).
       </p>
 
       <h4>4) Acceptable use</h4>
@@ -1397,7 +1390,7 @@ a:hover{
 
       <h4>6) Availability & changes</h4>
       <p class="muted">
-        We do not guarantee uninterrupted service, as modifications to the website in order to combat bugs and process required updates from our partners.
+        We may update, modify, or discontinue parts of ZenCards at any time. We do not guarantee uninterrupted service.
       </p>
 
       <h4>7) Disclaimer</h4>
@@ -1696,13 +1689,19 @@ async function refreshLandingGate() {
   const params = new URLSearchParams(window.location.search);
   const cameFromStripe = params.has("success") || params.has("session_id");
 
-    if (!access?.hasAccess && cameFromStripe) {
+  if (!access?.hasAccess && cameFromStripe) {
+  // If trial is blocked, don't poll — it's not going to become "active/trialing"
+  if (access?.statuses?.includes("trial_blocked")) {
+    // optional: also clean URL
+    history.replaceState({}, document.title, window.location.pathname);
+  } else {
     lpStatus.textContent = "Finishing setup… (this can take a few seconds)";
     const ok = await waitForAccess({ maxMs: 30000, intervalMs: 1500 });
     if (ok) access = await checkUserAccess(user.id);
 
     history.replaceState({}, document.title, window.location.pathname);
   }
+}
 
   // Show status info
   if (access?.rows?.length) {
@@ -1711,6 +1710,28 @@ async function refreshLandingGate() {
   } else {
     lpStatus.textContent = access?.hasAccess ? "Subscription status: ok" : "No active/trial subscription found.";
   }
+
+    // ✅ If trial was blocked (reused payment method), show clear message
+    // ✅ If trial was blocked (reused payment method), allow PAID checkout (no trial)
+  if (access?.statuses?.includes("trial_blocked")) {
+    lpStatus.textContent =
+      "Free trial already used on this payment method. You can still subscribe now (no trial).";
+
+    // ✅ Let them proceed (this button should take them to Stripe Checkout)
+    setLpGoButton(true);
+
+    // Optional: make the CTA text clearer
+    lpGoBtn.textContent = "Subscribe now";
+
+    // If you want: visually emphasize the CTA
+    lpGoBtn.style.background = "var(--green)";
+    lpGoBtn.style.color = "#020617";
+    lpGoBtn.style.cursor = "pointer";
+    lpGoBtn.style.boxShadow = "0 8px 18px rgba(16,185,129,0.28)";
+
+    return;
+  }
+
 
    // ✅ past_due -> auto-open portal
 if (access?.isPastDue) {
@@ -1848,6 +1869,12 @@ lpGoBtn?.addEventListener("click", async () => {
   // ✅ If they have access, go to app
   if (access?.hasAccess) {
     goToAppHtml();
+    return;
+  }
+
+  // ✅ If trial is blocked, send them to PAID checkout (no trial)
+  if (access?.statuses?.includes("trial_blocked")) {
+    await startCheckoutFromLanding();
     return;
   }
 
