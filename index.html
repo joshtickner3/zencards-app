@@ -195,13 +195,13 @@
 
     *{box-sizing:border-box}
     body{
-      margin:0;
-      padding:1rem;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-      background: radial-gradient(circle at top, var(--bg1) 0, var(--bg2) 55%);
-      color:var(--text);
-      line-height:1.5;
-    }
+  margin:0;
+  padding: clamp(16px, 3vw, 36px);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: radial-gradient(circle at top, var(--bg1) 0, var(--bg2) 55%);
+  color:var(--text);
+  line-height:1.5;
+}
   a{
   color: var(--link);
   text-decoration: underline;
@@ -211,15 +211,19 @@ a:hover{
   color: var(--link2);
 }
 
-    .container{max-width:980px;margin:0 auto;}
+.container{
+  max-width:980px;
+  margin:0 auto;
+  padding: 0 clamp(0px, 1vw, 10px);
+}
     .card{
-      background: var(--card);
-      border-radius: 0.9rem;
-      padding: 1rem;
-      margin-top: 1rem;
-      border: 1px solid var(--border);
-      box-shadow: var(--shadow);
-    }
+  background: var(--card);
+  border-radius: 0.9rem;
+  padding: clamp(14px, 2vw, 22px); /* 👈 THIS is the change */
+  margin-top: 1rem;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
     .row{
       display:flex;
       gap:1rem;
@@ -914,7 +918,6 @@ a:hover{
       </div>
     </div>
   </div>
-</div>
 </div>
 
  <!-- ===== ZenCards is Your Solution (NEW wrapper dropdown) ===== -->
