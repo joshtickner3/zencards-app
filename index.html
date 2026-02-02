@@ -420,6 +420,26 @@ a:hover{
 .painTitle .muted{
   font-size: 0.9rem;
 }
+/* If the right-side muted slot is empty, remove it so header spans full width */
+.painTitle .muted:empty,
+.solutionTitle .muted:empty { display: none; }
+.painTitle, .solutionTitle { gap: 0; }
+
+/* Ensure title rows are identical width to pricing */
+.painTitle,
+.solutionTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0;
+}
+
+/* Remove empty right-side slot so header spans full width */
+.painTitle .muted:empty,
+.solutionTitle .muted:empty {
+  display: none;
+}
+
 
 .painGrid{
   display:grid;
