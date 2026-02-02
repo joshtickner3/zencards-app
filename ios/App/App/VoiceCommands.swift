@@ -2,7 +2,6 @@ import Foundation
 import Capacitor
 import AVFoundation
 import Speech
-import MediaPlayer
 
 @objc(VoiceCommandsPlugin)
 public class VoiceCommandsPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -23,8 +22,6 @@ public class VoiceCommandsPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private var suspendedForTTS = false
 
-    private let remoteController = AudioRemoteController.shared
-
     public override func load() {
         super.load()
         print("✅ VoiceCommandsPlugin loaded into Capacitor bridge")
@@ -38,11 +35,6 @@ public class VoiceCommandsPlugin: CAPPlugin, CAPBridgedPlugin {
                                                selector: #selector(onTTSDidFinish),
                                                name: .zenTTSDidFinish,
                                                object: nil)
-
-        remoteController.onRatingChosen = { [weak self] rating in
-            self?.notifyListeners("remoteRating", data: ["rating": rating])
-        }
-        remoteController.configureRemoteCommands()
     }
 
     // MARK: - JS API
@@ -67,7 +59,6 @@ public class VoiceCommandsPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func stop(_ call: CAPPluginCall) {
         stopListening(deactivateSession: true)
-        remoteController.teardownRemoteCommands()
         call.resolve()
     }
     @objc func isAvailable(_ call: CAPPluginCall) {
