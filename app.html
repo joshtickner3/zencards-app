@@ -3183,15 +3183,18 @@ function speakWithWebTts(text, onEnd, opts = {}) {
     speakSegment();
   }
 
-  // Ensure voices are loaded before speaking
-  if (window.speechSynthesis.getVoices().length === 0) {
-    window.speechSynthesis.onvoiceschanged = function handler() {
-      window.speechSynthesis.onvoiceschanged = null;
-      startSpeaking();
-    };
-  } else {
-    startSpeaking();
-  }
+  // ✅ Always start immediately (works even if voices list is empty on iOS/WKWebView)
+startSpeaking();
+
+// ✅ Optional: if voices load later, you can re-cache voice selection for future calls
+// (IMPORTANT: don't clobber an existing onvoiceschanged handler)
+if (window.speechSynthesis.getVoices().length === 0) {
+  const prev = window.speechSynthesis.onvoiceschanged;
+  window.speechSynthesis.onvoiceschanged = function () {
+    try { if (typeof prev === "function") prev(); } catch (_) {}
+    // don't restart mid-sentence; just allow future calls to pick voices
+  };
+}
 }
 
     function listenForCommand(callback) {
