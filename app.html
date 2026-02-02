@@ -1260,26 +1260,40 @@ const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
     document.getElementById('deleteAccountBtn')?.addEventListener('click', showDeleteAccountModal);
 
     // On every session change, sync to Capacitor Preferences (native only)
-    (async function setupSessionSync() {
-      const isNative = !!window.Capacitor || !!window.cordova || !!window.webkit?.messageHandlers?.bridge;
-      if (!isNative) return;
+    // On every session change, sync to Capacitor Preferences (native only)
+(async function setupSessionSync() {
+  try {
+    const cap = window.Capacitor;
+    const isNative =
+      !!cap &&
+      (
+        (typeof cap.isNativePlatform === "function" && cap.isNativePlatform()) ||
+        (typeof cap.getPlatform === "function" && cap.getPlatform() !== "web")
+      );
+
+    if (!isNative) return;
+
+    // IMPORTANT: In a built Capacitor app, Preferences is available via Capacitor.Plugins
+    const Preferences =
+      cap?.Plugins?.Preferences ||
+      (await import("@capacitor/preferences")).Preferences; // fallback for bundled builds only
+
+    window.supabaseClient.auth.onAuthStateChange(async (_event, session) => {
       try {
-        const { Preferences } = await import('@capacitor/preferences');
-        window.supabaseClient.auth.onAuthStateChange(async (_event, session) => {
-          try {
-            if (session) {
-              await Preferences.set({ key: 'zencards-auth', value: localStorage.getItem('zencards-auth') || '' });
-            } else {
-              await Preferences.remove({ key: 'zencards-auth' });
-            }
-          } catch (e) {
-            console.warn('[Capacitor] Could not sync session to Preferences:', e);
-          }
-        });
+        if (session) {
+          await Preferences.set({ key: "zencards-auth", value: localStorage.getItem("zencards-auth") || "" });
+        } else {
+          await Preferences.remove({ key: "zencards-auth" });
+        }
       } catch (e) {
-        console.warn('[Capacitor] Could not set up Preferences sync:', e);
+        console.warn("[Capacitor] Could not sync session to Preferences:", e);
       }
-    })();
+    });
+  } catch (e) {
+    console.warn("[Capacitor] setupSessionSync failed (safe to ignore on web):", e);
+  }
+})().catch(e => console.warn("[Capacitor] setupSessionSync top-level:", e));
+
 // ===================== BFCache SAFETY (Safari/iOS, back button) =====================
 // If Safari restores this page from BFCache, JS state can be stale.
 // Force a hard reload so auth + UI + listeners re-bootstrap cleanly.
@@ -2532,6 +2546,7 @@ window.speakCardText = function(questionRaw, answerRaw, deckId, cardObj) {
         playBtn.title = "Play card (TTS)";
         playBtn.className = "secondary small";
        playBtn.addEventListener("click", () => {
+        unlockTtsOnce();
   window.speakCardText(card.question, card.answer, selectedDeckId, card);
 });
         actionsDiv.appendChild(playBtn);
@@ -3168,13 +3183,20 @@ function speakWithWebTts(text, onEnd, opts = {}) {
       };
 
       utt.onerror = (err) => {
-        if (myGeneration !== speakGeneration) return;
-        console.error("TTS error:", err);
-        setTimeout(() => {
-          if (myGeneration !== speakGeneration) return;
-          speakSegment();
-        }, seg.pause);
-      };
+  if (myGeneration !== speakGeneration) return;
+  console.error("TTS error:", {
+    error: err?.error,
+    elapsedTime: err?.elapsedTime,
+    name: err?.name,
+    message: err?.message,
+    event: err
+  });
+  setTimeout(() => {
+    if (myGeneration !== speakGeneration) return;
+    speakSegment();
+  }, seg.pause);
+};
+
 
       if (myGeneration !== speakGeneration) return;
       window.speechSynthesis.speak(utt);
@@ -3195,6 +3217,24 @@ if (window.speechSynthesis.getVoices().length === 0) {
     // don't restart mid-sentence; just allow future calls to pick voices
   };
 }
+}
+
+window.__zc_tts_unlocked = window.__zc_tts_unlocked || false;
+
+function unlockTtsOnce() {
+  if (window.__zc_tts_unlocked) return;
+  window.__zc_tts_unlocked = true;
+
+  try {
+    const u = new SpeechSynthesisUtterance(" ");
+    u.volume = 0;     // silent
+    u.rate = 1;
+    window.speechSynthesis.speak(u);
+    window.speechSynthesis.cancel(); // clears it immediately, but unlocks
+    console.log("[TTS] unlocked");
+  } catch (e) {
+    console.warn("[TTS] unlock failed:", e);
+  }
 }
 
     function listenForCommand(callback) {
@@ -5352,6 +5392,7 @@ setCardContent(voiceAnswerText, currentCard.answer);
     });
 
     startSilentBtn.addEventListener("click", () => {
+      unlockTtsOnce();
       saveLastMode("silent");
 if (selectedDeckId) saveLastDeckId(selectedDeckId);
       currentDeckId = selectedDeckId;
@@ -5394,6 +5435,7 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
     // >>> MODIFIED: add async + inline mic permission request here <<<
     // >>> REPLACE your existing startVoiceBtn handler with this whole block <<<
 startVoiceBtn.addEventListener("click", async () => {
+  unlockTtsOnce();
   saveLastMode("voice");
   if (selectedDeckId) saveLastDeckId(selectedDeckId);
 
