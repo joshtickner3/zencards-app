@@ -3029,8 +3029,12 @@ if (answerDelayAfterSpeechSecInput) {
 
   // Stop browser TTS
   if (window.speechSynthesis) {
-    try { window.speechSynthesis.cancel(); } catch (e) {}
-  }
+  try { window.speechSynthesis.cancel(); } catch (_) {}
+  // ✅ iOS Safari/WebView sometimes needs a second cancel on next tick
+  setTimeout(() => {
+    try { window.speechSynthesis.cancel(); } catch (_) {}
+  }, 0);
+}
 
   isSpeaking = false;
 
@@ -3058,105 +3062,119 @@ function speakSafe(text, onEnd) {
 // Pure browser TTS (this is basically your old speak() body)
 function speakWithWebTts(text, onEnd, opts = {}) {
   const { lang = "en-US" } = opts;
+
   if (!window.speechSynthesis) {
     setStatus("Text-to-speech not supported in this browser.");
     if (onEnd) onEnd();
     return;
   }
 
-  // 🧹 Clear any queued / half-finished utterances so we get a clean read.
-  try {
-    window.speechSynthesis.cancel();
-  } catch (e) {
-    console.error("Error cancelling previous speech:", e);
-  }
+  // Clear any queued / half-finished utterances
+  try { window.speechSynthesis.cancel(); } catch (_) {}
 
-  // This is a new TTS "generation"
+  // New TTS generation
   speakGeneration++;
   const myGeneration = speakGeneration;
 
-  // Expand acronyms (2+ consecutive capital letters) to spaced letters for TTS
   function expandAcronyms(str) {
-    return str.replace(/\b([A-Z]{2,})\b/g, (m) => m.split('').join(' '));
+    return String(str || "").replace(/\b([A-Z]{2,})\b/g, (m) => m.split("").join(" "));
   }
 
   const processedText = expandAcronyms(text);
 
-  // Split text into segments, keeping delimiters
+  // Split text into segments
   const segments = [];
-  let regex = /([^.,]+)([.,]?)/g;
+  const regex = /([^.,]+)([.,]?)/g;
   let match;
   while ((match = regex.exec(processedText)) !== null) {
     const phrase = match[1].trim();
     const delim = match[2];
-    if (phrase) segments.push({ text: phrase + (delim || ""), pause: delim === '.' ? 500 : delim === ',' ? 250 : 0 });
+    if (phrase) {
+      segments.push({
+        text: phrase + (delim || ""),
+        pause: delim === "." ? 500 : delim === "," ? 250 : 0,
+      });
+    }
   }
 
   function getPreferredVoice() {
-  const voices = window.speechSynthesis.getVoices();
+    const voices = window.speechSynthesis.getVoices();
+    const langPrefix = String(lang).split("-")[0];
 
-  // 1) Prefer voices that match the requested language
-  // Match either exact lang (e.g., "es-ES") or prefix (e.g., "es")
-  const langPrefix = String(lang).split("-")[0];
+    const matching = voices.filter(v => {
+      if (!v || !v.lang) return false;
+      const vPrefix = v.lang.split("-")[0];
+      return v.lang === lang || vPrefix === langPrefix;
+    });
 
-  const matching = voices.filter(v => {
-    if (!v || !v.lang) return false;
-    const vPrefix = v.lang.split("-")[0];
-    return v.lang === lang || vPrefix === langPrefix;
-  });
+    if (langPrefix === "en") {
+      let preferred =
+        matching.find(v => v.name === "Daniel") ||
+        matching.find(v => v.name === "Daniel (Enhanced)") ||
+        matching.find(v => !String(v.name || "").toLowerCase().includes("samantha")) ||
+        matching[0] ||
+        null;
+      return preferred;
+    }
 
-  // 2) If user asked for English, keep your "Daniel, not Samantha" preference
-  if (langPrefix === "en") {
-    let preferredVoice = matching.find(v => v.name === "Daniel")
-      || matching.find(v => v.name === "Daniel (Enhanced)");
-
-    // fall back to any matching English voice that isn't Samantha
-    if (!preferredVoice) preferredVoice = matching.find(v => !v.name.toLowerCase().includes("samantha"));
-    if (!preferredVoice) preferredVoice = matching[0] || null;
-    return preferredVoice;
+    return matching[0] || voices[0] || null;
   }
-
-  // 3) For non-English, just take the first matching voice (usually best pronunciation)
-  if (matching.length > 0) return matching[0];
-
-  // 4) Fallback: any voice at all (last resort)
-  return voices[0] || null;
-}
 
   function startSpeaking() {
     const preferredVoice = getPreferredVoice();
     let idx = 0;
+
     function speakSegment() {
+      // HARD STOP: if cancelled, stop immediately
+      if (myGeneration !== speakGeneration) return;
+
       if (idx >= segments.length) {
         isSpeaking = false;
         setStatus("");
         if (onEnd) onEnd();
         return;
       }
+
       const seg = segments[idx++];
+
+      // HARD STOP: check again right before speaking
+      if (myGeneration !== speakGeneration) return;
+
       const utt = new SpeechSynthesisUtterance(seg.text);
       utt.lang = lang;
-      if (preferredVoice) {
-        utt.voice = preferredVoice;
-      }
+      if (preferredVoice) utt.voice = preferredVoice;
+
       utt.rate = typeof ttsRate === "number" ? ttsRate : 0.8;
       utt.pitch = 1.0;
       utt.volume = typeof ttsVolume === "number" ? ttsVolume : 1.0;
+
       utt.onstart = () => {
         if (myGeneration !== speakGeneration) return;
         isSpeaking = true;
         setStatus("Speaking...");
       };
+
       utt.onend = () => {
         if (myGeneration !== speakGeneration) return;
-        setTimeout(speakSegment, seg.pause);
+        setTimeout(() => {
+          if (myGeneration !== speakGeneration) return;
+          speakSegment();
+        }, seg.pause);
       };
+
       utt.onerror = (err) => {
+        if (myGeneration !== speakGeneration) return;
         console.error("TTS error:", err);
-        setTimeout(speakSegment, seg.pause);
+        setTimeout(() => {
+          if (myGeneration !== speakGeneration) return;
+          speakSegment();
+        }, seg.pause);
       };
+
+      if (myGeneration !== speakGeneration) return;
       window.speechSynthesis.speak(utt);
     }
+
     speakSegment();
   }
 
@@ -3170,6 +3188,8 @@ function speakWithWebTts(text, onEnd, opts = {}) {
     startSpeaking();
   }
 }
+
+
 
     function listenForCommand(callback) {
       if (isMicMuted) {
@@ -3869,9 +3889,8 @@ document.addEventListener("keydown", (e) => {
     }
 
     backToMenuBtn.addEventListener("click", async () => {
-      await stopAllAudio();
-      showMainMenu();
-    });
+  await showMainMenu();
+});
 
     pauseBtn.addEventListener("click", async () => {
   isPaused = true;
