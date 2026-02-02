@@ -4600,18 +4600,25 @@ if (awaitingAnswerSignal && currentMode === "voice") {
     }
 
     // Apply scheduling normally
-    const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
-    if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
-      queueCardForAgain(currentDeckId, currentCard);
-    }
+    // Apply scheduling normally (this records the rating)
+const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
+if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
+  queueCardForAgain(currentDeckId, currentCard);
+}
 
-    awaitingDifficulty = false;
-    if (voiceRatingButtons) {
-      voiceRatingButtons.classList.add("hidden");
-    }
-    setStudyState(StudyState.IDLE);
-    runVoiceLoop();
-    return;
+awaitingDifficulty = false;
+if (voiceRatingButtons) {
+  voiceRatingButtons.classList.add("hidden");
+}
+
+// ✅ NEW: echo the rating word with mic OFF, then continue
+echoRatingThenContinue(ratingKey, () => {
+  if (isPaused) return; // safety
+  setStudyState(StudyState.IDLE);
+  runVoiceLoop();
+});
+
+return;
   }
 
   // Fallback: keep listening for the next command in voice mode
@@ -4636,6 +4643,48 @@ if (awaitingAnswerSignal && currentMode === "voice") {
           return "mark each card as good";
       }
     }
+
+    // ✅ NEW: speak back the chosen rating (echo) with mic OFF, then continue
+function echoRatingThenContinue(ratingKey, next) {
+  // Normalize what we speak back (exactly the rating word)
+  const spoken =
+    ratingKey === "again" ? "again" :
+    ratingKey === "hard"  ? "hard"  :
+    ratingKey === "good"  ? "good"  :
+    ratingKey === "easy"  ? "easy"  :
+    null;
+
+  if (!spoken) {
+    // fallback: just continue
+    next && next();
+    return;
+  }
+
+  // Hard stop any active listening and prevent re-starts during the echo
+  keepListening = false;
+  if (recognition) {
+    try { recognition.stop(); } catch (_) {}
+  }
+
+  // Mic OFF during echo
+  const prevMicMuted = isMicMuted;
+  isMicMuted = true;
+
+  // Optional: disable onscreen rating buttons during echo (prevents accidental taps)
+  setVoiceRatingButtonsEnabled(false);
+
+  // Speak the rating word, then continue
+  speakWithWebTts(spoken, () => {
+    // Restore mic state
+    isMicMuted = prevMicMuted;
+
+    // Re-enable rating buttons (though you usually hide them right after)
+    setVoiceRatingButtonsEnabled(true);
+
+    next && next();
+  }, { lang: "en-US" });
+}
+
 function speakAnswerThenAskDifficulty() {
   if (!currentCard) return;
 
