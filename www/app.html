@@ -3190,8 +3190,16 @@ function speakWithWebTts(text, onEnd, opts = {}) {
         }, seg.pause);
       };
 
-      utt.onerror = (err) => {
+    utt.onerror = (err) => {
   if (myGeneration !== speakGeneration) return;
+
+  // ✅ Ignore expected cancellations (caused by speechSynthesis.cancel())
+  const code = err?.error || "";
+  if (code === "canceled" || code === "interrupted") {
+    // Don't log this as an error; it's normal when we cancel/replace speech.
+    return;
+  }
+
   console.error("TTS error:", {
     error: err?.error,
     elapsedTime: err?.elapsedTime,
@@ -3199,6 +3207,8 @@ function speakWithWebTts(text, onEnd, opts = {}) {
     message: err?.message,
     event: err
   });
+
+  // Try to continue on real errors
   setTimeout(() => {
     if (myGeneration !== speakGeneration) return;
     speakSegment();
@@ -3231,16 +3241,31 @@ window.__zc_tts_unlocked = window.__zc_tts_unlocked || false;
 
 function unlockTtsOnce() {
   if (window.__zc_tts_unlocked) return;
-  window.__zc_tts_unlocked = true;
 
   try {
     const u = new SpeechSynthesisUtterance(" ");
-    u.volume = 0;     // silent
+    u.volume = 0; // silent
     u.rate = 1;
+
+    u.onend = () => {
+      window.__zc_tts_unlocked = true;
+      console.log("[TTS] unlocked");
+    };
+
+    u.onerror = () => {
+      // even if it errors, mark unlocked to avoid repeated attempts
+      window.__zc_tts_unlocked = true;
+      console.log("[TTS] unlocked (error ignored)");
+    };
+
     window.speechSynthesis.speak(u);
-    window.speechSynthesis.cancel(); // clears it immediately, but unlocks
-    console.log("[TTS] unlocked");
+
+    // ✅ fallback in case onend never fires
+    setTimeout(() => {
+      window.__zc_tts_unlocked = true;
+    }, 200);
   } catch (e) {
+    window.__zc_tts_unlocked = true;
     console.warn("[TTS] unlock failed:", e);
   }
 }
