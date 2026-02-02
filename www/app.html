@@ -1157,13 +1157,6 @@ input[type="number"]:focus{
 </div>
 
   <script>
-    // ✅ Fix BFCache (Back button) issues: force a clean reload when restored
-window.addEventListener("pageshow", (e) => {
-  if (e.persisted) {
-    console.log("[BFCache] Restored from back/forward cache -> reloading");
-    window.location.reload();
-  }
-});
 
     // ===================== SUPABASE CONFIG =====================
 const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
@@ -1381,12 +1374,6 @@ if (signOutBtn) {
   });
 }
 // ===================== BILLING (STRIPE PORTAL) =====================
-
-// Helper: returns a good redirect base for GitHub Pages + local
-function getBaseUrlForSameFolder() {
-  // app.html, reset.html, etc are in the same folder
-  return new URL(".", window.location.href).href; // ends with trailing slash
-}
 
 async function openStripeCustomerPortal() {
   try {
