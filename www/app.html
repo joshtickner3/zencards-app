@@ -3058,8 +3058,12 @@ if (answerDelayAfterSpeechSecInput) {
   // Stop browser TTS
  if (window.speechSynthesis) {
   try { window.speechSynthesis.cancel(); } catch (_) {}
-  // ✅ iOS Safari/WebView sometimes needs a second cancel on next tick
+
+  // ✅ IMPORTANT: don't let the "next tick" cancel kill NEW speech
+  const genAtStop = speakGeneration;
   setTimeout(() => {
+    // If speakGeneration changed, someone started a new utterance after stopAllAudio()
+    if (genAtStop !== speakGeneration) return;
     try { window.speechSynthesis.cancel(); } catch (_) {}
   }, 0);
 }
