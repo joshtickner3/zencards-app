@@ -749,78 +749,71 @@ input[type="number"]:focus{
 
       <!-- Study options -->
       <div class="card">
-        <div class="row" style="justify-content:space-between;align-items:center;">
-          <h3>Study Options</h3>
-          <div style="flex:0 0 auto;text-align:right;">
-            <button id="toggleStudyOptionsBtn" class="secondary small" type="button">Show</button>
-          </div>
+        <h3>Study Options</h3>
+        <div>
+          <label class="inline">
+            <input type="checkbox" id="skipInstructionsAfterFirst" checked />
+            Skip detailed difficulty instructions after first card
+          </label>
         </div>
-        <div id="studyOptionsPanel" class="hidden" style="margin-top:0.5rem;">
-          <div>
-            <label class="inline">
-              <input type="checkbox" id="skipInstructionsAfterFirst" checked />
-              Skip detailed difficulty instructions after first card
-            </label>
-          </div>
-          <!-- Automatic mode -->
-          <div>
-            <label class="inline">
-              <input type="checkbox" id="autoGoodToggle" />
-              Can't give voice commands? Enable automatic mode so each card is assigned
-              <select id="autoRatingSelect" style="width:auto;min-width:120px;">
-                <option value="again">Again</option>
-                <option value="hard">Hard</option>
-                <option value="good" selected>Good</option>
-                <option value="easy">Easy</option>
-                <option value="tomorrow">Show again tomorrow</option>
-              </select>
-              rating automatically
-              <span class="badge">New</span>
-            </label>
-          </div>
-          <div style="margin-top:0.5rem;">
-            <label class="inline" for="handsFreeNextDelaySeconds">
-              Delay after rating before next question
-            </label>
-            <input type="number" id="handsFreeNextDelaySeconds" min="0" max="30" value="2" style="width:60px;" />
-            <span>seconds</span>
-          </div>
-          <!-- NEW: auto study-ahead options -->
-          <div style="margin-top:0.5rem;">
-            <label class="inline">
-              <input type="checkbox" id="autoEnterStudyAhead" />
-              After I finish all due cards, automatically enter study-ahead mode
-            </label>
-          </div>
-          <div>
-            <label class="inline">
-              <input type="checkbox" id="loopStudyAhead" />
-              In study-ahead mode, keep looping the deck automatically
-            </label>
-          </div>
-          <div style="margin-top:0.5rem;">
-            <strong>Hands-free answer behavior:</strong>
-            <div class="row" style="margin-top:0.25rem;">
-              <div class="inline">
-                <input type="radio" name="answerMode" id="answerModeDelay" value="delay" checked />
-                <label for="answerModeDelay">Wait</label>
-                <input type="number" id="answerDelaySeconds" min="1" max="60" value="4" style="width:60px;" />
-                <span>seconds before answer</span>
-              </div>
-              <div class="inline">
-                <input type="radio" name="answerMode" id="answerModeVoice" value="voice" />
-                <label for="answerModeVoice">Play answer after I speak</label>
-              </div>
+        <!-- Automatic mode -->
+        <div>
+          <label class="inline">
+            <input type="checkbox" id="autoGoodToggle" />
+            Can't give voice commands? Enable automatic mode so each card is assigned
+            <select id="autoRatingSelect" style="width:auto;min-width:120px;">
+              <option value="again">Again</option>
+              <option value="hard">Hard</option>
+              <option value="good" selected>Good</option>
+              <option value="easy">Easy</option>
+              <option value="tomorrow">Show again tomorrow</option>
+            </select>
+            rating automatically
+            <span class="badge">New</span>
+          </label>
+        </div>
+        <div style="margin-top:0.5rem;">
+          <label class="inline" for="handsFreeNextDelaySeconds">
+            Delay after rating before next question
+          </label>
+          <input type="number" id="handsFreeNextDelaySeconds" min="0" max="30" value="2" style="width:60px;" />
+          <span>seconds</span>
+        </div>
+        <!-- NEW: auto study-ahead options -->
+        <div style="margin-top:0.5rem;">
+          <label class="inline">
+            <input type="checkbox" id="autoEnterStudyAhead" />
+            After I finish all due cards, automatically enter study-ahead mode
+          </label>
+        </div>
+        <div>
+          <label class="inline">
+            <input type="checkbox" id="loopStudyAhead" />
+            In study-ahead mode, keep looping the deck automatically
+          </label>
+        </div>
+        <div style="margin-top:0.5rem;">
+          <strong>Hands-free answer behavior:</strong>
+          <div class="row" style="margin-top:0.25rem;">
+            <div class="inline">
+              <input type="radio" name="answerMode" id="answerModeDelay" value="delay" checked />
+              <label for="answerModeDelay">Wait</label>
+              <input type="number" id="answerDelaySeconds" min="1" max="60" value="4" style="width:60px;" />
+              <span>seconds before answer</span>
+            </div>
+            <div class="inline">
+              <input type="radio" name="answerMode" id="answerModeVoice" value="voice" />
+              <label for="answerModeVoice">Play answer after I speak</label>
             </div>
           </div>
-          <!-- NEW: study-ahead answer gap control -->
-          <div style="margin-top:0.5rem;">
-            <label class="inline" for="studyAheadGapSeconds">
-              Study-ahead: delay after answer before next question
-            </label>
-            <input type="number" id="studyAheadGapSeconds" min="1" max="60" value="4" style="width:60px;" />
-            <span>seconds</span>
-          </div>
+        </div>
+        <!-- NEW: study-ahead answer gap control -->
+        <div style="margin-top:0.5rem;">
+          <label class="inline" for="studyAheadGapSeconds">
+            Study-ahead: delay after answer before next question
+          </label>
+          <input type="number" id="studyAheadGapSeconds" min="1" max="60" value="4" style="width:60px;" />
+          <span>seconds</span>
         </div>
       </div>
 
@@ -1148,14 +1141,7 @@ input[type="number"]:focus{
   </div>
 </div>
 
-   <script>
-    // ✅ Fix BFCache (Back button) issues: force a clean reload when restored
-window.addEventListener("pageshow", (e) => {
-  if (e.persisted) {
-    console.log("[BFCache] Restored from back/forward cache -> reloading");
-    window.location.reload();
-  }
-});
+  <script>
 
     // ===================== SUPABASE CONFIG =====================
 const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
@@ -1260,40 +1246,26 @@ const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
     document.getElementById('deleteAccountBtn')?.addEventListener('click', showDeleteAccountModal);
 
     // On every session change, sync to Capacitor Preferences (native only)
-    // On every session change, sync to Capacitor Preferences (native only)
-(async function setupSessionSync() {
-  try {
-    const cap = window.Capacitor;
-    const isNative =
-      !!cap &&
-      (
-        (typeof cap.isNativePlatform === "function" && cap.isNativePlatform()) ||
-        (typeof cap.getPlatform === "function" && cap.getPlatform() !== "web")
-      );
-
-    if (!isNative) return;
-
-    // IMPORTANT: In a built Capacitor app, Preferences is available via Capacitor.Plugins
-    const Preferences =
-      cap?.Plugins?.Preferences ||
-      (await import("@capacitor/preferences")).Preferences; // fallback for bundled builds only
-
-    window.supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+    (async function setupSessionSync() {
+      const isNative = !!window.Capacitor || !!window.cordova || !!window.webkit?.messageHandlers?.bridge;
+      if (!isNative) return;
       try {
-        if (session) {
-          await Preferences.set({ key: "zencards-auth", value: localStorage.getItem("zencards-auth") || "" });
-        } else {
-          await Preferences.remove({ key: "zencards-auth" });
-        }
+        const { Preferences } = await import('@capacitor/preferences');
+        window.supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+          try {
+            if (session) {
+              await Preferences.set({ key: 'zencards-auth', value: localStorage.getItem('zencards-auth') || '' });
+            } else {
+              await Preferences.remove({ key: 'zencards-auth' });
+            }
+          } catch (e) {
+            console.warn('[Capacitor] Could not sync session to Preferences:', e);
+          }
+        });
       } catch (e) {
-        console.warn("[Capacitor] Could not sync session to Preferences:", e);
+        console.warn('[Capacitor] Could not set up Preferences sync:', e);
       }
-    });
-  } catch (e) {
-    console.warn("[Capacitor] setupSessionSync failed (safe to ignore on web):", e);
-  }
-})().catch(e => console.warn("[Capacitor] setupSessionSync top-level:", e));
-
+    })();
 // ===================== BFCache SAFETY (Safari/iOS, back button) =====================
 // If Safari restores this page from BFCache, JS state can be stale.
 // Force a hard reload so auth + UI + listeners re-bootstrap cleanly.
@@ -1387,12 +1359,6 @@ if (signOutBtn) {
   });
 }
 // ===================== BILLING (STRIPE PORTAL) =====================
-
-// Helper: returns a good redirect base for GitHub Pages + local
-function getBaseUrlForSameFolder() {
-  // app.html, reset.html, etc are in the same folder
-  return new URL(".", window.location.href).href; // ends with trailing slash
-}
 
 async function openStripeCustomerPortal() {
   try {
@@ -2546,7 +2512,6 @@ window.speakCardText = function(questionRaw, answerRaw, deckId, cardObj) {
         playBtn.title = "Play card (TTS)";
         playBtn.className = "secondary small";
        playBtn.addEventListener("click", () => {
-        unlockTtsOnce();
   window.speakCardText(card.question, card.answer, selectedDeckId, card);
 });
         actionsDiv.appendChild(playBtn);
@@ -3048,18 +3013,9 @@ if (answerDelayAfterSpeechSecInput) {
   clearAnswerAfterSpeechDelay();
 
   // Stop browser TTS
- if (window.speechSynthesis) {
-  try { window.speechSynthesis.cancel(); } catch (_) {}
-
-  // ✅ IMPORTANT: don't let the "next tick" cancel kill NEW speech
-  const genAtStop = speakGeneration;
-  setTimeout(() => {
-    // If speakGeneration changed, someone started a new utterance after stopAllAudio()
-    if (genAtStop !== speakGeneration) return;
-    try { window.speechSynthesis.cancel(); } catch (_) {}
-  }, 0);
-}
-
+  if (window.speechSynthesis) {
+    try { window.speechSynthesis.cancel(); } catch (e) {}
+  }
 
   isSpeaking = false;
 
@@ -3087,183 +3043,116 @@ function speakSafe(text, onEnd) {
 // Pure browser TTS (this is basically your old speak() body)
 function speakWithWebTts(text, onEnd, opts = {}) {
   const { lang = "en-US" } = opts;
-
   if (!window.speechSynthesis) {
     setStatus("Text-to-speech not supported in this browser.");
     if (onEnd) onEnd();
     return;
   }
 
-  // Clear any queued / half-finished utterances
-  try { window.speechSynthesis.cancel(); } catch (_) {}
+  // 🧹 Clear any queued / half-finished utterances so we get a clean read.
+  try {
+    window.speechSynthesis.cancel();
+  } catch (e) {
+    console.error("Error cancelling previous speech:", e);
+  }
 
-  // New TTS generation
+  // This is a new TTS "generation"
   speakGeneration++;
   const myGeneration = speakGeneration;
 
+  // Expand acronyms (2+ consecutive capital letters) to spaced letters for TTS
   function expandAcronyms(str) {
-    return String(str || "").replace(/\b([A-Z]{2,})\b/g, (m) => m.split("").join(" "));
+    return str.replace(/\b([A-Z]{2,})\b/g, (m) => m.split('').join(' '));
   }
 
   const processedText = expandAcronyms(text);
 
-  // Split text into segments
+  // Split text into segments, keeping delimiters
   const segments = [];
-  const regex = /([^.,]+)([.,]?)/g;
+  let regex = /([^.,]+)([.,]?)/g;
   let match;
   while ((match = regex.exec(processedText)) !== null) {
     const phrase = match[1].trim();
     const delim = match[2];
-    if (phrase) {
-      segments.push({
-        text: phrase + (delim || ""),
-        pause: delim === "." ? 500 : delim === "," ? 250 : 0,
-      });
-    }
+    if (phrase) segments.push({ text: phrase + (delim || ""), pause: delim === '.' ? 500 : delim === ',' ? 250 : 0 });
   }
 
   function getPreferredVoice() {
-    const voices = window.speechSynthesis.getVoices();
-    const langPrefix = String(lang).split("-")[0];
+  const voices = window.speechSynthesis.getVoices();
 
-    const matching = voices.filter(v => {
-      if (!v || !v.lang) return false;
-      const vPrefix = v.lang.split("-")[0];
-      return v.lang === lang || vPrefix === langPrefix;
-    });
+  // 1) Prefer voices that match the requested language
+  // Match either exact lang (e.g., "es-ES") or prefix (e.g., "es")
+  const langPrefix = String(lang).split("-")[0];
 
-    if (langPrefix === "en") {
-      let preferred =
-        matching.find(v => v.name === "Daniel") ||
-        matching.find(v => v.name === "Daniel (Enhanced)") ||
-        matching.find(v => !String(v.name || "").toLowerCase().includes("samantha")) ||
-        matching[0] ||
-        null;
-      return preferred;
-    }
+  const matching = voices.filter(v => {
+    if (!v || !v.lang) return false;
+    const vPrefix = v.lang.split("-")[0];
+    return v.lang === lang || vPrefix === langPrefix;
+  });
 
-    return matching[0] || voices[0] || null;
+  // 2) If user asked for English, keep your "Daniel, not Samantha" preference
+  if (langPrefix === "en") {
+    let preferredVoice = matching.find(v => v.name === "Daniel")
+      || matching.find(v => v.name === "Daniel (Enhanced)");
+
+    // fall back to any matching English voice that isn't Samantha
+    if (!preferredVoice) preferredVoice = matching.find(v => !v.name.toLowerCase().includes("samantha"));
+    if (!preferredVoice) preferredVoice = matching[0] || null;
+    return preferredVoice;
   }
+
+  // 3) For non-English, just take the first matching voice (usually best pronunciation)
+  if (matching.length > 0) return matching[0];
+
+  // 4) Fallback: any voice at all (last resort)
+  return voices[0] || null;
+}
 
   function startSpeaking() {
     const preferredVoice = getPreferredVoice();
     let idx = 0;
-
     function speakSegment() {
-      // HARD STOP: if cancelled, stop immediately
-      if (myGeneration !== speakGeneration) return;
-
       if (idx >= segments.length) {
         isSpeaking = false;
         setStatus("");
         if (onEnd) onEnd();
         return;
       }
-
       const seg = segments[idx++];
-
-      // HARD STOP: check again right before speaking
-      if (myGeneration !== speakGeneration) return;
-
       const utt = new SpeechSynthesisUtterance(seg.text);
       utt.lang = lang;
-      if (preferredVoice) utt.voice = preferredVoice;
-
+      if (preferredVoice) {
+        utt.voice = preferredVoice;
+      }
       utt.rate = typeof ttsRate === "number" ? ttsRate : 0.8;
       utt.pitch = 1.0;
       utt.volume = typeof ttsVolume === "number" ? ttsVolume : 1.0;
-
       utt.onstart = () => {
         if (myGeneration !== speakGeneration) return;
         isSpeaking = true;
         setStatus("Speaking...");
       };
-
       utt.onend = () => {
         if (myGeneration !== speakGeneration) return;
-        setTimeout(() => {
-          if (myGeneration !== speakGeneration) return;
-          speakSegment();
-        }, seg.pause);
+        setTimeout(speakSegment, seg.pause);
       };
-
-    utt.onerror = (err) => {
-  if (myGeneration !== speakGeneration) return;
-
-  // ✅ Ignore expected cancellations (caused by speechSynthesis.cancel())
-  const code = err?.error || "";
-  if (code === "canceled" || code === "interrupted") {
-    // Don't log this as an error; it's normal when we cancel/replace speech.
-    return;
-  }
-
-  console.error("TTS error:", {
-    error: err?.error,
-    elapsedTime: err?.elapsedTime,
-    name: err?.name,
-    message: err?.message,
-    event: err
-  });
-
-  // Try to continue on real errors
-  setTimeout(() => {
-    if (myGeneration !== speakGeneration) return;
-    speakSegment();
-  }, seg.pause);
-};
-
-
-      if (myGeneration !== speakGeneration) return;
+      utt.onerror = (err) => {
+        console.error("TTS error:", err);
+        setTimeout(speakSegment, seg.pause);
+      };
       window.speechSynthesis.speak(utt);
     }
-
     speakSegment();
   }
 
-  // ✅ Always start immediately (works even if voices list is empty on iOS/WKWebView)
-startSpeaking();
-
-// ✅ Optional: if voices load later, you can re-cache voice selection for future calls
-// (IMPORTANT: don't clobber an existing onvoiceschanged handler)
-if (window.speechSynthesis.getVoices().length === 0) {
-  const prev = window.speechSynthesis.onvoiceschanged;
-  window.speechSynthesis.onvoiceschanged = function () {
-    try { if (typeof prev === "function") prev(); } catch (_) {}
-    // don't restart mid-sentence; just allow future calls to pick voices
-  };
-}
-}
-
-window.__zc_tts_unlocked = window.__zc_tts_unlocked || false;
-
-function unlockTtsOnce() {
-  if (window.__zc_tts_unlocked) return;
-
-  try {
-    const u = new SpeechSynthesisUtterance(" ");
-    u.volume = 0; // silent
-    u.rate = 1;
-
-    u.onend = () => {
-      window.__zc_tts_unlocked = true;
-      console.log("[TTS] unlocked");
+  // Ensure voices are loaded before speaking
+  if (window.speechSynthesis.getVoices().length === 0) {
+    window.speechSynthesis.onvoiceschanged = function handler() {
+      window.speechSynthesis.onvoiceschanged = null;
+      startSpeaking();
     };
-
-    u.onerror = () => {
-      // even if it errors, mark unlocked to avoid repeated attempts
-      window.__zc_tts_unlocked = true;
-      console.log("[TTS] unlocked (error ignored)");
-    };
-
-    window.speechSynthesis.speak(u);
-
-    // ✅ fallback in case onend never fires
-    setTimeout(() => {
-      window.__zc_tts_unlocked = true;
-    }, 200);
-  } catch (e) {
-    window.__zc_tts_unlocked = true;
-    console.warn("[TTS] unlock failed:", e);
+  } else {
+    startSpeaking();
   }
 }
 
@@ -3964,9 +3853,10 @@ document.addEventListener("keydown", (e) => {
       updateDeckBadge();
     }
 
-   backToMenuBtn.addEventListener("click", async () => {
-  await showMainMenu();
-});
+    backToMenuBtn.addEventListener("click", async () => {
+      await stopAllAudio();
+      showMainMenu();
+    });
 
     pauseBtn.addEventListener("click", async () => {
   isPaused = true;
@@ -4694,7 +4584,6 @@ if (awaitingAnswerSignal && currentMode === "voice") {
       return;
     }
 
-    // Apply scheduling normally
     // Apply scheduling normally (this records the rating)
 const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
 if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
@@ -5422,7 +5311,6 @@ setCardContent(voiceAnswerText, currentCard.answer);
     });
 
     startSilentBtn.addEventListener("click", () => {
-      unlockTtsOnce();
       saveLastMode("silent");
 if (selectedDeckId) saveLastDeckId(selectedDeckId);
       currentDeckId = selectedDeckId;
@@ -5465,7 +5353,6 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
     // >>> MODIFIED: add async + inline mic permission request here <<<
     // >>> REPLACE your existing startVoiceBtn handler with this whole block <<<
 startVoiceBtn.addEventListener("click", async () => {
-  unlockTtsOnce();
   saveLastMode("voice");
   if (selectedDeckId) saveLastDeckId(selectedDeckId);
 
