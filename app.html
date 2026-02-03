@@ -818,15 +818,6 @@ input[type="number"]:focus{
               </div>
             </div>
           </div>
-
-          <div style="margin-top:0.5rem;">
-  <label class="inline">
-    <input type="checkbox" id="answerCheckToggle" />
-    Say “Correct/Incorrect” after I speak my answer
-    <span class="badge">New</span>
-  </label>
-</div>
-
           <!-- NEW: study-ahead answer gap control -->
           <div style="margin-top:0.5rem;">
             <label class="inline" for="studyAheadGapSeconds">
@@ -2853,42 +2844,6 @@ function getPlainTextFromCard(raw) {
   tmp.innerHTML = raw || "";
   return tmp.textContent || tmp.innerText || "";
 }
-function normalizeForCompare(s) {
-  return String(s || "")
-    .toLowerCase()
-    .replace(/<[^>]*>/g, " ")        // safety: strip any HTML
-    .replace(/[^a-z0-9\s]/g, " ")    // drop punctuation
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function jaccardSimilarity(a, b) {
-  const A = new Set(a.split(" ").filter(Boolean));
-  const B = new Set(b.split(" ").filter(Boolean));
-  if (A.size === 0 || B.size === 0) return 0;
-  let inter = 0;
-  for (const w of A) if (B.has(w)) inter++;
-  const union = A.size + B.size - inter;
-  return union === 0 ? 0 : inter / union;
-}
-
-function isSpokenAnswerCorrect(spoken, expectedRaw) {
-  const expected = normalizeForCompare(getPlainTextFromCard(expectedRaw));
-  const said = normalizeForCompare(spoken);
-
-  if (!expected || !said) return false;
-
-  // 1) Strong match: exact or containment
-  if (said === expected) return true;
-  if (expected.length >= 8 && (said.includes(expected) || expected.includes(said))) return true;
-
-  // 2) Softer match: token overlap (helps with small wording differences)
-  const sim = jaccardSimilarity(said, expected);
-
-  // Tune this threshold if you want stricter/looser
-  return sim >= 0.78;
-}
-
     function setStatus(text) {
       statusDiv.textContent = text;
     }
@@ -3383,8 +3338,6 @@ function getStudyPrefs() {
   if (typeof p.studyAheadGapSec !== "number") p.studyAheadGapSec = 4;
   if (typeof p.autoEnterStudyAhead !== "boolean") p.autoEnterStudyAhead = false;
   if (typeof p.loopStudyAhead !== "boolean") p.loopStudyAhead = false;
-  if (typeof p.answerCheckEnabled !== "boolean") p.answerCheckEnabled = false;
-
 
   // Clamp numeric values
   p.answerDelaySec = Math.max(1, Math.min(60, Math.floor(p.answerDelaySec)));
@@ -3413,7 +3366,6 @@ function saveStudyPrefs(patch = {}) {
 
     const skipInstructionsAfterFirstCheckbox = document.getElementById("skipInstructionsAfterFirst");
     const autoGoodToggle = document.getElementById("autoGoodToggle");
-    const answerCheckToggle = document.getElementById("answerCheckToggle");
     const autoRatingSelect = document.getElementById("autoRatingSelect");
     const answerModeDelayRadio = document.getElementById("answerModeDelay");
     const answerModeVoiceRadio = document.getElementById("answerModeVoice");
@@ -3478,9 +3430,6 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
     let currentCard = null;
 
     function applyStudyPrefsToUIAndState() {
-      if (answerCheckToggle) answerCheckToggle.checked = !!p.answerCheckEnabled;
-answerCheckEnabled = !!p.answerCheckEnabled;
-
   const p = getStudyPrefs();
 
   // UI controls
@@ -3544,14 +3493,6 @@ function wireStudyPrefsListeners() {
       }
     });
   }
-
-  if (answerCheckToggle) {
-  answerCheckToggle.addEventListener("change", () => {
-    saveStudyPrefs({ answerCheckEnabled: !!answerCheckToggle.checked });
-    applyStudyPrefsToUIAndState();
-  });
-}
-
 
   if (answerModeDelayRadio) {
     answerModeDelayRadio.addEventListener("change", () => {
@@ -3646,7 +3587,6 @@ let loopStudyAhead = false;       // from Study Options
     let skipInstructionsAfterFirst = true;
     let hasSpokenInstructionsOnce = false;
     let answerMode = "delay";
-    let answerCheckEnabled = false;
     let answerDelayMs = 4000;
     let autoGoodMode = false;
     let handsFreeNextDelayMs = 2000;
@@ -4310,17 +4250,6 @@ function parseMuteSeconds(text) {
   return null;
 }
 
-function parseCorrectIncorrect(text) {
-  const t = normalizeCmdText(text);
-
-  // common variants / mishears
-  if (t.includes("correct") || t === "right" || t.includes("thats right")) return "correct";
-  if (t.includes("incorrect") || t.includes("wrong") || t.includes("not correct")) return "incorrect";
-
-  return null;
-}
-
-
 function parseRatingFromText(text) {
   const t = normalizeCmdText(text);
   if (!t) return null;
@@ -4380,41 +4309,6 @@ function isMainMenuCommand(text) {
     t.includes("go to main menu")
   );
 }
-let awaitingAnswerCheck = false;
-
-function askCorrectIncorrectThenContinue(next) {
-  awaitingAnswerCheck = true;
-
-  speakWithWebTts("Correct or incorrect?", () => {
-    listenForCommand(async (resp) => {
-if (await handleGlobalVoiceCommands(resp)) return;
-const parsed = parseCorrectIncorrect(resp);
-
-
-      if (!parsed) {
-        // reprompt once, then fall back to continuing (no lock)
-        speakWithWebTts("Please say correct or incorrect.", () => {
-          listenForCommand(async (resp2) => {
-            if (await handleGlobalVoiceCommands(resp2)) return;
-            const parsed2 = parseCorrectIncorrect(resp2);
-            awaitingAnswerCheck = false;
-            // you can optionally store parsed2 somewhere, or ignore
-            next && next();
-          });
-        });
-        return;
-      }
-
-      awaitingAnswerCheck = false;
-
-      // Optional: store result if you want stats later
-      // lastAnswerCheckResult = parsed;
-
-      next && next();
-    });
-  }, { lang: "en-US" });
-}
-
 
 // NEW: stop any current audio, then confirm + go to main menu
 async function speakAndGoToMainMenu() {
@@ -4817,38 +4711,46 @@ function speakAnswerThenAskDifficulty() {
 
   // 🔊 Speak the answer in its language
   speakWithWebTts(
-  getPlainTextFromCard(currentCard.answer),
-  async () => {
-    if (isPaused) return;
+    getPlainTextFromCard(currentCard.answer),
+    async () => {
+      if (isPaused) return;
 
-    const continueAfterAnswerCheck = () => {
-      // ===== STUDY-AHEAD HANDS-FREE: never ask for rating =====
+      // ===== STUDY-AHEAD HANDS-FREE: always respect the study-ahead gap and never ask for rating =====
       if (noScheduleChanges && studyAheadSession) {
         startStudyAheadAnswerWindow(false);
         return;
       }
 
-      // ===== Automatic mode for pure hands-free =====
+      // ===== Automatic mode for pure hands-free, no commands =====
       if (autoGoodMode) {
+        // Only schedule in normal mode; never schedule in noScheduleChanges mode
         if (!noScheduleChanges) {
           const behaviorRating = autoModeBehavior || "good";
+
           if (autoModeBehavior === "tomorrow") {
             applyTomorrowScheduling(currentDeckId, currentCard.id);
           } else {
             const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, behaviorRating);
-            if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
+            if (
+              nextState &&
+              nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES
+            ) {
               queueCardForAgain(currentDeckId, currentCard);
             }
           }
         }
+
+        // Just advance to the next card
         setStudyState(StudyState.IDLE);
         runVoiceLoop();
         return;
       }
 
-      // ===== Normal hands-free flow: ask for rating =====
+      // ===== Normal hands-free flow: show rating buttons, prompt again/hard/good/easy, then listen =====
       awaitingDifficulty = true;
-      if (voiceRatingButtons) voiceRatingButtons.classList.remove("hidden");
+      if (voiceRatingButtons) {
+        voiceRatingButtons.classList.remove("hidden");
+      }
 
       const detailed = !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
       hasSpokenInstructionsOnce = true;
@@ -4859,25 +4761,17 @@ function speakAnswerThenAskDifficulty() {
 
       setStatus(promptText);
 
-      speakWithWebTts(promptText, () => {
-        if (!isPaused) listenForCommand(handleVoiceTranscript);
-      }, { lang: "en-US" });
-    };
-
-    // ✅ NEW: answer check gate
-    if (answerCheckEnabled) {
-      askCorrectIncorrectThenContinue(() => {
-        if (isPaused) return;
-        continueAfterAnswerCheck();
-      });
-      return;
-    }
-
-    // default behavior
-    continueAfterAnswerCheck();
-  },
-  { lang: aLang }
-);
+      // ✅ Speak the prompt in English (or change if you want)
+      speakWithWebTts(
+        promptText,
+        () => {
+          if (!isPaused) listenForCommand(handleVoiceTranscript);
+        },
+        { lang: "en-US" }
+      );
+    },
+    { lang: aLang }
+  );
 }
 
     // NEW: Study-ahead answer window – gives you time to say "repeat answer" or "main menu"
