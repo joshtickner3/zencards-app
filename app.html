@@ -1320,7 +1320,7 @@ async function signOutFromApp() {
     console.log("[LOGOUT] signing out...");
 
     // Stop any study audio/listening
-try { await stopAllAudioHard("logout"); } catch (_) {}
+    try { stopAllAudio(); } catch (_) {}
 
     // Supabase sign out
     await supabaseClient.auth.signOut();
@@ -2852,15 +2852,6 @@ function getPlainTextFromCard(raw) {
     // Every time we start or forcibly stop TTS, bump this.
 // Old TTS callbacks check this and no-op if they're "stale".
 let speakGeneration = 0;
-// Global kill token for *all* study audio/async flow
-let zcKillToken = 0;
-
-function bumpKillToken() {
-  zcKillToken++;
-  return zcKillToken;
-}
-
-
 
     // ===== Browser Web SpeechRecognition fallback =====
     const SpeechRecognition =
@@ -3040,51 +3031,28 @@ if (answerDelayAfterSpeechSecInput) {
 }
 
     // Helper: stop all audio + listening
-   async function stopAllAudioHard(reason = "") {
-  const myKill = bumpKillToken();
-
-  // 1) Invalidate in-flight speech segment loops
+    async function stopAllAudio() {
+  // Invalidate any in-flight TTS callbacks
   speakGeneration++;
+  clearAnswerAfterSpeechDelay();
 
-  // 2) Clear ALL timers/intervals related to study flow
-  try { clearAnswerAfterSpeechDelay(); } catch (_) {}
-
-  if (studyAheadGapTimerId !== null) { clearTimeout(studyAheadGapTimerId); studyAheadGapTimerId = null; }
-  inStudyAheadAnswerGap = false;
-
-  if (questionDelayTimerId !== null) { clearTimeout(questionDelayTimerId); questionDelayTimerId = null; }
-
-  if (micMuteIntervalId !== null) { clearInterval(micMuteIntervalId); micMuteIntervalId = null; }
-  isMicMuted = false;
-  micMutedUntilMs = 0;
-  awaitingMuteSeconds = false;
-  if (micMuteTimerEl) micMuteTimerEl.classList.add("hidden");
-
-  // 3) Cancel browser TTS immediately
+  // Stop browser TTS
   if (window.speechSynthesis) {
-    try { window.speechSynthesis.cancel(); } catch (_) {}
+    try { window.speechSynthesis.cancel(); } catch (e) {}
   }
+
   isSpeaking = false;
 
-  // 4) Stop recognition immediately
+  // Stop browser speech recognition
   if (recognition) {
     try {
       keepListening = false;
       recognition.onresult = null;
       recognition.onerror = null;
       recognition.onend = null;
-      recognition.abort?.();  // <-- IMPORTANT: abort is more immediate than stop on iOS
-      recognition.stop?.();
-    } catch (_) {}
+      recognition.stop();
+    } catch (e) {}
   }
-
-  // 5) Prevent loops from continuing
-  awaitingDifficulty = false;
-  awaitingAnswerSignal = false;
-  awaitingPostCompletionChoice = false;
-
-  // Optional: helps debug
-  if (reason) console.log("[AUDIO HARD STOP]", reason, { kill: myKill });
 }
 
   // Wrapper: choose NativeTTS (iOS app) or browser TTS (web)
@@ -3115,8 +3083,6 @@ function speakWithWebTts(text, onEnd, opts = {}) {
   // This is a new TTS "generation"
   speakGeneration++;
   const myGeneration = speakGeneration;
-  const myKill = zcKillToken;
-
 
   // Expand acronyms (2+ consecutive capital letters) to spaced letters for TTS
   function expandAcronyms(str) {
@@ -3191,7 +3157,6 @@ function speakWithWebTts(text, onEnd, opts = {}) {
         setStatus("Speaking...");
       };
       utt.onend = () => {
-        if (myKill !== zcKillToken) return;
         if (myGeneration !== speakGeneration) return;
         setTimeout(speakSegment, seg.pause);
       };
@@ -3786,7 +3751,7 @@ function startMicMute(seconds) {
     }
 
     async function showMainMenu() {
-   await stopAllAudioHard("showMainMenu");
+    await stopAllAudio();
       clearStudyAheadGapTimer();
       clearQuestionDelayTimer();
 
@@ -3913,7 +3878,7 @@ document.addEventListener("keydown", (e) => {
     }
 
     backToMenuBtn.addEventListener("click", async () => {
-      await stopAllAudioHard("backToMenuBtn");
+      await stopAllAudio();
       showMainMenu();
     });
 
@@ -4017,15 +3982,14 @@ document.addEventListener("keydown", (e) => {
   }
 });
     
-   async function endStudySession() {
-  if (voiceRatingButtons) voiceRatingButtons.classList.add("hidden");
-
-  // ✅ Hard stop first (kills any pending segment timers)
-  await stopAllAudioHard("endStudySession");
-
-  // ✅ Now show menu (showMainMenu also hard-stops, but that's fine)
-  await showMainMenu();
-
+    function endStudySession() {
+  clearStudyAheadGapTimer();
+  clearQuestionDelayTimer();
+  clearAnswerAfterSpeechDelay();
+  if (voiceRatingButtons) {
+    voiceRatingButtons.classList.add("hidden");
+  }
+  showMainMenu();
   setStatus("Study session ended.");
 }
 
