@@ -1,34 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-   <script>
-  // Restore Supabase session from native storage (native only, web-safe: no imports)
-  (async function restoreSupabaseSession() {
-    try {
-      const cap = window.Capacitor;
-      const isNative =
-        !!cap &&
-        (
-          (typeof cap.isNativePlatform === "function" && cap.isNativePlatform()) ||
-          (typeof cap.getPlatform === "function" && cap.getPlatform() !== "web")
-        );
-
-      if (!isNative) return;
-
-      const Preferences = cap?.Plugins?.Preferences;
-      if (!Preferences) {
-        console.warn("[Capacitor] Preferences plugin not available via Capacitor.Plugins");
-        return;
-      }
-
-      const { value } = await Preferences.get({ key: "zencards-auth" });
-      if (value) localStorage.setItem("zencards-auth", value);
-    } catch (e) {
-      console.warn("[Capacitor] Could not restore session from Preferences:", e);
-    }
-  })();
-</script>
-
+    <!-- Capacitor Preferences for robust session persistence on iOS -->
+    <script type="module">
+      import { Preferences } from '@capacitor/preferences';
+      // Restore Supabase session from native storage before anything else
+      (async function restoreSupabaseSession() {
+        // Only run in native app
+        const isNative = !!window.Capacitor || !!window.cordova || !!window.webkit?.messageHandlers?.bridge;
+        if (!isNative) return;
+        try {
+          const { value } = await Preferences.get({ key: 'zencards-auth' });
+          if (value) {
+            localStorage.setItem('zencards-auth', value);
+          }
+        } catch (e) {
+          console.warn('[Capacitor] Could not restore session from Preferences:', e);
+        }
+      })();
+    </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <meta charset="UTF-8" />
@@ -1271,42 +1261,25 @@ const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
 
     // On every session change, sync to Capacitor Preferences (native only)
     (async function setupSessionSync() {
-  try {
-    const cap = window.Capacitor;
-    const isNative =
-      !!cap &&
-      (
-        (typeof cap.isNativePlatform === "function" && cap.isNativePlatform()) ||
-        (typeof cap.getPlatform === "function" && cap.getPlatform() !== "web")
-      );
-
-    if (!isNative) return;
-
-    const Preferences = cap?.Plugins?.Preferences;
-    if (!Preferences) {
-      console.warn("[Capacitor] Preferences plugin not available via Capacitor.Plugins");
-      return;
-    }
-
-    window.supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+      const isNative = !!window.Capacitor || !!window.cordova || !!window.webkit?.messageHandlers?.bridge;
+      if (!isNative) return;
       try {
-        if (session) {
-          await Preferences.set({
-            key: "zencards-auth",
-            value: localStorage.getItem("zencards-auth") || ""
-          });
-        } else {
-          await Preferences.remove({ key: "zencards-auth" });
-        }
+        const { Preferences } = await import('@capacitor/preferences');
+        window.supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+          try {
+            if (session) {
+              await Preferences.set({ key: 'zencards-auth', value: localStorage.getItem('zencards-auth') || '' });
+            } else {
+              await Preferences.remove({ key: 'zencards-auth' });
+            }
+          } catch (e) {
+            console.warn('[Capacitor] Could not sync session to Preferences:', e);
+          }
+        });
       } catch (e) {
-        console.warn("[Capacitor] Could not sync session to Preferences:", e);
+        console.warn('[Capacitor] Could not set up Preferences sync:', e);
       }
-    });
-  } catch (e) {
-    console.warn("[Capacitor] Could not set up Preferences sync:", e);
-  }
-})();
-
+    })();
 // ===================== BFCache SAFETY (Safari/iOS, back button) =====================
 // If Safari restores this page from BFCache, JS state can be stale.
 // Force a hard reload so auth + UI + listeners re-bootstrap cleanly.
