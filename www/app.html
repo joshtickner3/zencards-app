@@ -1,34 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-   <script>
-  // Restore Supabase session from native storage (native only, web-safe: no imports)
-  (async function restoreSupabaseSession() {
-    try {
-      const cap = window.Capacitor;
-      const isNative =
-        !!cap &&
-        (
-          (typeof cap.isNativePlatform === "function" && cap.isNativePlatform()) ||
-          (typeof cap.getPlatform === "function" && cap.getPlatform() !== "web")
-        );
-
-      if (!isNative) return;
-
-      const Preferences = cap?.Plugins?.Preferences;
-      if (!Preferences) {
-        console.warn("[Capacitor] Preferences plugin not available via Capacitor.Plugins");
-        return;
-      }
-
-      const { value } = await Preferences.get({ key: "zencards-auth" });
-      if (value) localStorage.setItem("zencards-auth", value);
-    } catch (e) {
-      console.warn("[Capacitor] Could not restore session from Preferences:", e);
-    }
-  })();
-</script>
-
+    <!-- Capacitor Preferences for robust session persistence on iOS -->
+    <script type="module">
+      import { Preferences } from '@capacitor/preferences';
+      // Restore Supabase session from native storage before anything else
+      (async function restoreSupabaseSession() {
+        // Only run in native app
+        const isNative = !!window.Capacitor || !!window.cordova || !!window.webkit?.messageHandlers?.bridge;
+        if (!isNative) return;
+        try {
+          const { value } = await Preferences.get({ key: 'zencards-auth' });
+          if (value) {
+            localStorage.setItem('zencards-auth', value);
+          }
+        } catch (e) {
+          console.warn('[Capacitor] Could not restore session from Preferences:', e);
+        }
+      })();
+    </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <meta charset="UTF-8" />
@@ -204,11 +194,19 @@ document.addEventListener('visibilitychange', function() {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+  justify-content: center; /* ✅ centers the buttons */
 }
+
 
 .topUserBar button {
   margin: 0; /* important: override your default button margin */
 }
+
+/* app.html only: hide billing portal button */
+#manageBillingBtn {
+  display: none !important;
+}
+
 
     /* Hide Sign Up button on app.html (users sign up on landing) */
 #signUpBtn {
@@ -1159,13 +1157,6 @@ input[type="number"]:focus{
 </div>
 
   <script>
-    // ✅ Fix BFCache (Back button) issues: force a clean reload when restored
-window.addEventListener("pageshow", (e) => {
-  if (e.persisted) {
-    console.log("[BFCache] Restored from back/forward cache -> reloading");
-    window.location.reload();
-  }
-});
 
     // ===================== SUPABASE CONFIG =====================
 const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
@@ -1271,42 +1262,25 @@ const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
 
     // On every session change, sync to Capacitor Preferences (native only)
     (async function setupSessionSync() {
-  try {
-    const cap = window.Capacitor;
-    const isNative =
-      !!cap &&
-      (
-        (typeof cap.isNativePlatform === "function" && cap.isNativePlatform()) ||
-        (typeof cap.getPlatform === "function" && cap.getPlatform() !== "web")
-      );
-
-    if (!isNative) return;
-
-    const Preferences = cap?.Plugins?.Preferences;
-    if (!Preferences) {
-      console.warn("[Capacitor] Preferences plugin not available via Capacitor.Plugins");
-      return;
-    }
-
-    window.supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+      const isNative = !!window.Capacitor || !!window.cordova || !!window.webkit?.messageHandlers?.bridge;
+      if (!isNative) return;
       try {
-        if (session) {
-          await Preferences.set({
-            key: "zencards-auth",
-            value: localStorage.getItem("zencards-auth") || ""
-          });
-        } else {
-          await Preferences.remove({ key: "zencards-auth" });
-        }
+        const { Preferences } = await import('@capacitor/preferences');
+        window.supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+          try {
+            if (session) {
+              await Preferences.set({ key: 'zencards-auth', value: localStorage.getItem('zencards-auth') || '' });
+            } else {
+              await Preferences.remove({ key: 'zencards-auth' });
+            }
+          } catch (e) {
+            console.warn('[Capacitor] Could not sync session to Preferences:', e);
+          }
+        });
       } catch (e) {
-        console.warn("[Capacitor] Could not sync session to Preferences:", e);
+        console.warn('[Capacitor] Could not set up Preferences sync:', e);
       }
-    });
-  } catch (e) {
-    console.warn("[Capacitor] Could not set up Preferences sync:", e);
-  }
-})();
-
+    })();
 // ===================== BFCache SAFETY (Safari/iOS, back button) =====================
 // If Safari restores this page from BFCache, JS state can be stale.
 // Force a hard reload so auth + UI + listeners re-bootstrap cleanly.
@@ -1400,12 +1374,6 @@ if (signOutBtn) {
   });
 }
 // ===================== BILLING (STRIPE PORTAL) =====================
-
-// Helper: returns a good redirect base for GitHub Pages + local
-function getBaseUrlForSameFolder() {
-  // app.html, reset.html, etc are in the same folder
-  return new URL(".", window.location.href).href; // ends with trailing slash
-}
 
 async function openStripeCustomerPortal() {
   try {
@@ -2200,7 +2168,7 @@ function refreshMoveDeckSelect() {
   }
 }
 
-      // ================= IMAGE INSERT HELPERS =================
+    // ================= IMAGE INSERT HELPERS =================
 function insertImageTagInto(textarea, imgSrc) {
   if (!textarea || !imgSrc) return;
 
@@ -4648,9 +4616,11 @@ echoRatingThenContinue(ratingKey, () => {
   setStudyState(StudyState.IDLE);
   runVoiceLoop();
 });
+
 return;
   }
-   // Fallback: keep listening for the next command in voice mode
+
+  // Fallback: keep listening for the next command in voice mode
   if (currentMode === "voice") {
     listenForCommand(handleVoiceTranscript);
   }
