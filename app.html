@@ -194,19 +194,11 @@ document.addEventListener('visibilitychange', function() {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  justify-content: center; /* ✅ centers the buttons */
 }
-
 
 .topUserBar button {
   margin: 0; /* important: override your default button margin */
 }
-
-/* app.html only: hide billing portal button */
-#manageBillingBtn {
-  display: none !important;
-}
-
 
     /* Hide Sign Up button on app.html (users sign up on landing) */
 #signUpBtn {
@@ -1157,6 +1149,13 @@ input[type="number"]:focus{
 </div>
 
   <script>
+    // ✅ Fix BFCache (Back button) issues: force a clean reload when restored
+window.addEventListener("pageshow", (e) => {
+  if (e.persisted) {
+    console.log("[BFCache] Restored from back/forward cache -> reloading");
+    window.location.reload();
+  }
+});
 
     // ===================== SUPABASE CONFIG =====================
 const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
@@ -1374,6 +1373,12 @@ if (signOutBtn) {
   });
 }
 // ===================== BILLING (STRIPE PORTAL) =====================
+
+// Helper: returns a good redirect base for GitHub Pages + local
+function getBaseUrlForSameFolder() {
+  // app.html, reset.html, etc are in the same folder
+  return new URL(".", window.location.href).href; // ends with trailing slash
+}
 
 async function openStripeCustomerPortal() {
   try {
@@ -4600,25 +4605,18 @@ if (awaitingAnswerSignal && currentMode === "voice") {
     }
 
     // Apply scheduling normally
-    // Apply scheduling normally (this records the rating)
-const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
-if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
-  queueCardForAgain(currentDeckId, currentCard);
-}
+    const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
+    if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
+      queueCardForAgain(currentDeckId, currentCard);
+    }
 
-awaitingDifficulty = false;
-if (voiceRatingButtons) {
-  voiceRatingButtons.classList.add("hidden");
-}
-
-// ✅ NEW: echo the rating word with mic OFF, then continue
-echoRatingThenContinue(ratingKey, () => {
-  if (isPaused) return; // safety
-  setStudyState(StudyState.IDLE);
-  runVoiceLoop();
-});
-
-return;
+    awaitingDifficulty = false;
+    if (voiceRatingButtons) {
+      voiceRatingButtons.classList.add("hidden");
+    }
+    setStudyState(StudyState.IDLE);
+    runVoiceLoop();
+    return;
   }
 
   // Fallback: keep listening for the next command in voice mode
@@ -4643,48 +4641,6 @@ return;
           return "mark each card as good";
       }
     }
-
-    // ✅ NEW: speak back the chosen rating (echo) with mic OFF, then continue
-function echoRatingThenContinue(ratingKey, next) {
-  // Normalize what we speak back (exactly the rating word)
-  const spoken =
-    ratingKey === "again" ? "again" :
-    ratingKey === "hard"  ? "hard"  :
-    ratingKey === "good"  ? "good"  :
-    ratingKey === "easy"  ? "easy"  :
-    null;
-
-  if (!spoken) {
-    // fallback: just continue
-    next && next();
-    return;
-  }
-
-  // Hard stop any active listening and prevent re-starts during the echo
-  keepListening = false;
-  if (recognition) {
-    try { recognition.stop(); } catch (_) {}
-  }
-
-  // Mic OFF during echo
-  const prevMicMuted = isMicMuted;
-  isMicMuted = true;
-
-  // Optional: disable onscreen rating buttons during echo (prevents accidental taps)
-  setVoiceRatingButtonsEnabled(false);
-
-  // Speak the rating word, then continue
-  speakWithWebTts(spoken, () => {
-    // Restore mic state
-    isMicMuted = prevMicMuted;
-
-    // Re-enable rating buttons (though you usually hide them right after)
-    setVoiceRatingButtonsEnabled(true);
-
-    next && next();
-  }, { lang: "en-US" });
-}
-
 function speakAnswerThenAskDifficulty() {
   if (!currentCard) return;
 
