@@ -3,13 +3,13 @@
 <head>
     <!-- Capacitor Preferences for robust session persistence on iOS -->
     <script type="module">
-      import { Preferences } from '@capacitor/preferences';
       // Restore Supabase session from native storage before anything else
       (async function restoreSupabaseSession() {
         // Only run in native app
         const isNative = !!window.Capacitor || !!window.cordova || !!window.webkit?.messageHandlers?.bridge;
         if (!isNative) return;
         try {
+          const { Preferences } = await import('@capacitor/preferences');
           const { value } = await Preferences.get({ key: 'zencards-auth' });
           if (value) {
             localStorage.setItem('zencards-auth', value);
