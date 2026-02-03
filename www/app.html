@@ -2173,7 +2173,7 @@ function refreshMoveDeckSelect() {
   }
 }
 
-      // ================= IMAGE INSERT HELPERS =================
+    // ================= IMAGE INSERT HELPERS =================
 function insertImageTagInto(textarea, imgSrc) {
   if (!textarea || !imgSrc) return;
 
@@ -4604,6 +4604,7 @@ if (awaitingAnswerSignal && currentMode === "voice") {
       return;
     }
 
+    // Apply scheduling normally
     // Apply scheduling normally (this records the rating)
 const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
 if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
@@ -4621,9 +4622,11 @@ echoRatingThenContinue(ratingKey, () => {
   setStudyState(StudyState.IDLE);
   runVoiceLoop();
 });
+
 return;
   }
-   // Fallback: keep listening for the next command in voice mode
+
+  // Fallback: keep listening for the next command in voice mode
   if (currentMode === "voice") {
     listenForCommand(handleVoiceTranscript);
   }
