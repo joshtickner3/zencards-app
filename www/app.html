@@ -200,10 +200,6 @@ document.addEventListener('visibilitychange', function() {
 .topUserBar button {
   margin: 0; /* important: override your default button margin */
 }
-/* app.html only: hide billing portal button */
-#manageBillingBtn {
-  display: none !important;
-}
 
     /* Hide Sign Up button on app.html (users sign up on landing) */
 #signUpBtn {
@@ -764,14 +760,14 @@ input[type="number"]:focus{
           <div>
             <label class="inline">
               <input type="checkbox" id="skipInstructionsAfterFirst" checked />
-              Skip detailed difficulty instructions after first card
+              Skip difficulty instructions after first card
             </label>
           </div>
           <!-- Automatic mode -->
           <div>
             <label class="inline">
               <input type="checkbox" id="autoGoodToggle" />
-              Can't give voice commands? Enable automatic mode so each card is assigned
+              Enable automatic mode so each card is assigned
               <select id="autoRatingSelect" style="width:auto;min-width:120px;">
                 <option value="again">Again</option>
                 <option value="hard">Hard</option>
