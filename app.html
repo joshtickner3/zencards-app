@@ -3605,6 +3605,19 @@ let loopStudyAhead = false;       // from Study Options
     }
     let autoModeBehavior = "good"; // again | hard | good | easy | tomorrow
 
+    function runVoiceLoopAfterRating() {
+      setStudyState(StudyState.IDLE);
+      const autoGoodEnabled = !!autoGoodToggle?.checked;
+      const delayMs = Math.max(0, Number(handsFreeNextDelayMs || 0));
+      if (!autoGoodEnabled && delayMs > 0) {
+        setTimeout(() => {
+          if (!isPaused) runVoiceLoop();
+        }, delayMs);
+      } else {
+        runVoiceLoop();
+      }
+    }
+
     let studyAheadGapMs = 4000;
     let inStudyAheadAnswerGap = false;
     let answerAfterSpeechTimerId = null;
@@ -4623,8 +4636,7 @@ if (voiceRatingButtons) {
 // ✅ NEW: echo the rating word with mic OFF, then continue
 echoRatingThenContinue(ratingKey, () => {
   if (isPaused) return; // safety
-  setStudyState(StudyState.IDLE);
-  runVoiceLoop();
+  runVoiceLoopAfterRating();
 });
 
 return;
@@ -5302,15 +5314,7 @@ setCardContent(voiceAnswerText, currentCard.answer);
     }
 
     voiceRatingButtons.classList.add("hidden");
-    setStudyState(StudyState.IDLE);
-    // If autoGood is not enabled, delay before next question
-    if (!autoGoodToggle.checked && handsFreeNextDelayMs > 0) {
-      setTimeout(() => {
-        runVoiceLoop();
-      }, handsFreeNextDelayMs);
-    } else {
-      runVoiceLoop();
-    }
+    runVoiceLoopAfterRating();
   });
 }
 
