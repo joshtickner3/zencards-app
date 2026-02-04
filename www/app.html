@@ -3619,6 +3619,13 @@ let loopStudyAhead = false;       // from Study Options
     }
 
     let studyAheadGapMs = 4000;
+    const difficultyPromptGraceMs = 1200;
+    let lastDifficultyPromptAt = 0;
+
+    function startDifficultyListening() {
+      lastDifficultyPromptAt = Date.now();
+      listenForCommand(handleVoiceTranscript);
+    }
     let inStudyAheadAnswerGap = false;
     let answerAfterSpeechTimerId = null;
 let answerAfterSpeechDueMs = 0;
@@ -4361,7 +4368,7 @@ async function handleGlobalVoiceCommands(text) {
           ? "How was that? Say again, hard, good, or easy."
           : "How was that?";
         speak(promptText, () => {
-          listenForCommand(handleVoiceTranscript);
+          startDifficultyListening();
         });
         return;
       }
@@ -4612,10 +4619,17 @@ if (awaitingAnswerSignal && currentMode === "voice") {
 
     const ratingKey = parseRatingFromText(text);
     if (!ratingKey) {
+      const trimmed = (text || "").trim().toLowerCase();
+      const tooSoon = Date.now() - lastDifficultyPromptAt < difficultyPromptGraceMs;
+      const promptEcho = trimmed.includes("how was that") || trimmed.includes("again, hard, good, or easy");
+      if (!trimmed || tooSoon || promptEcho) {
+        startDifficultyListening();
+        return;
+      }
       speak(
         "I didn't catch that. Please say again, hard, good, or easy.",
         () => {
-          listenForCommand(handleVoiceTranscript);
+          startDifficultyListening();
         }
       );
       return;
@@ -4777,7 +4791,7 @@ function speakAnswerThenAskDifficulty() {
       speakWithWebTts(
         promptText,
         () => {
-          if (!isPaused) listenForCommand(handleVoiceTranscript);
+          if (!isPaused) startDifficultyListening();
         },
         { lang: "en-US" }
       );
