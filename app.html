@@ -2910,6 +2910,62 @@ let speakGeneration = 0;
     }
     // <<< END MIC HELPER <<<
 
+    // ===== Wake-listener: "start hands free study session" =====
+    let wakeListening = false;
+
+    function isStartHandsFreeCommand(text) {
+      const t = String(text || "").toLowerCase().trim();
+      return t.includes("start hands free study session");
+    }
+
+    function stopWakeListening() {
+      wakeListening = false;
+      if (recognition) {
+        try {
+          recognition.onresult = null;
+          recognition.onerror = null;
+          recognition.onend = null;
+          recognition.stop();
+        } catch (_) {}
+      }
+    }
+
+    function startWakeListening() {
+      if (wakeListening) return;
+      if (currentMode === "voice") return;
+      if (isMicMuted) return;
+      if (!speechSupported || !recognition) return;
+
+      wakeListening = true;
+      setStatus("Say 'start hands free study session' to begin.");
+
+      recognition.onresult = (event) => {
+        const res = event.results && event.results[0];
+        const transcript = res && res[0] ? res[0].transcript : "";
+        if (isStartHandsFreeCommand(transcript)) {
+          wakeListening = false;
+          stopWakeListening();
+          startHandsFreeFromVoiceCommand();
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Wake STT error:", event.error);
+        wakeListening = false;
+        if (event.error !== "not-allowed") {
+          setTimeout(() => startWakeListening(), 1200);
+        }
+      };
+
+      recognition.onend = () => {
+        if (wakeListening && currentMode !== "voice" && !isMicMuted) {
+          try { recognition.start(); } catch (_) {}
+        }
+      };
+
+      try { recognition.start(); } catch (_) {}
+    }
+
     // NEW: TTS settings (rate & volume)
     let ttsRate = 1.0;
     let ttsVolume = 1.0;
@@ -3826,6 +3882,7 @@ function startMicMute(seconds) {
       voiceEditPanel.classList.add("hidden");
             if (voiceRatingButtons) voiceRatingButtons.classList.add("hidden");
       setStudyState(StudyState.IDLE);
+      startWakeListening();
     }
 function updateDeckBadge() {
   if (!deckBadge) return;
@@ -5426,7 +5483,20 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
 
     // >>> MODIFIED: add async + inline mic permission request here <<<
     // >>> REPLACE your existing startVoiceBtn handler with this whole block <<<
+function startHandsFreeFromVoiceCommand() {
+  if (currentMode === "voice") return;
+
+  const deckId = selectedDeckId || (deckSelect ? deckSelect.value : null);
+  if (!deckId) {
+    speakSafe("Please select a deck first.", () => startWakeListening());
+    return;
+  }
+
+  if (startVoiceBtn) startVoiceBtn.click();
+}
+
 startVoiceBtn.addEventListener("click", async () => {
+  stopWakeListening();
   saveLastMode("voice");
   if (selectedDeckId) saveLastDeckId(selectedDeckId);
 
@@ -5621,6 +5691,9 @@ function showSessionError(msg) {
   }
    applyStudyPrefsToUIAndState();
   wireStudyPrefsListeners();
+
+  requestMicrophoneAccess();
+  startWakeListening();
 }
 
 init();
