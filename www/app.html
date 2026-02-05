@@ -800,7 +800,6 @@ input[type="number"]:focus{
                 <option value="easy">Easy</option>
                 <option value="tomorrow">Show again tomorrow</option>
               </select>
-              rating automatically
               <span class="badge">New</span>
             </label>
           </div>
@@ -2908,6 +2907,7 @@ let speakGeneration = 0;
           setStatus("Please allow microphone access in your browser to use hands-free mode.");
         });
     }
+    // <<< END MIC HELPER <<<
 
     // NEW: TTS settings (rate & volume)
     let ttsRate = 1.0;
@@ -5423,6 +5423,8 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
       return "Starting automatic hands free study session. I will read the question, then the answer, and " + desc + ".";
     }
 
+    // >>> MODIFIED: add async + inline mic permission request here <<<
+    // >>> REPLACE your existing startVoiceBtn handler with this whole block <<<
 startVoiceBtn.addEventListener("click", async () => {
   saveLastMode("voice");
   if (selectedDeckId) saveLastDeckId(selectedDeckId);
