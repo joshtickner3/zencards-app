@@ -86,27 +86,6 @@
     }
   };
 // ===== App background/foreground auto-pause/resume logic =====
-function shouldBeListeningForVoice() {
-  return (
-    currentMode === 'voice' &&
-    !isPaused &&
-    (awaitingAnswerSignal ||
-      awaitingDifficulty ||
-      inAnswerAfterSpeechDelay ||
-      inStudyAheadAnswerGap ||
-      awaitingPostCompletionChoice)
-  );
-}
-
-function ensureVoiceMicReady(reason) {
-  if (!shouldBeListeningForVoice()) return;
-  try {
-    listenForCommand(handleVoiceTranscript);
-  } catch (e) {
-    console.error("[VOICE] ensureVoiceMicReady failed:", reason, e);
-  }
-}
-
 document.addEventListener('visibilitychange', function() {
   if (document.hidden) {
     // App is backgrounded
@@ -137,10 +116,6 @@ document.addEventListener('visibilitychange', function() {
       } else {
         runVoiceLoop();
       }
-
-      setTimeout(() => {
-        if (!document.hidden) ensureVoiceMicReady("resume");
-      }, 350);
     }
   }
 });
@@ -2891,70 +2866,6 @@ let speakGeneration = 0;
       recognition.maxAlternatives = 3; // tiny robustness boost, still using top result
     }
 
-    // ===== Native VoiceCommands plugin (iOS app) =====
-    let nativeVoicePlugin = null;
-    let nativeVoiceAvailable = false;
-    let nativeVoiceCallback = null;
-    let nativeVoiceMode = null; // "wake" | "command" | null
-
-    function setupNativeVoicePlugin() {
-      try {
-        const cap = window.Capacitor;
-        const plugins = cap?.Plugins || {};
-        nativeVoicePlugin = plugins.VoiceCommands || null;
-        nativeVoiceAvailable = !!nativeVoicePlugin;
-        if (nativeVoicePlugin && typeof nativeVoicePlugin.addListener === "function") {
-          nativeVoicePlugin.addListener("speechResult", (event) => {
-            const text = event?.text || "";
-            const isFinal = !!event?.isFinal;
-
-            if (nativeVoiceMode === "wake") {
-              if (isStartHandsFreeCommand(text)) {
-                stopWakeListening();
-                startHandsFreeFromVoiceCommand();
-              }
-              return;
-            }
-
-            if (nativeVoiceMode === "command" && nativeVoiceCallback) {
-              if (isFinal) {
-                const cb = nativeVoiceCallback;
-                nativeVoiceCallback = null;
-                nativeVoiceMode = null;
-                cb(text);
-              }
-            }
-          });
-        }
-      } catch (e) {
-        nativeVoicePlugin = null;
-        nativeVoiceAvailable = false;
-      }
-    }
-
-    setupNativeVoicePlugin();
-
-    async function startNativeVoiceListening(mode, callback) {
-      if (!nativeVoiceAvailable || !nativeVoicePlugin) return false;
-      nativeVoiceMode = mode;
-      nativeVoiceCallback = callback || null;
-      try {
-        await nativeVoicePlugin.start();
-        return true;
-      } catch (e) {
-        nativeVoiceMode = null;
-        nativeVoiceCallback = null;
-        return false;
-      }
-    }
-
-    async function stopNativeVoiceListening() {
-      if (!nativeVoiceAvailable || !nativeVoicePlugin) return;
-      try { await nativeVoicePlugin.stop(); } catch (_) {}
-      nativeVoiceMode = null;
-      nativeVoiceCallback = null;
-    }
-
     // >>> NEW: explicit microphone permission helper (kept as-is, though not called now) <<<
     function requestMicrophoneAccess() {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -2973,71 +2884,6 @@ let speakGeneration = 0;
         });
     }
     // <<< END MIC HELPER <<<
-
-    // ===== Wake-listener: "start hands free study session" =====
-    let wakeListening = false;
-
-    function isStartHandsFreeCommand(text) {
-      const t = String(text || "").toLowerCase().trim();
-      return t.includes("start hands free study session");
-    }
-
-    function stopWakeListening() {
-      wakeListening = false;
-      stopNativeVoiceListening();
-      if (recognition) {
-        try {
-          recognition.onresult = null;
-          recognition.onerror = null;
-          recognition.onend = null;
-          recognition.stop();
-        } catch (_) {}
-      }
-    }
-
-    function startWakeListening() {
-      if (wakeListening) return;
-      if (currentMode === "voice") return;
-      if (isMicMuted) return;
-
-      if (nativeVoiceAvailable) {
-        wakeListening = true;
-        setStatus("Say 'start hands free study session' to begin.");
-        startNativeVoiceListening("wake");
-        return;
-      }
-
-      if (!speechSupported || !recognition) return;
-
-      wakeListening = true;
-      setStatus("Say 'start hands free study session' to begin.");
-
-      recognition.onresult = (event) => {
-        const res = event.results && event.results[0];
-        const transcript = res && res[0] ? res[0].transcript : "";
-        if (isStartHandsFreeCommand(transcript)) {
-          wakeListening = false;
-          stopWakeListening();
-          startHandsFreeFromVoiceCommand();
-        }
-      };
-
-      recognition.onerror = (event) => {
-        console.error("Wake STT error:", event.error);
-        wakeListening = false;
-        if (event.error !== "not-allowed") {
-          setTimeout(() => startWakeListening(), 1200);
-        }
-      };
-
-      recognition.onend = () => {
-        if (wakeListening && currentMode !== "voice" && !isMicMuted) {
-          try { recognition.start(); } catch (_) {}
-        }
-      };
-
-      try { recognition.start(); } catch (_) {}
-    }
 
     // NEW: TTS settings (rate & volume)
     let ttsRate = 1.0;
@@ -3335,12 +3181,6 @@ function speakWithWebTts(text, onEnd, opts = {}) {
   // Don’t listen while muted
   return;
 }
-
-      if (nativeVoiceAvailable) {
-        setStatus("Listening...");
-        startNativeVoiceListening("command", callback);
-        return;
-      }
 
       // 2) Fallback: Browser Web SpeechRecognition
       if (!speechSupported || !recognition) {
@@ -3961,7 +3801,6 @@ function startMicMute(seconds) {
       voiceEditPanel.classList.add("hidden");
             if (voiceRatingButtons) voiceRatingButtons.classList.add("hidden");
       setStudyState(StudyState.IDLE);
-      startWakeListening();
     }
 function updateDeckBadge() {
   if (!deckBadge) return;
@@ -5562,20 +5401,7 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
 
     // >>> MODIFIED: add async + inline mic permission request here <<<
     // >>> REPLACE your existing startVoiceBtn handler with this whole block <<<
-function startHandsFreeFromVoiceCommand() {
-  if (currentMode === "voice") return;
-
-  const deckId = selectedDeckId || (deckSelect ? deckSelect.value : null);
-  if (!deckId) {
-    speakSafe("Please select a deck first.", () => startWakeListening());
-    return;
-  }
-
-  if (startVoiceBtn) startVoiceBtn.click();
-}
-
 startVoiceBtn.addEventListener("click", async () => {
-  stopWakeListening();
   saveLastMode("voice");
   if (selectedDeckId) saveLastDeckId(selectedDeckId);
 
@@ -5623,7 +5449,7 @@ startVoiceBtn.addEventListener("click", async () => {
   }
 
   // If we need voice commands but have NO native plugin and NO browser STT, we can't proceed
-  if (needsVoiceCommands && !speechSupported && !nativeVoiceAvailable) {
+ if (needsVoiceCommands && !speechSupported) {
     alert("Speech recognition not supported in this environment.");
     return;
   }
@@ -5770,9 +5596,6 @@ function showSessionError(msg) {
   }
    applyStudyPrefsToUIAndState();
   wireStudyPrefsListeners();
-
-  requestMicrophoneAccess();
-  startWakeListening();
 }
 
 init();
