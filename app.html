@@ -86,6 +86,27 @@
     }
   };
 // ===== App background/foreground auto-pause/resume logic =====
+function shouldBeListeningForVoice() {
+  return (
+    currentMode === 'voice' &&
+    !isPaused &&
+    (awaitingAnswerSignal ||
+      awaitingDifficulty ||
+      inAnswerAfterSpeechDelay ||
+      inStudyAheadAnswerGap ||
+      awaitingPostCompletionChoice)
+  );
+}
+
+function ensureVoiceMicReady(reason) {
+  if (!shouldBeListeningForVoice()) return;
+  try {
+    listenForCommand(handleVoiceTranscript);
+  } catch (e) {
+    console.error("[VOICE] ensureVoiceMicReady failed:", reason, e);
+  }
+}
+
 document.addEventListener('visibilitychange', function() {
   if (document.hidden) {
     // App is backgrounded
@@ -116,6 +137,10 @@ document.addEventListener('visibilitychange', function() {
       } else {
         runVoiceLoop();
       }
+
+      setTimeout(() => {
+        if (!document.hidden) ensureVoiceMicReady("resume");
+      }, 350);
     }
   }
 });
@@ -2883,7 +2908,6 @@ let speakGeneration = 0;
           setStatus("Please allow microphone access in your browser to use hands-free mode.");
         });
     }
-    // <<< END MIC HELPER <<<
 
     // NEW: TTS settings (rate & volume)
     let ttsRate = 1.0;
@@ -5399,8 +5423,6 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
       return "Starting automatic hands free study session. I will read the question, then the answer, and " + desc + ".";
     }
 
-    // >>> MODIFIED: add async + inline mic permission request here <<<
-    // >>> REPLACE your existing startVoiceBtn handler with this whole block <<<
 startVoiceBtn.addEventListener("click", async () => {
   saveLastMode("voice");
   if (selectedDeckId) saveLastDeckId(selectedDeckId);
