@@ -86,26 +86,6 @@
     }
   };
 // ===== App background/foreground auto-pause/resume logic =====
-function shouldBeListeningForVoice() {
-  return (
-    currentMode === 'voice' &&
-    !isPaused &&
-    (awaitingAnswerSignal ||
-      awaitingDifficulty ||
-      inAnswerAfterSpeechDelay ||
-      inStudyAheadAnswerGap ||
-      awaitingPostCompletionChoice)
-  );
-}
-
-function ensureVoiceMicReady(reason) {
-  if (!shouldBeListeningForVoice()) return;
-  try {
-    listenForCommand(handleVoiceTranscript);
-  } catch (e) {
-    console.error("[VOICE] ensureVoiceMicReady failed:", reason, e);
-  }
-}
 
 document.addEventListener('visibilitychange', function() {
   if (document.hidden) {
@@ -137,10 +117,6 @@ document.addEventListener('visibilitychange', function() {
       } else {
         runVoiceLoop();
       }
-
-      setTimeout(() => {
-        if (!document.hidden) ensureVoiceMicReady("resume");
-      }, 350);
     }
   }
 });
