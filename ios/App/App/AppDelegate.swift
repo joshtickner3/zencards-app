@@ -51,17 +51,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     private func configureAudioSession() {
         let session = AVAudioSession.sharedInstance()
         do {
-            // CRITICAL: Configure to FORCE audio output to speaker
+            // Configure for playback without forcing the phone speaker
             try session.setCategory(
                 .playback,
                 mode: .default,
                 options: [
                     .duckOthers,                        // Lower other app audio
-                    .defaultToSpeaker
+                    .allowBluetooth,
+                    .allowBluetoothA2DP,
+                    .allowAirPlay
                 ]
             )
             try session.setActive(true, options: .notifyOthersOnDeactivation)
-            print("🔊 [AppDelegate] Audio session configured: .playback + defaultToSpeaker")
+            print("🔊 [AppDelegate] Audio session configured: .playback + bluetooth/airplay")
         } catch {
             print("❌ [AppDelegate] Audio session error: \(error)")
         }

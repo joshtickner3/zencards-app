@@ -353,14 +353,16 @@ public class NativeAudioPlayerPlugin: CAPPlugin, CAPBridgedPlugin {
             do {
                 let session = AVAudioSession.sharedInstance()
                 
-                // Set category to .playback and route to speaker
-                             print("🔊 [NativeAudioPlayer] Setting audio session to .playback with defaultToSpeaker + duckOthers")
+                // Set category to .playback and allow car/Bluetooth/AirPlay routing
+                print("🔊 [NativeAudioPlayer] Setting audio session to .playback with bluetooth/airplay + duckOthers")
                 try session.setCategory(
                     .playback,
                     mode: .default,
                     options: [
                         .duckOthers,                        // Lower other app audio
-                        .defaultToSpeaker
+                        .allowBluetooth,
+                        .allowBluetoothA2DP,
+                        .allowAirPlay
                     ]
                 )
                 
