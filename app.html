@@ -4614,11 +4614,21 @@ if (awaitingAnswerSignal && currentMode === "voice") {
     }
 
     const ratingKey = parseRatingFromText(text);
-    if (!ratingKey) {
-      const trimmed = (text || "").trim().toLowerCase();
-      const tooSoon = Date.now() - lastDifficultyPromptAt < difficultyPromptGraceMs;
-      const promptEcho = trimmed.includes("how was that") || trimmed.includes("again, hard, good, or easy");
-      if (!trimmed || tooSoon || promptEcho) {
+    const trimmed = (text || "").trim().toLowerCase();
+    const tooSoon = Date.now() - lastDifficultyPromptAt < difficultyPromptGraceMs;
+    const ratingWords = ["again", "hard", "good", "easy"].filter(w => trimmed.includes(w)).length;
+    const promptEcho =
+      trimmed.includes("how was that") ||
+      trimmed.includes("say again") ||
+      ratingWords >= 2;
+
+    if (ratingKey) {
+      if (promptEcho && tooSoon) {
+        startDifficultyListening();
+        return;
+      }
+    } else {
+      if (!trimmed || promptEcho || tooSoon) {
         startDifficultyListening();
         return;
       }
