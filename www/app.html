@@ -2890,6 +2890,70 @@ let speakGeneration = 0;
       recognition.maxAlternatives = 3; // tiny robustness boost, still using top result
     }
 
+    // ===== Native VoiceCommands plugin (iOS app) =====
+    let nativeVoicePlugin = null;
+    let nativeVoiceAvailable = false;
+    let nativeVoiceCallback = null;
+    let nativeVoiceMode = null; // "wake" | "command" | null
+
+    function setupNativeVoicePlugin() {
+      try {
+        const cap = window.Capacitor;
+        const plugins = cap?.Plugins || {};
+        nativeVoicePlugin = plugins.VoiceCommands || null;
+        nativeVoiceAvailable = !!nativeVoicePlugin;
+        if (nativeVoicePlugin && typeof nativeVoicePlugin.addListener === "function") {
+          nativeVoicePlugin.addListener("speechResult", (event) => {
+            const text = event?.text || "";
+            const isFinal = !!event?.isFinal;
+
+            if (nativeVoiceMode === "wake") {
+              if (isStartHandsFreeCommand(text)) {
+                stopWakeListening();
+                startHandsFreeFromVoiceCommand();
+              }
+              return;
+            }
+
+            if (nativeVoiceMode === "command" && nativeVoiceCallback) {
+              if (isFinal) {
+                const cb = nativeVoiceCallback;
+                nativeVoiceCallback = null;
+                nativeVoiceMode = null;
+                cb(text);
+              }
+            }
+          });
+        }
+      } catch (e) {
+        nativeVoicePlugin = null;
+        nativeVoiceAvailable = false;
+      }
+    }
+
+    setupNativeVoicePlugin();
+
+    async function startNativeVoiceListening(mode, callback) {
+      if (!nativeVoiceAvailable || !nativeVoicePlugin) return false;
+      nativeVoiceMode = mode;
+      nativeVoiceCallback = callback || null;
+      try {
+        await nativeVoicePlugin.start();
+        return true;
+      } catch (e) {
+        nativeVoiceMode = null;
+        nativeVoiceCallback = null;
+        return false;
+      }
+    }
+
+    async function stopNativeVoiceListening() {
+      if (!nativeVoiceAvailable || !nativeVoicePlugin) return;
+      try { await nativeVoicePlugin.stop(); } catch (_) {}
+      nativeVoiceMode = null;
+      nativeVoiceCallback = null;
+    }
+
     // >>> NEW: explicit microphone permission helper (kept as-is, though not called now) <<<
     function requestMicrophoneAccess() {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -2919,6 +2983,7 @@ let speakGeneration = 0;
 
     function stopWakeListening() {
       wakeListening = false;
+      stopNativeVoiceListening();
       if (recognition) {
         try {
           recognition.onresult = null;
@@ -2933,6 +2998,14 @@ let speakGeneration = 0;
       if (wakeListening) return;
       if (currentMode === "voice") return;
       if (isMicMuted) return;
+
+      if (nativeVoiceAvailable) {
+        wakeListening = true;
+        setStatus("Say 'start hands free study session' to begin.");
+        startNativeVoiceListening("wake");
+        return;
+      }
+
       if (!speechSupported || !recognition) return;
 
       wakeListening = true;
@@ -3261,6 +3334,12 @@ function speakWithWebTts(text, onEnd, opts = {}) {
   // Don’t listen while muted
   return;
 }
+
+      if (nativeVoiceAvailable) {
+        setStatus("Listening...");
+        startNativeVoiceListening("command", callback);
+        return;
+      }
 
       // 2) Fallback: Browser Web SpeechRecognition
       if (!speechSupported || !recognition) {
@@ -5543,7 +5622,7 @@ startVoiceBtn.addEventListener("click", async () => {
   }
 
   // If we need voice commands but have NO native plugin and NO browser STT, we can't proceed
- if (needsVoiceCommands && !speechSupported) {
+  if (needsVoiceCommands && !speechSupported && !nativeVoiceAvailable) {
     alert("Speech recognition not supported in this environment.");
     return;
   }
