@@ -395,6 +395,28 @@ a:hover{
       padding-top:0.75rem;
     }
     /* ===== Student pain strip (goes above KPI row) ===== */
+    .dualCodingCard{
+  margin-top: 0.75rem;
+  background:#020617;
+  border:1px solid #111827;
+  border-radius:0.85rem;
+  padding:0.95rem;
+  width: 100%;
+}
+
+.dualCodingHeader{
+  font-weight: 900;
+  font-size: 1.05rem;
+  margin: 0 0 0.35rem 0;
+}
+
+.dualCodingBody{
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
 .painStrip{
   margin-top: 0.9rem;
   margin-bottom: 0.75rem;
@@ -969,7 +991,6 @@ a:hover{
 
   <div class="collapsible-content" id="solutionContent" style="display:none;">
 
-    <!-- ✅ Move "Use ZenCards anywhere" UNDER the new header -->
     <div class="useStrip" style="margin-top:0.75rem;">
       <div class="useTitle">
         <h3 class="collapsible-header" id="useAnywhereHeader" tabindex="0" style="cursor:pointer;user-select:none;">
@@ -994,38 +1015,44 @@ a:hover{
       </div>
     </div>
 
-    <!-- ✅ The 8 boxes now live inside the solution dropdown -->
     <div class="kpiRow">
-      <div class="kpi"> 
+      <div class="kpi">
         <p class="big">What is ZenCards? </p>
         <p class="small">ZenCards features audio flashcards controlled by your voice commands. <span style="color:#0ed428;font-weight:700;">You will turn every single second of unusable time throughout the day (commuting, walking to class, cleaning, etc.) into high quality review time. </span><span style="color:#0dee32;font-weight:700;"> Students requiring noteable amounts of time to study average 2.5 extra hours per day of free time gained.</span></p>
       </div>
 
-      <div class="kpi"> 
+      <div class="kpi">
         <p class="big">Procrastination is a thing of the past</p>
         <p class="small">
-          <span style="text-decoration:line-through;color:#b91c1c;"></span>
-          <span style="color:#22c55e;font-weight:700;"></span>
-           <span style="color:#0ed428;font-weight:700;">Make any moment during your day quality study time so you never get stressed out needing to cram the night before an exam again</span>.
-          <span style="color:#f59e42;font-weight:600;"></span>
+          <span style="color:#0ed428;font-weight:700;">Make any moment during your day quality study time so you never get stressed out needing to cram the night before an exam again</span>.
         </p>
       </div>
 
       <div class="kpi">
         <p class="big">Live the life you deserve as a student</p>
-        <p class="small"> <span style="color:#0ed428;font-weight:700;">Don't sacrafice early life financial freedom, weekend plans or your well-being for a 4.0 gpa ever again and enjoy the limited time the student experience has to offer while still maintaining a 4.0 and unlocking post-graduation opportunities</span>.</p>
+        <p class="small"><span style="color:#0ed428;font-weight:700;">Don't sacrafice early life financial freedom, weekend plans or your well-being for a 4.0 gpa ever again and enjoy the limited time the student experience has to offer while still maintaining a 4.0 and unlocking post-graduation opportunities</span>.</p>
       </div>
 
       <div class="kpi">
         <p class="big">Simplicity and convenience </p>
         <p class="small">
-          We optimize spaced repetition intervals for you so you never need to worry about what or when to review.  <span style="color:#0ed428;font-weight:700;">We put an emphasis on convenience so studying feels like a choce, never a chore</span>.
+          We optimize spaced repetition intervals for you so you never need to worry about what or when to review.
+          <span style="color:#0ed428;font-weight:700;">We put an emphasis on convenience so studying feels like a choce, never a chore</span>.
         </p>
       </div>
     </div>
 
+    <!-- ✅ This is now correctly inside the dropdown -->
+    <div class="dualCodingCard">
+      <p class="dualCodingHeader">Your new academic game-changer: The dual coding effect</p>
+      <p class="dualCodingBody">
+        ZenCards enables dual coding. Whenever you are taking time solely to study, you will be encoding information via visual AND auditory pathways as well. As a conservative estimate, studies show that dual coding enables learning content for exams in 30% less time than traditional flashcards. On top of this, long term retention are substantially higher, so by the time finale exams come around, you will need far less time and effort to review the whole semesters worth of material.
+      </p>
+    </div>
+
   </div>
 </div>
+
 
 <!-- PRICING -->
 <div class="pricingStrip">
