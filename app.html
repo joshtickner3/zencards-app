@@ -2456,13 +2456,13 @@ function rebuildDeckUI() {
 
 // --- Web Speech API TTS for cards ---
 // --- Daniel voice cache ---
-window._tomVoice = null;
+window._danielVoice = null;
 
-function cacheTomVoice() {
+function cacheDanielVoice() {
   const voices = window.speechSynthesis.getVoices();
   for (let v of voices) {
-    if (v.name === "Tom") {
-      window._tomVoice = v;
+    if (v.name === "Daniel") {
+      window._danielVoice = v;
       break;
     }
   }
@@ -2476,8 +2476,8 @@ function getCardLangs(deck, card) {
 }
 
 if (typeof window.speechSynthesis !== 'undefined') {
-  window.speechSynthesis.onvoiceschanged = cacheTomVoice;
-  cacheTomVoice();
+  window.speechSynthesis.onvoiceschanged = cacheDanielVoice;
+  cacheDanielVoice();
 }
 
 window.speakCardText = function(questionRaw, answerRaw, deckId, cardObj) {
@@ -3063,30 +3063,48 @@ if (answerDelayAfterSpeechSecInput) {
 }
 
     // Helper: stop all audio + listening
-    async function stopAllAudio() {
+   // Helper: stop all audio + listening + any timers that can restart speech
+async function stopAllAudio() {
   // Invalidate any in-flight TTS callbacks
   speakGeneration++;
-  clearAnswerAfterSpeechDelay();
-    clearAutoGoodNextCardTimer();
 
+  // Kill ALL timers/windows that can fire later and speak again
+  try { clearAnswerAfterSpeechDelay(); } catch (_) {}
+  try { clearAutoGoodNextCardTimer(); } catch (_) {}
+  try { clearStudyAheadGapTimer(); } catch (_) {}
+  try { clearQuestionDelayTimer(); } catch (_) {}
+  try { clearMicMuteTimer(); } catch (_) {}
 
-  // Stop browser TTS
+  // Reset key flow flags so nothing thinks it's mid-step
+  awaitingAnswerSignal = false;
+  awaitingDifficulty = false;
+  awaitingPostCompletionChoice = false;
+  inAnswerAfterSpeechDelay = false;
+  inStudyAheadAnswerGap = false;
+  keepListening = false;
+
+  // Stop browser TTS (Safari sometimes needs a double-cancel)
   if (window.speechSynthesis) {
-    try { window.speechSynthesis.cancel(); } catch (e) {}
+    try { window.speechSynthesis.cancel(); } catch (_) {}
+    try { setTimeout(() => { try { window.speechSynthesis.cancel(); } catch (_) {} }, 0); } catch (_) {}
   }
-
   isSpeaking = false;
 
-  // Stop browser speech recognition
+  // Stop browser speech recognition and prevent auto-restart
   if (recognition) {
     try {
-      keepListening = false;
       recognition.onresult = null;
       recognition.onerror = null;
       recognition.onend = null;
       recognition.stop();
-    } catch (e) {}
+    } catch (_) {}
   }
+
+  // Optional: hide answer + rating UI so it doesn't “look alive”
+  try { if (voiceAnswer) voiceAnswer.classList.add("hidden"); } catch (_) {}
+  try { if (voiceRatingButtons) voiceRatingButtons.classList.add("hidden"); } catch (_) {}
+
+  setStatus("");
 }
 
   // Wrapper: choose NativeTTS (iOS app) or browser TTS (web)
@@ -3168,8 +3186,8 @@ segments.push({
 
   // 2) If user asked for English, keep your "Daniel, not Samantha" preference
   if (langPrefix === "en") {
-    let preferredVoice = matching.find(v => v.name === "Tom")
-      || matching.find(v => v.name === "Tom (Enhanced)");
+    let preferredVoice = matching.find(v => v.name === "Daniel")
+      || matching.find(v => v.name === "Daniel (Enhanced)");
 
     // fall back to any matching English voice that isn't Samantha
     if (!preferredVoice) preferredVoice = matching.find(v => !v.name.toLowerCase().includes("samantha"));
@@ -3961,9 +3979,10 @@ document.addEventListener("keydown", (e) => {
     }
 
     backToMenuBtn.addEventListener("click", async () => {
-      await stopAllAudio();
-      showMainMenu();
-    });
+  await stopAllAudio();
+  await showMainMenu();
+});
+
 
     pauseBtn.addEventListener("click", async () => {
   isPaused = true;
@@ -4067,14 +4086,16 @@ document.addEventListener("keydown", (e) => {
   }
 });
     
-    function endStudySession() {
+   async function endStudySession() {
+  await stopAllAudio(); // ✅ guarantees no leftover speech or recognition
+
   clearStudyAheadGapTimer();
   clearQuestionDelayTimer();
   clearAnswerAfterSpeechDelay();
-  if (voiceRatingButtons) {
-    voiceRatingButtons.classList.add("hidden");
-  }
-  showMainMenu();
+
+  if (voiceRatingButtons) voiceRatingButtons.classList.add("hidden");
+
+  await showMainMenu();
   setStatus("Study session ended.");
 }
 
