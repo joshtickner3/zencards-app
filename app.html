@@ -2564,6 +2564,19 @@ function getCardLangs(deck, card) {
   return { qLang, aLang };
 }
 
+function speakPlainAnswerWithCardLang(prefixText = "", onEnd) {
+  const { deck, card } = getActiveDeckAndCardForTts();
+  if (!card) { if (onEnd) onEnd(); return; }
+
+  const { aLang } = getCardLangs(deck, card);
+  const answer = getPlainTextFromCard(card.answer || "");
+  if (!answer.trim()) { if (onEnd) onEnd(); return; }
+
+  const textToSpeak = prefixText ? (prefixText + answer) : answer;
+  speakWithWebTts(textToSpeak, onEnd, { lang: aLang });
+}
+
+
 if (typeof window.speechSynthesis !== 'undefined') {
   window.speechSynthesis.onvoiceschanged = cacheDanielVoice;
   cacheDanielVoice();
@@ -4523,45 +4536,38 @@ async function handleGlobalVoiceCommands(text) {
 
   // 🔁 Repeat answer — allowed whenever we've already shown an answer
   if (t.includes("repeat answer") && currentMode === "voice" && currentCard) {
-    const plainAnswer = getPlainTextFromCard(currentCard.answer);
-    speakSafe("Answer: " + plainAnswer, () => {
-      if (isPaused) return;
+  speakPlainAnswerWithCardLang("", () => {
+    if (isPaused) return;
 
-      // If we're in study-ahead + gap, restart the gap window
-      if (noScheduleChanges && studyAheadSession && inStudyAheadAnswerGap) {
-        startStudyAheadAnswerWindow(true);
-        return;
-      }
+    if (noScheduleChanges && studyAheadSession && inStudyAheadAnswerGap) {
+      startStudyAheadAnswerWindow(true);
+      return;
+    }
 
-      // If we are waiting for difficulty in normal mode, just re-prompt
-      if (awaitingDifficulty && !noScheduleChanges) {
-        const detailed =
-          !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
-        hasSpokenInstructionsOnce = true;
-        const promptText = detailed
-          ? "How was that? Say again, hard, good, or easy."
-          : "How was that?";
-        speak(promptText, () => {
-          startDifficultyListening();
-        });
-        return;
-      }
+    if (awaitingDifficulty && !noScheduleChanges) {
+      const detailed = !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
+      hasSpokenInstructionsOnce = true;
+      const promptText = detailed
+        ? "How was that? Say again, hard, good, or easy."
+        : "How was that?";
+      speak(promptText, () => startDifficultyListening());
+      return;
+    }
 
-      // If we're at post-completion choice, re-prompt main menu
-      if (awaitingPostCompletionChoice) {
-        speakSafe("Say main menu to go back.", () => {
-          listenForCommand(handleVoiceTranscript);
-        });
-        return;
-      }
-
-      // Otherwise, just keep listening for the next command
-      if (currentMode === "voice") {
+    if (awaitingPostCompletionChoice) {
+      speakSafe("Say main menu to go back.", () => {
         listenForCommand(handleVoiceTranscript);
-      }
-    });
-    return true;
-  }
+      });
+      return;
+    }
+
+    if (currentMode === "voice") {
+      listenForCommand(handleVoiceTranscript);
+    }
+  });
+  return true;
+}
+
 
   // 🧊 Pause study session – pause IMMEDIATELY (before speaking)
 if (
