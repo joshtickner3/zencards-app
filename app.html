@@ -3979,10 +3979,9 @@ document.addEventListener("keydown", (e) => {
     }
 
     backToMenuBtn.addEventListener("click", async () => {
-  await stopAllAudio();
-  await showMainMenu();
-});
-
+      await stopAllAudio();
+      showMainMenu();
+    });
 
     pauseBtn.addEventListener("click", async () => {
   isPaused = true;
@@ -4086,16 +4085,14 @@ document.addEventListener("keydown", (e) => {
   }
 });
     
-   async function endStudySession() {
-  await stopAllAudio(); // ✅ guarantees no leftover speech or recognition
-
+    function endStudySession() {
   clearStudyAheadGapTimer();
   clearQuestionDelayTimer();
   clearAnswerAfterSpeechDelay();
-
-  if (voiceRatingButtons) voiceRatingButtons.classList.add("hidden");
-
-  await showMainMenu();
+  if (voiceRatingButtons) {
+    voiceRatingButtons.classList.add("hidden");
+  }
+  showMainMenu();
   setStatus("Study session ended.");
 }
 
