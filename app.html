@@ -1,14 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <style>
-    .instructions-top-right {
-      position: fixed;
-      top: 1rem;
-      right: 1rem;
-      z-index: 1000;
-    }
-  </style>
+ <style>
+  .instructions-top-right {
+    position: static;           /* no longer fixed */
+    display: flex;
+    justify-content: center;    /* center horizontally */
+    margin: 0.35rem 0 0.9rem;   /* space under subtitle */
+    z-index: auto;
+  }
+</style>
+
     <!-- Capacitor Preferences for robust session persistence on iOS -->
     <script type="module">
       import { Preferences } from '@capacitor/preferences';
@@ -670,6 +672,13 @@ input[type="number"]:focus{
 
     <p class="appSubtitle">Hands-free & silent spaced&nbsp;repetition flashcards</p>
 
+    <div class="instructions-top-right">
+  <button id="openInstructionsBtn" class="secondary small" type="button">
+    Instructions / Voice Commands
+  </button>
+</div>
+
+
     <!-- ========== MAIN SETTINGS / MENU ========== -->
     <div id="mainMenu" class="card">
       <h2>Main Menu</h2>
@@ -922,14 +931,6 @@ input[type="number"]:focus{
           <button id="startSilentBtn" class="secondary">Start Silent Study</button>
 
         </div>
-
-
-    <!-- Instructions Button Top Right -->
-    <div class="instructions-top-right">
-      <button id="openInstructionsBtn" class="secondary small" type="button">
-        Instructions / Voice Commands
-      </button>
-    </div>
 
         <p style="font-size:0.85rem;color:#9ca3af;margin-top:0.5rem;">
           Voice commands (hands-free): "again", "hard", "good", "easy", "go to the next card",
@@ -2467,6 +2468,39 @@ function cacheDanielVoice() {
     }
   }
 }
+
+function getActiveDeckAndCardForTts() {
+  const deck = currentDeckId ? getDeckById(currentDeckId) : null;
+  const card = currentCard || null;
+  return { deck, card };
+}
+
+function speakCurrentAnswerWithLang(onEnd) {
+  const { deck, card } = getActiveDeckAndCardForTts();
+  const { aLang } = getCardLangs(deck, card);
+
+  const answer = getPlainTextFromCard(card?.answer || "");
+  if (!answer.trim()) {
+    if (onEnd) onEnd();
+    return;
+  }
+
+  speakWithWebTts(answer, onEnd, { lang: aLang });
+}
+
+function speakCurrentQuestionWithLang(onEnd) {
+  const { deck, card } = getActiveDeckAndCardForTts();
+  const { qLang } = getCardLangs(deck, card);
+
+  const question = getPlainTextFromCard(card?.question || "");
+  if (!question.trim()) {
+    if (onEnd) onEnd();
+    return;
+  }
+
+  speakWithWebTts(question, onEnd, { lang: qLang });
+}
+
 
 
 function getCardLangs(deck, card) {
