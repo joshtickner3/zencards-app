@@ -21,13 +21,13 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>ZenCards uses Bluetooth audio devices such as AirPods, headphones, and CarPlay for hands-free studying.</string>
+	<string>ZenCards uses bluetooth to route audio through airpods and headphones. </string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>ZenCards uses Bluetooth audio devices such as AirPods, headphones, and CarPlay for hands-free studying.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>ZenCards uses the microphone to listen for your hands-free study commands.</string>
+	<string>ZenCards uses the microphone to listen for your answers and hands-free study commands. </string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>ZenCards uses speech recognition to understand your voice commands</string>
+	<string>ZenCards uses speech recognition to understand your voice commands. </string>
 	<key>UIBackgroundModes</key>
 	<array/>
 	<key>UILaunchStoryboardName</key>

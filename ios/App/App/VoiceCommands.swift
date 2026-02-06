@@ -93,22 +93,41 @@ public class VoiceCommandsPlugin: CAPPlugin, CAPBridgedPlugin {
     private func configureAudioSessionForListening() {
         let session = AVAudioSession.sharedInstance()
         do {
-            // When we need to listen, switch to .playAndRecord
-            // This supports BOTH playback and recording simultaneously
-            try session.setCategory(
-                .playAndRecord,
-                mode: .measurement,
-                options: [
-                    .defaultToSpeaker,           // routes to speaker instead of receiver
-                    .duckOthers                  // duck background audio
-                ]
-            )
-            try session.setActive(true, options: [])
-            print("🎤 [VoiceCommands] Audio session switched to .playAndRecord for listening")
+            // ✅ Do NOT call setCategory here.
+            // AppDelegate owns the audio session category/options.
+            try session.setActive(true)
+
+            // ✅ Re-apply “never route to CarPlay” every time we start listening
+            enforceNoCarPlayOutput()
+
+            print("🎤 [VoiceCommands] Audio session activated for listening (no category override)")
         } catch {
-            print("❌ [VoiceCommands] AudioSession listening config error: \(error)")
+            print("❌ [VoiceCommands] AudioSession activate error: \(error)")
         }
     }
+
+    private func enforceNoCarPlayOutput() {
+        let session = AVAudioSession.sharedInstance()
+        let outputs = session.currentRoute.outputs
+
+        let hasCarAudio = outputs.contains { $0.portType == .carAudio }
+
+        // If CarPlay/car head-unit is the route, force iPhone speaker.
+        if hasCarAudio {
+            do {
+                try session.overrideOutputAudioPort(.speaker)
+                print("🚗🔇 [VoiceCommands] Car audio detected → forcing iPhone speaker")
+            } catch {
+                print("❌ [VoiceCommands] Failed to override output:", error)
+            }
+        } else {
+            // Remove override so AirPods/headphones work normally when connected
+            do {
+                try session.overrideOutputAudioPort(.none)
+            } catch { }
+        }
+    }
+
 
     // MARK: - Listening
 
@@ -165,7 +184,7 @@ public class VoiceCommandsPlugin: CAPPlugin, CAPBridgedPlugin {
         audioEngine.inputNode.removeTap(onBus: 0)
 
         if deactivateSession {
-            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            stopListening(deactivateSession: false)
         }
     }
 
