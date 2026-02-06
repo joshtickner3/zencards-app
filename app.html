@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <style>
+    .instructions-top-right {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      z-index: 1000;
+    }
+  </style>
     <!-- Capacitor Preferences for robust session persistence on iOS -->
     <script type="module">
       import { Preferences } from '@capacitor/preferences';
@@ -916,9 +924,12 @@ input[type="number"]:focus{
         </div>
 
 
-        <button id="openInstructionsBtn" class="secondary small" type="button">
-  Instructions / Voice Commands
-</button>
+    <!-- Instructions Button Top Right -->
+    <div class="instructions-top-right">
+      <button id="openInstructionsBtn" class="secondary small" type="button">
+        Instructions / Voice Commands
+      </button>
+    </div>
 
         <p style="font-size:0.85rem;color:#9ca3af;margin-top:0.5rem;">
           Voice commands (hands-free): "again", "hard", "good", "easy", "go to the next card",
