@@ -4348,8 +4348,15 @@ function parseRatingFromText(text) {
 
     // Helper: detect "main menu" style commands
 function isMainMenuCommand(text) {
-  // EXACT command only
-  return normalizeCmdText(text) === "go to the main menu";
+  const t = text.toLowerCase();
+  return (
+    t.includes("main menu") ||
+    (t.includes("menu") && t.includes("main")) ||
+    t.includes("back to menu") ||
+    t.includes("back to the menu") ||
+    t.includes("go to the menu") ||
+    t.includes("go to main menu")
+  );
 }
 
 // NEW: stop any current audio, then confirm + go to main menu
@@ -4470,7 +4477,7 @@ if (
   }
 
   // 🏠 Main menu – now allowed in ANY voice state (normal or study-ahead)
-  if (isMainMenuCommand(text) && currentMode === "voice") {
+  if (isMainMenuCommand(t) && currentMode === "voice") {
     speakAndGoToMainMenu();
     return true;
   }
