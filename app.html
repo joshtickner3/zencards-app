@@ -2456,16 +2456,18 @@ function rebuildDeckUI() {
 
 // --- Web Speech API TTS for cards ---
 // --- Daniel voice cache ---
-window._danielVoice = null;
-function cacheDanielVoice() {
+window._alexVoice = null;
+
+function cacheAlexVoice() {
   const voices = window.speechSynthesis.getVoices();
   for (let v of voices) {
-    if (v.name && v.name.toLowerCase().includes('daniel')) {
-      window._danielVoice = v;
+    if (v.name === "Alex") {
+      window._alexVoice = v;
       break;
     }
   }
 }
+
 
 function getCardLangs(deck, card) {
   const qLang = (card && card.qLang) || (deck && deck.qLang) || "en-US";
@@ -2474,8 +2476,8 @@ function getCardLangs(deck, card) {
 }
 
 if (typeof window.speechSynthesis !== 'undefined') {
-  window.speechSynthesis.onvoiceschanged = cacheDanielVoice;
-  cacheDanielVoice();
+  window.speechSynthesis.onvoiceschanged = cacheAlexVoice;
+  cacheAlexVoice();
 }
 
 window.speakCardText = function(questionRaw, answerRaw, deckId, cardObj) {
@@ -3146,8 +3148,8 @@ function speakWithWebTts(text, onEnd, opts = {}) {
 
   // 2) If user asked for English, keep your "Daniel, not Samantha" preference
   if (langPrefix === "en") {
-    let preferredVoice = matching.find(v => v.name === "Daniel")
-      || matching.find(v => v.name === "Daniel (Enhanced)");
+    let preferredVoice = matching.find(v => v.name === "Alex")
+      || matching.find(v => v.name === "Alex (Enhanced)");
 
     // fall back to any matching English voice that isn't Samantha
     if (!preferredVoice) preferredVoice = matching.find(v => !v.name.toLowerCase().includes("samantha"));
