@@ -4197,7 +4197,8 @@ setCardContent(silentAnswerText, currentCard.answer);
    // NEW: stop any current audio, then confirm + go to main menu
 async function speakAndGoToMainMenu() {
   await stopAllAudio();
- speakSafe("Going to the main menu.", async () => { await endStudySession(); });
+  await endStudySession();
+  speakSafe("Going to the main menu.");
 }
 
 
