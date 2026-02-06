@@ -4197,7 +4197,7 @@ setCardContent(silentAnswerText, currentCard.answer);
    // NEW: stop any current audio, then confirm + go to main menu
 async function speakAndGoToMainMenu() {
   await stopAllAudio();
- speakSafe("Going to the main menu.", () => { endStudySession(); });
+ speakSafe("Going to the main menu.", async () => { await endStudySession(); });
 }
 
 
@@ -4418,8 +4418,8 @@ function isMainMenuCommand(text) {
 // NEW: stop any current audio, then confirm + go to main menu
 async function speakAndGoToMainMenu() {
   await stopAllAudio();
-  speakSafe("Going to the main menu.", () => {
-    endStudySession();
+  speakSafe("Going to the main menu.", async () => {
+    await endStudySession();
   });
 }
 
@@ -4540,7 +4540,7 @@ if (
 
   // ❌ End study session
   if (t.includes("end study session")) {
-    endStudySession();
+    await endStudySession();
     return true;
   }
 
@@ -5433,9 +5433,9 @@ setCardContent(voiceAnswerText, currentCard.answer);
   });
 }
 
-    silentMainMenuBtn.addEventListener("click", () => {
+    silentMainMenuBtn.addEventListener("click", async () => {
       silentCompletionControls.classList.add("hidden");
-      endStudySession();
+      await endStudySession();
     });
 
     silentStudyAheadBtn.addEventListener("click", () => {
