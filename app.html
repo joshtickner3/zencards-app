@@ -2456,13 +2456,13 @@ function rebuildDeckUI() {
 
 // --- Web Speech API TTS for cards ---
 // --- Daniel voice cache ---
-window._alexVoice = null;
+window._tomVoice = null;
 
-function cacheAlexVoice() {
+function cacheTomVoice() {
   const voices = window.speechSynthesis.getVoices();
   for (let v of voices) {
-    if (v.name === "Alex") {
-      window._alexVoice = v;
+    if (v.name === "Tom") {
+      window._tomVoice = v;
       break;
     }
   }
@@ -2476,8 +2476,8 @@ function getCardLangs(deck, card) {
 }
 
 if (typeof window.speechSynthesis !== 'undefined') {
-  window.speechSynthesis.onvoiceschanged = cacheAlexVoice;
-  cacheAlexVoice();
+  window.speechSynthesis.onvoiceschanged = cacheTomVoice;
+  cacheTomVoice();
 }
 
 window.speakCardText = function(questionRaw, answerRaw, deckId, cardObj) {
@@ -2490,9 +2490,9 @@ window.speakCardText = function(questionRaw, answerRaw, deckId, cardObj) {
   // Speak question, then answer after 3s pause, using your unified TTS with correct languages
   speakWithWebTts(question, () => {
     if (answer && answer.trim()) {
-      setTimeout(() => {
-        speakWithWebTts(answer, null, { lang: aLang });
-      }, 3000); // 3 second pause
+     speakWithWebTts("Answer.", () => {
+  setTimeout(() => speakWithWebTts(answer), 400);
+});
     }
   }, { lang: qLang });
 };
@@ -3067,6 +3067,8 @@ if (answerDelayAfterSpeechSecInput) {
   // Invalidate any in-flight TTS callbacks
   speakGeneration++;
   clearAnswerAfterSpeechDelay();
+    clearAutoGoodNextCardTimer();
+
 
   // Stop browser TTS
   if (window.speechSynthesis) {
@@ -3121,7 +3123,7 @@ function speakWithWebTts(text, onEnd, opts = {}) {
     return str.replace(/\b([A-Z]{2,})\b/g, (m) => m.split('').join(' '));
   }
 
-  const processedText = expandAcronyms(text);
+  const processedText = addCognitivePauses(expandAcronyms(text));
 
   // Split text into segments, keeping delimiters
   const segments = [];
@@ -3130,8 +3132,26 @@ function speakWithWebTts(text, onEnd, opts = {}) {
   while ((match = regex.exec(processedText)) !== null) {
     const phrase = match[1].trim();
     const delim = match[2];
-    if (phrase) segments.push({ text: phrase + (delim || ""), pause: delim === '.' ? 500 : delim === ',' ? 250 : 0 });
+segments.push({
+  text: phrase + (delim || ""),
+  pause: delim === '.' ? 700 : delim === ',' ? 350 : 0
+});
   }
+  function addCognitivePauses(str) {
+  return str
+    // pause after numbers
+    .replace(/(\d+)/g, "$1,")
+
+    // pause after list words
+    .replace(/\b(and|or|but|because|so|which|that)\b/gi, "$1,")
+
+    // pause after definitions
+    .replace(/\bis\b/gi, "is,")
+
+    // pause after “for example / such as”
+    .replace(/\b(for example|such as)\b/gi, "$1,");
+}
+
 
   function getPreferredVoice() {
   const voices = window.speechSynthesis.getVoices();
@@ -3148,8 +3168,8 @@ function speakWithWebTts(text, onEnd, opts = {}) {
 
   // 2) If user asked for English, keep your "Daniel, not Samantha" preference
   if (langPrefix === "en") {
-    let preferredVoice = matching.find(v => v.name === "Alex")
-      || matching.find(v => v.name === "Alex (Enhanced)");
+    let preferredVoice = matching.find(v => v.name === "Tom")
+      || matching.find(v => v.name === "Tom (Enhanced)");
 
     // fall back to any matching English voice that isn't Samantha
     if (!preferredVoice) preferredVoice = matching.find(v => !v.name.toLowerCase().includes("samantha"));
@@ -3180,7 +3200,7 @@ function speakWithWebTts(text, onEnd, opts = {}) {
       if (preferredVoice) {
         utt.voice = preferredVoice;
       }
-      utt.rate = typeof ttsRate === "number" ? ttsRate : 0.8;
+utt.rate = typeof ttsRate === "number" ? ttsRate : 0.75;
       utt.pitch = 1.0;
       utt.volume = typeof ttsVolume === "number" ? ttsVolume : 1.0;
       utt.onstart = () => {
@@ -3725,6 +3745,15 @@ const micMuteSecondsEl = document.getElementById("micMuteSeconds");
 
     // NEW: track delay window between question and answer in delay mode
     let questionDelayTimerId = null;
+    let autoGoodNextCardTimerId = null;
+
+function clearAutoGoodNextCardTimer() {
+  if (autoGoodNextCardTimerId !== null) {
+    clearTimeout(autoGoodNextCardTimerId);
+    autoGoodNextCardTimerId = null;
+  }
+}
+
 
     function clearStudyAheadGapTimer() {
       if (studyAheadGapTimerId !== null) {
@@ -3806,6 +3835,8 @@ function startMicMute(seconds) {
     await stopAllAudio();
       clearStudyAheadGapTimer();
       clearQuestionDelayTimer();
+      clearAutoGoodNextCardTimer();
+
 
       // Do NOT clear currentCard here, so it is preserved for resuming study
       currentMode = null;
@@ -3944,6 +3975,8 @@ document.addEventListener("keydown", (e) => {
 await stopAllAudio(); 
   clearStudyAheadGapTimer();
   clearQuestionDelayTimer();
+  clearAutoGoodNextCardTimer();
+
 
   pauseBtn.disabled = true;
   resumeBtn.disabled = false;
@@ -4807,10 +4840,16 @@ function speakAnswerThenAskDifficulty() {
           }
         }
 
-        // Just advance to the next card
-        setStudyState(StudyState.IDLE);
-        runVoiceLoop();
-        return;
+          // ✅ Auto-good mode: wait 5 seconds before the next question
+  setStudyState(StudyState.IDLE);
+
+  clearAutoGoodNextCardTimer();
+  autoGoodNextCardTimerId = setTimeout(() => {
+    autoGoodNextCardTimerId = null;
+    if (!isPaused) runVoiceLoop();
+  }, 5000);
+
+  return;
       }
 
       // ===== Normal hands-free flow: show rating buttons, prompt again/hard/good/easy, then listen =====
