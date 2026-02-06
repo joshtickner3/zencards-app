@@ -3965,7 +3965,7 @@ document.addEventListener("keydown", (e) => {
 });
 
 
-    async function showStudySection(mode) {
+    function showStudySection(mode) {
       currentMode = mode;
       mainMenuDiv.classList.add("hidden");
       studySectionDiv.classList.remove("hidden");
@@ -4197,8 +4197,7 @@ setCardContent(silentAnswerText, currentCard.answer);
    // NEW: stop any current audio, then confirm + go to main menu
 async function speakAndGoToMainMenu() {
   await stopAllAudio();
-  await endStudySession();
-  speakSafe("Going to the main menu.");
+ speakSafe("Going to the main menu.", () => { endStudySession(); });
 }
 
 
@@ -4419,8 +4418,8 @@ function isMainMenuCommand(text) {
 // NEW: stop any current audio, then confirm + go to main menu
 async function speakAndGoToMainMenu() {
   await stopAllAudio();
-  speakSafe("Going to the main menu.", async () => {
-    await endStudySession();
+  speakSafe("Going to the main menu.", () => {
+    endStudySession();
   });
 }
 
@@ -4541,7 +4540,7 @@ if (
 
   // ❌ End study session
   if (t.includes("end study session")) {
-    await endStudySession();
+    endStudySession();
     return true;
   }
 
@@ -5434,9 +5433,9 @@ setCardContent(voiceAnswerText, currentCard.answer);
   });
 }
 
-    silentMainMenuBtn.addEventListener("click", async () => {
+    silentMainMenuBtn.addEventListener("click", () => {
       silentCompletionControls.classList.add("hidden");
-      await endStudySession();
+      endStudySession();
     });
 
     silentStudyAheadBtn.addEventListener("click", () => {
