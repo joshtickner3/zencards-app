@@ -1151,7 +1151,7 @@ input[type="number"]:focus{
 
       <h3> Important</h3>
       <p style="color:#9ca3af;margin-top:0.25rem;">
-        Say <strong></strong> ZenCards requires exact wording of these voice commands for a smooth user experience. New useers- navigate to study options and settings to customize your study session. 
+        Say <strong></strong> ZenCards requires exact wording of these voice commands for a smooth user experience. New users- navigate to study options and settings to customize your study session. 
       </p>
 
       <hr style="border:0;border-top:1px solid #111827;margin:1rem 0;" />
@@ -4348,16 +4348,8 @@ function parseRatingFromText(text) {
 
     // Helper: detect "main menu" style commands
 function isMainMenuCommand(text) {
-  const t = text.toLowerCase();
-  return (
-    t.includes("main menu") ||
-    (t.includes("menu") && t.includes("main")) ||
-    t.includes("go back") ||
-    t.includes("back to menu") ||
-    t.includes("back to the menu") ||
-    t.includes("go to the menu") ||
-    t.includes("go to main menu")
-  );
+  // EXACT command only
+  return normalizeCmdText(text) === "go to the main menu";
 }
 
 // NEW: stop any current audio, then confirm + go to main menu
@@ -4478,7 +4470,7 @@ if (
   }
 
   // 🏠 Main menu – now allowed in ANY voice state (normal or study-ahead)
-  if (isMainMenuCommand(t) && currentMode === "voice") {
+  if (isMainMenuCommand(text) && currentMode === "voice") {
     speakAndGoToMainMenu();
     return true;
   }
