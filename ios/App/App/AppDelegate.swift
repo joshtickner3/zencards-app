@@ -59,7 +59,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 .playAndRecord,
                 mode: .spokenAudio,
                 options: [
-                    .defaultToSpeaker,        // ✅ iPhone speaker by default (unless headphones/AirPods)
                     .allowBluetoothHFP,       // ✅ fixes deprecated .allowBluetooth
                     .allowBluetoothA2DP       // ✅ AirPods / high quality BT audio
                     // ❌ NO .duckOthers (we want GPS to override us)

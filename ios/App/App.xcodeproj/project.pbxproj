@@ -12,7 +12,6 @@
 		3B05C9502F141719000CC4BC /* PluginViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B05C94F2F141719000CC4BC /* PluginViewController.swift */; };
 		3B05C9522F157192000CC4BC /* test-tone.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 3B05C9512F157192000CC4BC /* test-tone.mp3 */; };
 		3B7D02162EDE009400FF1514 /* VoiceCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B7D02152EDE009400FF1514 /* VoiceCommands.swift */; };
-		3B7D02202EE8BDE400FF1514 /* NativeTTSPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = 3B7D021F2EE8BDE400FF1514 /* NativeTTSPlugin.m */; };
 		3B7D02262EF07EDB00FF1514 /* ZenAudioNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B7D02252EF07EDB00FF1514 /* ZenAudioNotifications.swift */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
@@ -245,7 +244,6 @@
 			files = (
 				3B7D02262EF07EDB00FF1514 /* ZenAudioNotifications.swift in Sources */,
 				3B05C9502F141719000CC4BC /* PluginViewController.swift in Sources */,
-				3B7D02202EE8BDE400FF1514 /* NativeTTSPlugin.m in Sources */,
 				3B7D02162EDE009400FF1514 /* VoiceCommands.swift in Sources */,
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 			);
