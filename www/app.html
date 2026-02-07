@@ -958,16 +958,10 @@ input[type="number"]:focus{
             Answer in: <span id="timerAnswerAfterSpeech">0</span>s
           </div>
           <div class="badge" style="display:inline-block;margin-right:0.25rem;">
-            Answer plays in: <span id="timerQuestionToAnswer">0</span>s
-          </div>
-          <div class="badge" style="display:inline-block;margin-right:0.25rem;">
             Rating prompt in: <span id="timerAnswerToRating">0</span>s
           </div>
           <div class="badge" style="display:inline-block;">
             Next question in: <span id="timerAfterRating">0</span>s
-          </div>
-          <div class="badge" style="display:inline-block;margin-left:0.25rem;">
-            Study-ahead next in: <span id="timerStudyAheadGap">0</span>s
           </div>
         </div>
 
@@ -3765,10 +3759,8 @@ const micMuteTimerEl = document.getElementById("micMuteTimer");
 const micMuteSecondsEl = document.getElementById("micMuteSeconds");
 const voiceTimersEl = document.getElementById("voiceTimers");
 const timerAnswerAfterSpeechEl = document.getElementById("timerAnswerAfterSpeech");
-const timerQuestionToAnswerEl = document.getElementById("timerQuestionToAnswer");
 const timerAnswerToRatingEl = document.getElementById("timerAnswerToRating");
 const timerAfterRatingEl = document.getElementById("timerAfterRating");
-const timerStudyAheadGapEl = document.getElementById("timerStudyAheadGap");
 
 
     // NEW: track if question/answer have been spoken for current card
@@ -3777,7 +3769,6 @@ const timerStudyAheadGapEl = document.getElementById("timerStudyAheadGap");
 
     // NEW: track delay window between question and answer in delay mode
     let questionDelayTimerId = null;
-    let questionDelayDueMs = 0;
     let answerToRatingDelayTimerId = null;
 
     function clearAnswerToRatingDelayTimer() {
@@ -3801,28 +3792,22 @@ const timerStudyAheadGapEl = document.getElementById("timerStudyAheadGap");
       if (!voiceTimersEl || currentMode !== "voice") return;
       const now = Date.now();
       const answerRemaining = Math.max(0, Math.ceil((answerAfterSpeechDueMs - now) / 1000));
-      const questionRemaining = Math.max(0, Math.ceil((questionDelayDueMs - now) / 1000));
       const ratingRemaining = Math.max(0, Math.ceil((answerToRatingDueMs - now) / 1000));
       const nextRemaining = Math.max(0, Math.ceil((afterRatingDueMs - now) / 1000));
-      const studyAheadRemaining = Math.max(0, Math.ceil((studyAheadGapDueMs - now) / 1000));
 
       const showAnswer = answerAfterSpeechDueMs > now;
-      const showQuestionDelay = answerMode === "delay" && questionDelayDueMs > now;
       const showRating = answerToRatingDueMs > now;
       const showNext = afterRatingDueMs > now;
-      const showStudyAhead = noScheduleChanges && studyAheadSession && studyAheadGapDueMs > now;
 
-      if (!showAnswer && !showQuestionDelay && !showRating && !showNext && !showStudyAhead) {
+      if (!showAnswer && !showRating && !showNext) {
         voiceTimersEl.classList.add("hidden");
         return;
       }
 
       voiceTimersEl.classList.remove("hidden");
       if (timerAnswerAfterSpeechEl) timerAnswerAfterSpeechEl.textContent = String(answerRemaining);
-      if (timerQuestionToAnswerEl) timerQuestionToAnswerEl.textContent = String(questionRemaining);
       if (timerAnswerToRatingEl) timerAnswerToRatingEl.textContent = String(ratingRemaining);
       if (timerAfterRatingEl) timerAfterRatingEl.textContent = String(nextRemaining);
-      if (timerStudyAheadGapEl) timerStudyAheadGapEl.textContent = String(studyAheadRemaining);
     }
 
     setInterval(updateVoiceTimers, 250);
@@ -3832,7 +3817,6 @@ const timerStudyAheadGapEl = document.getElementById("timerStudyAheadGap");
         clearTimeout(studyAheadGapTimerId);
         studyAheadGapTimerId = null;
       }
-      studyAheadGapDueMs = 0;
       inStudyAheadAnswerGap = false;
     }
 
@@ -3841,7 +3825,6 @@ const timerStudyAheadGapEl = document.getElementById("timerStudyAheadGap");
         clearTimeout(questionDelayTimerId);
         questionDelayTimerId = null;
       }
-      questionDelayDueMs = 0;
     }
 
     function startOrResetQuestionDelayTimer() {
@@ -3851,7 +3834,6 @@ const timerStudyAheadGapEl = document.getElementById("timerStudyAheadGap");
         Math.min(60, Math.floor(answerDelayMs / 1000))
       );
       setStudyState(StudyState.WAITING_FOR_ANSWER);
-      questionDelayDueMs = Date.now() + delay * 1000;
       questionDelayTimerId = setTimeout(() => {
         if (!isPaused) {
           speakAnswerThenAskDifficulty();
@@ -4736,11 +4718,6 @@ if (awaitingAnswerSignal && currentMode === "voice") {
   // ✅ If we get here while awaitingAnswerSignal is true, the user said something OTHER than "mute microphone"
   // So proceed with playing the answer
   console.log("[VOICE] User spoke in voice-answer mode (not mute), calling startOrResetAnswerAfterSpeechDelay");
-  if (!normalizeCmdText(text).length) {
-    setStatus("Listening for your answer...");
-    listenForCommand(handleVoiceTranscript);
-    return;
-  }
   awaitingAnswerSignal = false;
   startOrResetAnswerAfterSpeechDelay();
   return;
@@ -5025,7 +5002,6 @@ function speakAnswerThenAskDifficulty() {
         studyAheadGapTimerId = setTimeout(() => {
           inStudyAheadAnswerGap = false;
           studyAheadGapTimerId = null;
-          studyAheadGapDueMs = 0;
           if (studyAheadRepeatAnswerActive) {
             pendingStudyAheadAdvance = true;
             return;
@@ -5034,7 +5010,6 @@ function speakAnswerThenAskDifficulty() {
             runVoiceLoop();
           }
         }, studyAheadGapMs);
-        studyAheadGapDueMs = Date.now() + studyAheadGapMs;
       };
 
       if (!restartOnly && !studyAheadPromptedOnceVoice) {
