@@ -3245,38 +3245,34 @@ segments.push({
 
   function getPreferredVoice() {
   const voices = window.speechSynthesis.getVoices();
+
+  // 1) Prefer voices that match the requested language
+  // Match either exact lang (e.g., "es-ES") or prefix (e.g., "es")
   const langPrefix = String(lang).split("-")[0];
 
-  // 1) Match exact language
   const matching = voices.filter(v => {
-    if (!v.lang) return false;
+    if (!v || !v.lang) return false;
     const vPrefix = v.lang.split("-")[0];
     return v.lang === lang || vPrefix === langPrefix;
   });
 
-  // 2) If English, pick a natural voice in this order:
+  // 2) If user asked for English, keep your "Daniel, not Samantha" preference
   if (langPrefix === "en") {
-    // Safari/macOS: Alex or Siri female
-    const safariVoices = ["Alex", "Samantha", "Siri"];
-    for (const name of safariVoices) {
-      const found = matching.find(v => v.name.includes(name));
-      if (found) return found;
-    }
-    // Chrome: Google high quality voices
-    const chromeVoices = matching.filter(v => v.name.toLowerCase().includes("google"));
-    if (chromeVoices.length > 0) return chromeVoices[0];
+    let preferredVoice = matching.find(v => v.name === "Daniel")
+      || matching.find(v => v.name === "Daniel (Enhanced)");
 
-    // fallback: any English voice
-    if (matching.length > 0) return matching[0];
+    // fall back to any matching English voice that isn't Samantha
+    if (!preferredVoice) preferredVoice = matching.find(v => !v.name.toLowerCase().includes("samantha"));
+    if (!preferredVoice) preferredVoice = matching[0] || null;
+    return preferredVoice;
   }
 
-  // 3) For non-English, first matching
+  // 3) For non-English, just take the first matching voice (usually best pronunciation)
   if (matching.length > 0) return matching[0];
 
-  // 4) Nothing matched: fallback to any voice
+  // 4) Fallback: any voice at all (last resort)
   return voices[0] || null;
 }
-
 
   function startSpeaking() {
     const preferredVoice = getPreferredVoice();
