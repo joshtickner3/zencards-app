@@ -4403,9 +4403,15 @@ function isMainMenuCommand(text) {
   return t === "main menu";
 }
 
-// Stop any current audio, then go to main menu immediately
-async function speakAndGoToMainMenu() {
+// Stop any current audio, then go to main menu (optionally speak)
+async function speakAndGoToMainMenu(withConfirmation = false) {
   await stopAllAudio();
+  if (withConfirmation) {
+    speakSafe("Going to the main menu.", () => {
+      endStudySession();
+    });
+    return;
+  }
   endStudySession();
 }
 
@@ -4531,7 +4537,7 @@ if (
 
   // 🏠 Main menu – now allowed in ANY voice state (normal or study-ahead)
    if (isMainMenuCommand(t) && currentMode === "voice") {
-    speakAndGoToMainMenu();
+    speakAndGoToMainMenu(true);
     return true;
   }
 
