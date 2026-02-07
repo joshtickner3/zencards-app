@@ -4369,9 +4369,9 @@ async function handleGlobalVoiceCommands(text) {
         const detailed =
           !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
         hasSpokenInstructionsOnce = true;
-        const promptText = detailed
-          ? "How was that? Say again, hard, good, or easy."
-          : "How was that?";
+          const promptText = detailed
+            ? "How was that. Say again, hard, good, or easy."
+            : "How was that.";
         speak(promptText, () => {
           startDifficultyListening();
         });
@@ -4797,8 +4797,8 @@ function speakAnswerThenAskDifficulty() {
       hasSpokenInstructionsOnce = true;
 
       const promptText = detailed
-        ? "How was that? Say again, hard, good, or easy."
-        : "How was that?";
+        ? "How was that. Say again, hard, good, or easy."
+        : "How was that.";
 
       setStatus(promptText);
 
