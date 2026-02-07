@@ -4404,9 +4404,13 @@ async function handleGlobalVoiceCommands(text) {
     speakSafe("Answer: " + plainAnswer, () => {
       if (isPaused) return;
 
-      // If we're in study-ahead + gap, restart the gap window
-      if (noScheduleChanges && studyAheadSession && inStudyAheadAnswerGap) {
-        startStudyAheadAnswerWindow(true);
+      // If we're in study-ahead, stay on this card after repeating
+      if (noScheduleChanges && studyAheadSession) {
+        clearStudyAheadGapTimer();
+        inStudyAheadAnswerGap = true;
+        if (currentMode === "voice") {
+          listenForCommand(handleVoiceTranscript);
+        }
         return;
       }
 

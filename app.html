@@ -4531,8 +4531,12 @@ async function handleGlobalVoiceCommands(text) {
      speakPlainAnswerWithCardLang("", () => {
     if (isPaused) return;
 
-         if (noScheduleChanges && studyAheadSession && inStudyAheadAnswerGap) {
-      startStudyAheadAnswerWindow(true);
+         if (noScheduleChanges && studyAheadSession) {
+      clearStudyAheadGapTimer();
+      inStudyAheadAnswerGap = true;
+      if (currentMode === "voice") {
+        listenForCommand(handleVoiceTranscript);
+      }
       return;
     }
 
