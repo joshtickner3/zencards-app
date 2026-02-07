@@ -953,6 +953,17 @@ input[type="number"]:focus{
     Mic muted: <span id="micMuteSeconds">0</span>s
   </span>
 </div>
+        <div id="voiceTimers" class="hidden" style="margin-top:0.5rem;">
+          <div class="badge" style="display:inline-block;margin-right:0.25rem;">
+            Answer in: <span id="timerAnswerAfterSpeech">0</span>s
+          </div>
+          <div class="badge" style="display:inline-block;margin-right:0.25rem;">
+            Rating prompt in: <span id="timerAnswerToRating">0</span>s
+          </div>
+          <div class="badge" style="display:inline-block;">
+            Next question in: <span id="timerAfterRating">0</span>s
+          </div>
+        </div>
 
         <!-- Inline edit for voice mode -->
         <div style="margin-top:0.5rem;">
@@ -3049,6 +3060,7 @@ if (answerDelayAfterSpeechSecInput) {
   speakGeneration++;
   clearAnswerAfterSpeechDelay();
   clearAnswerToRatingDelayTimer();
+  clearAfterRatingDelayTimer();
 
   // Stop browser TTS
   if (window.speechSynthesis) {
@@ -3660,11 +3672,16 @@ let loopStudyAhead = false;       // from Study Options
       setStudyState(StudyState.IDLE);
       const autoGoodEnabled = !!autoGoodToggle?.checked;
       const delayMs = Math.max(0, Number(handsFreeNextDelayMs || 0));
+      clearAfterRatingDelayTimer();
       if (!autoGoodEnabled && delayMs > 0) {
-        setTimeout(() => {
+        afterRatingDueMs = Date.now() + delayMs;
+        afterRatingTimerId = setTimeout(() => {
+          afterRatingTimerId = null;
+          afterRatingDueMs = 0;
           if (!isPaused) runVoiceLoop();
         }, delayMs);
       } else {
+        afterRatingDueMs = 0;
         runVoiceLoop();
       }
     }
@@ -3682,6 +3699,8 @@ let loopStudyAhead = false;       // from Study Options
     let pendingStudyAheadAdvance = false;
     let answerAfterSpeechTimerId = null;
 let answerAfterSpeechDueMs = 0;
+  let answerToRatingDueMs = 0;
+  let afterRatingDueMs = 0;
 let inAnswerAfterSpeechDelay = false;
 
 function clearAnswerAfterSpeechDelay() {
@@ -3738,6 +3757,10 @@ let awaitingMuteSeconds = false;
 // DOM refs (safe here because index.html already loaded)
 const micMuteTimerEl = document.getElementById("micMuteTimer");
 const micMuteSecondsEl = document.getElementById("micMuteSeconds");
+const voiceTimersEl = document.getElementById("voiceTimers");
+const timerAnswerAfterSpeechEl = document.getElementById("timerAnswerAfterSpeech");
+const timerAnswerToRatingEl = document.getElementById("timerAnswerToRating");
+const timerAfterRatingEl = document.getElementById("timerAfterRating");
 
 
     // NEW: track if question/answer have been spoken for current card
@@ -3753,7 +3776,41 @@ const micMuteSecondsEl = document.getElementById("micMuteSeconds");
         clearTimeout(answerToRatingDelayTimerId);
         answerToRatingDelayTimerId = null;
       }
+      answerToRatingDueMs = 0;
     }
+
+    let afterRatingTimerId = null;
+    function clearAfterRatingDelayTimer() {
+      if (afterRatingTimerId !== null) {
+        clearTimeout(afterRatingTimerId);
+        afterRatingTimerId = null;
+      }
+      afterRatingDueMs = 0;
+    }
+
+    function updateVoiceTimers() {
+      if (!voiceTimersEl || currentMode !== "voice") return;
+      const now = Date.now();
+      const answerRemaining = Math.max(0, Math.ceil((answerAfterSpeechDueMs - now) / 1000));
+      const ratingRemaining = Math.max(0, Math.ceil((answerToRatingDueMs - now) / 1000));
+      const nextRemaining = Math.max(0, Math.ceil((afterRatingDueMs - now) / 1000));
+
+      const showAnswer = answerAfterSpeechDueMs > now;
+      const showRating = answerToRatingDueMs > now;
+      const showNext = afterRatingDueMs > now;
+
+      if (!showAnswer && !showRating && !showNext) {
+        voiceTimersEl.classList.add("hidden");
+        return;
+      }
+
+      voiceTimersEl.classList.remove("hidden");
+      if (timerAnswerAfterSpeechEl) timerAnswerAfterSpeechEl.textContent = String(answerRemaining);
+      if (timerAnswerToRatingEl) timerAnswerToRatingEl.textContent = String(ratingRemaining);
+      if (timerAfterRatingEl) timerAfterRatingEl.textContent = String(nextRemaining);
+    }
+
+    setInterval(updateVoiceTimers, 250);
 
     function clearStudyAheadGapTimer() {
       if (studyAheadGapTimerId !== null) {
@@ -4917,11 +4974,14 @@ function speakAnswerThenAskDifficulty() {
       const delayMs = Math.max(0, Number(answerToRatingDelayMs || 0));
       if (delayMs > 0) {
         setStudyState(StudyState.WAITING_FOR_RATING);
+        answerToRatingDueMs = Date.now() + delayMs;
         answerToRatingDelayTimerId = setTimeout(() => {
           answerToRatingDelayTimerId = null;
+          answerToRatingDueMs = 0;
           if (!isPaused) startDifficultyPrompt();
         }, delayMs);
       } else {
+        answerToRatingDueMs = 0;
         startDifficultyPrompt();
       }
     },
