@@ -3193,6 +3193,13 @@ function speakWithWebTts(text, onEnd, opts = {}) {
     return;
   }
 
+    // ✅ IMPORTANT: stop STT while we speak so we don’t “hear ourselves”
+  try {
+    keepListening = false;
+    if (recognition) recognition.stop();
+  } catch (e) {}
+
+
   // 🧹 Clear any queued / half-finished utterances so we get a clean read.
   try {
     window.speechSynthesis.cancel();
@@ -5212,6 +5219,9 @@ function speakAnswerThenAskDifficulty() {
         setStatus("Paused.");
         return;
       }
+
+        stopListeningForCommand(); // ✅ ensure nothing is listening from study-ahead gap
+
       clearStudyAheadGapTimer();
       clearQuestionDelayTimer();
       clearAnswerAfterSpeechDelay();
