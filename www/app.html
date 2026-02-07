@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+   <style>
+    .instructions-top-right {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      z-index: 1000;
+    }
+  </style>
     <!-- Capacitor Preferences for robust session persistence on iOS -->
     <script type="module">
       import { Preferences } from '@capacitor/preferences';
@@ -85,27 +93,7 @@
       }
     }
   };
-// ===== App background/foreground auto-pause/resume logic =====
-function shouldBeListeningForVoice() {
-  return (
-    currentMode === 'voice' &&
-    !isPaused &&
-    (awaitingAnswerSignal ||
-      awaitingDifficulty ||
-      inAnswerAfterSpeechDelay ||
-      inStudyAheadAnswerGap ||
-      awaitingPostCompletionChoice)
-  );
-}
 
-function ensureVoiceMicReady(reason) {
-  if (!shouldBeListeningForVoice()) return;
-  try {
-    listenForCommand(handleVoiceTranscript);
-  } catch (e) {
-    console.error("[VOICE] ensureVoiceMicReady failed:", reason, e);
-  }
-}
 
 document.addEventListener('visibilitychange', function() {
   if (document.hidden) {
@@ -137,10 +125,6 @@ document.addEventListener('visibilitychange', function() {
       } else {
         runVoiceLoop();
       }
-
-      setTimeout(() => {
-        if (!document.hidden) ensureVoiceMicReady("resume");
-      }, 350);
     }
   }
 });
@@ -916,9 +900,12 @@ input[type="number"]:focus{
         </div>
 
 
-        <button id="openInstructionsBtn" class="secondary small" type="button">
-  Instructions / Voice Commands
-</button>
+           <!-- Instructions Button Top Right -->
+    <div class="instructions-top-right">
+      <button id="openInstructionsBtn" class="secondary small" type="button">
+        Instructions / Voice Commands
+      </button>
+    </div>
 
         <p style="font-size:0.85rem;color:#9ca3af;margin-top:0.5rem;">
           Voice commands (hands-free): "again", "hard", "good", "easy", "go to the next card",
@@ -1131,16 +1118,16 @@ input[type="number"]:focus{
 
       <h3>🎤 When to say voice commands</h3>
       <ul>
-        <li><strong>After the question</strong>: you can say <em>repeat question</em> or <em>go to next card</em>.</li>
-        <li><strong>After the answer</strong>: say your rating (<em>again / hard / good / easy</em>).</li>
-        <li><strong>Any time</strong>: <em>pause study session</em>, <em>resume study session</em>, <em>go to the main menu</em>.</li>
+   <li><strong>After the question</strong>: you can say <em>repeat question or mute microphone </em> or <em></em>.</li>
+        <li><strong>After the answer</strong>: say your rating when prompted (<em>again / hard / good / easy</em>).</li>
+        <li><strong>Any time</strong>: <em>"pause study session"</em>, <em>"resume study session"</em>, <em>"go to the main menu"</em>.</li>
       </ul>
 
       <hr style="border:0;border-top:1px solid #111827;margin:1rem 0;" />
 
-      <h3>➡️ Next Card</h3>
+      <h3>➡️ Important</h3>
       <p style="color:#9ca3af;margin-top:0.25rem;">
-        Say <strong>“go to next card”</strong> to skip the current card and immediately move forward.
+    Say <strong></strong> ZenCards requires exact wording of these voice commands for a smooth user experience. New users- navigate to study options and settings to customize your study session. 
       </p>
 
       <hr style="border:0;border-top:1px solid #111827;margin:1rem 0;" />
@@ -1160,7 +1147,6 @@ input[type="number"]:focus{
       <h3>🗣️ Full voice command list</h3>
       <ul>
         <li><strong>again</strong>, <strong>hard</strong>, <strong>good</strong>, <strong>easy</strong> — rate the card</li>
-        <li><strong>go to next card</strong> — skip ahead</li>
         <li><strong>repeat question</strong></li>
         <li><strong>repeat answer</strong></li>
         <li><strong>pause study session</strong></li>
@@ -4342,7 +4328,6 @@ function isMainMenuCommand(text) {
   return (
     t.includes("main menu") ||
     (t.includes("menu") && t.includes("main")) ||
-    t.includes("go back") ||
     t.includes("back to menu") ||
     t.includes("back to the menu") ||
     t.includes("go to the menu") ||
@@ -4468,7 +4453,7 @@ if (
   }
 
   // 🏠 Main menu – now allowed in ANY voice state (normal or study-ahead)
-  if (isMainMenuCommand(t) && currentMode === "voice") {
+   if (isMainMenuCommand(t) && currentMode === "voice") {
     speakAndGoToMainMenu();
     return true;
   }

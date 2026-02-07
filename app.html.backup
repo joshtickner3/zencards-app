@@ -1,10 +1,84 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+ <style>
+  .instructions-top-right {
+    position: static;           /* no longer fixed */
+    display: flex;
+    justify-content: center;    /* center horizontally */
+    margin: 0.35rem 0 0.9rem;   /* space under subtitle */
+    z-index: auto;
+  }
+</style>
+
+    <!-- Capacitor Preferences for robust session persistence on iOS -->
+    <script type="module">
+      import { Preferences } from '@capacitor/preferences';
+      // Restore Supabase session from native storage before anything else
+      (async function restoreSupabaseSession() {
+        // Only run in native app
+        const isNative = !!window.Capacitor || !!window.cordova || !!window.webkit?.messageHandlers?.bridge;
+        if (!isNative) return;
+        try {
+          const { value } = await Preferences.get({ key: 'zencards-auth' });
+          if (value) {
+            localStorage.setItem('zencards-auth', value);
+          }
+        } catch (e) {
+          console.warn('[Capacitor] Could not restore session from Preferences:', e);
+        }
+      })();
+    </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <meta charset="UTF-8" />
   <title>ZenCards — Hands-Free Audio Flashcards </title>
+  <script>
+    // --- Persist and Restore Study Settings ---
+    function saveStudySettings() {
+      const settings = {
+        deck: document.getElementById('deckSelect')?.value || '',
+        ttsRate: document.getElementById('ttsRateInput')?.value || '',
+        ttsVolume: document.getElementById('ttsVolumeInput')?.value || '',
+        // Add more as needed (e.g., mode, delay)
+      };
+      localStorage.setItem('zencards_study_settings', JSON.stringify(settings));
+    }
+
+    function restoreStudySettings() {
+      const settings = JSON.parse(localStorage.getItem('zencards_study_settings') || '{}');
+      if (settings.deck && document.getElementById('deckSelect')) {
+        document.getElementById('deckSelect').value = settings.deck;
+      }
+      if (settings.ttsRate && document.getElementById('ttsRateInput')) {
+        document.getElementById('ttsRateInput').value = settings.ttsRate;
+      }
+      if (settings.ttsVolume && document.getElementById('ttsVolumeInput')) {
+        document.getElementById('ttsVolumeInput').value = settings.ttsVolume;
+      }
+      // Add more as needed
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      restoreStudySettings();
+      // Save on change
+      ['deckSelect','ttsRateInput','ttsVolumeInput'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', saveStudySettings);
+      });
+    });
+    // Prevent double-tap to zoom on iOS
+    (function() {
+      let lastTouchEnd = 0;
+      document.addEventListener('touchend', function(event) {
+        const now = Date.now();
+        if (now - lastTouchEnd <= 350) {
+          event.preventDefault();
+        }
+        lastTouchEnd = now;
+      }, { passive: false });
+    })();
+  </script>
 <meta
   name="viewport"
   content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes, maximum-scale=5.0"
@@ -21,6 +95,65 @@
       }
     }
   };
+// ===== App background/foreground auto-pause/resume logic =====
+function shouldBeListeningForVoice() {
+  return (
+    currentMode === 'voice' &&
+    !isPaused &&
+    (awaitingAnswerSignal ||
+      awaitingDifficulty ||
+      inAnswerAfterSpeechDelay ||
+      inStudyAheadAnswerGap ||
+      awaitingPostCompletionChoice)
+  );
+}
+
+function ensureVoiceMicReady(reason) {
+  if (!shouldBeListeningForVoice()) return;
+  try {
+    listenForCommand(handleVoiceTranscript);
+  } catch (e) {
+    console.error("[VOICE] ensureVoiceMicReady failed:", reason, e);
+  }
+}
+
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden) {
+    // App is backgrounded
+    if (!isPaused && currentMode === 'voice') {
+      // Robust pause logic: match button/voice command
+      isPaused = true;
+      if (currentCard) window.restartCardOnResumeVoice = true;
+      stopAllAudio();
+      clearStudyAheadGapTimer();
+      clearQuestionDelayTimer();
+      clearAnswerAfterSpeechDelay();
+      if (typeof pauseBtn !== 'undefined') pauseBtn.disabled = true;
+      if (typeof resumeBtn !== 'undefined') resumeBtn.disabled = false;
+      setStatus('Paused. Say "resume study session" or tap Resume.');
+      speakSafe('Paused.', () => {
+        listenForCommand(handleVoiceTranscript);
+      });
+    }
+  } else {
+    // App is foregrounded
+    if (currentMode === 'voice' && isPaused) {
+      isPaused = false;
+      if (typeof pauseBtn !== 'undefined') pauseBtn.disabled = false;
+      if (typeof resumeBtn !== 'undefined') resumeBtn.disabled = true;
+      if (window.restartCardOnResumeVoice && currentCard) {
+        window.restartCardOnResumeVoice = false;
+        restartCurrentCardVoiceFlow();
+      } else {
+        runVoiceLoop();
+      }
+
+      setTimeout(() => {
+        if (!document.hidden) ensureVoiceMicReady("resume");
+      }, 350);
+    }
+  }
+});
 </script>
 
 <script
@@ -96,6 +229,7 @@
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+   justify-content: center; /* ✅ centers the buttons */
 }
 
 .topUserBar button {
@@ -420,6 +554,10 @@ input[type="number"]:focus{
   inset: 0;
   z-index: 9999;
 }
+/* Prevent iOS zoom on input focus in modals */
+.modal input, .modal select, .modal textarea {
+  font-size: 16px !important;
+}
 
 .modalBackdrop {
   position: absolute;
@@ -516,14 +654,15 @@ input[type="number"]:focus{
 </div>
 
   <!-- Top-left signed-in bar -->
+
 <div id="authLoggedIn" class="topUserBar hidden">
   <p class="signedInLine">
     Signed in as <strong id="userEmailLabel"></strong>
   </p>
-
   <div class="btnRow">
     <button id="logOutBtn" class="secondary small">Log Out</button>
     <button id="manageBillingBtn" class="small">Manage Billing</button>
+    <button class="btn danger small" id="deleteAccountBtn" type="button" style="background:#dc2626;color:#fff;">Delete Account</button>
   </div>
 </div>
 
@@ -532,6 +671,13 @@ input[type="number"]:focus{
 </div>
 
     <p class="appSubtitle">Hands-free & silent spaced&nbsp;repetition flashcards</p>
+
+    <div class="instructions-top-right">
+  <button id="openInstructionsBtn" class="secondary small" type="button">
+    Instructions / Voice Commands
+  </button>
+</div>
+
 
     <!-- ========== MAIN SETTINGS / MENU ========== -->
     <div id="mainMenu" class="card">
@@ -544,6 +690,9 @@ input[type="number"]:focus{
           <div>
             <label for="deckSelect">Select deck:</label>
             <select id="deckSelect"></select>
+          </div>
+          <div style="flex:0 0 auto;">
+            <button id="editDeckNameBtn" class="secondary">Edit Deck Name</button>
           </div>
           <div>
             <label for="newDeckName">New deck name:</label>
@@ -566,14 +715,15 @@ input[type="number"]:focus{
         <h3>Cards (Viewer & Editor)</h3>
         <div class="row">
          <div>
+  <div>
+  <label for="cardQuestionLang">Question language (TTS):</label>
+  <select id="cardQuestionLang"></select>
+
   <label for="cardQuestion">Question:</label>
-  <textarea id="cardQuestion" placeholder="Enter question"></textarea>
-  
+  <textarea id="cardQuestion" placeholder="Enter question" spellcheck="true" autocorrect="on" autocomplete="on" autocapitalize="sentences"></textarea>
+
   <div style="margin-top:0.25rem;font-size:0.8rem;">
-    <button type="button"
-            class="secondary small"
-            data-insert-image
-            data-target="cardQuestion">
+    <button type="button" class="secondary small" data-insert-image data-target="cardQuestion">
       Insert image…
     </button>
     <span style="color:#9ca3af;">
@@ -581,15 +731,16 @@ input[type="number"]:focus{
     </span>
   </div>
 </div>
+
 <div>
+  <label for="cardAnswerLang">Answer language (TTS):</label>
+  <select id="cardAnswerLang"></select>
+
   <label for="cardAnswer">Answer:</label>
-  <textarea id="cardAnswer" placeholder="Enter answer"></textarea>
-  
+  <textarea id="cardAnswer" placeholder="Enter answer" spellcheck="true" autocorrect="on" autocomplete="on" autocapitalize="sentences"></textarea>
+
   <div style="margin-top:0.25rem;font-size:0.8rem;">
-    <button type="button"
-            class="secondary small"
-            data-insert-image
-            data-target="cardAnswer">
+    <button type="button" class="secondary small" data-insert-image data-target="cardAnswer">
       Insert image…
     </button>
     <span style="color:#9ca3af;">
@@ -597,6 +748,9 @@ input[type="number"]:focus{
     </span>
   </div>
 </div>
+
+</div>
+  <!-- Only one Insert image button for answer field -->
         </div>
         <div class="row">
           <div style="flex:0 0 auto;">
@@ -638,64 +792,77 @@ input[type="number"]:focus{
 
       <!-- Study options -->
       <div class="card">
-        <h3>Study Options</h3>
-        <div>
-          <label class="inline">
-            <input type="checkbox" id="skipInstructionsAfterFirst" checked />
-            Skip detailed difficulty instructions after first card
-          </label>
-        </div>
-        <!-- Automatic mode -->
-        <div>
-          <label class="inline">
-            <input type="checkbox" id="autoGoodToggle" />
-            Can't give voice commands? Enable automatic mode so each card is assigned
-            <select id="autoRatingSelect" style="width:auto;min-width:120px;">
-              <option value="again">Again</option>
-              <option value="hard">Hard</option>
-              <option value="good" selected>Good</option>
-              <option value="easy">Easy</option>
-              <option value="tomorrow">Show again tomorrow</option>
-            </select>
-            rating automatically
-            <span class="badge">New</span>
-          </label>
-        </div>
-                <!-- NEW: auto study-ahead options -->
-        <div style="margin-top:0.5rem;">
-          <label class="inline">
-            <input type="checkbox" id="autoEnterStudyAhead" />
-            After I finish all due cards, automatically enter study-ahead mode
-          </label>
-        </div>
-        <div>
-          <label class="inline">
-            <input type="checkbox" id="loopStudyAhead" />
-            In study-ahead mode, keep looping the deck automatically
-          </label>
-        </div>
-        <div style="margin-top:0.5rem;">
-          <strong>Hands-free answer behavior:</strong>
-          <div class="row" style="margin-top:0.25rem;">
-            <div class="inline">
-              <input type="radio" name="answerMode" id="answerModeDelay" value="delay" checked />
-              <label for="answerModeDelay">Wait</label>
-              <input type="number" id="answerDelaySeconds" min="1" max="60" value="4" style="width:60px;" />
-              <span>seconds before answer</span>
-            </div>
-            <div class="inline">
-              <input type="radio" name="answerMode" id="answerModeVoice" value="voice" />
-              <label for="answerModeVoice">Play answer after I speak</label>
-            </div>
+        <div class="row" style="justify-content:space-between;align-items:center;">
+          <h3>Study Options</h3>
+          <div style="flex:0 0 auto;text-align:right;">
+            <button id="toggleStudyOptionsBtn" class="secondary small" type="button">Show</button>
           </div>
         </div>
-        <!-- NEW: study-ahead answer gap control -->
-        <div style="margin-top:0.5rem;">
-          <label class="inline" for="studyAheadGapSeconds">
-            Study-ahead: delay after answer before next question
-          </label>
-          <input type="number" id="studyAheadGapSeconds" min="1" max="60" value="4" style="width:60px;" />
-          <span>seconds</span>
+        <div id="studyOptionsPanel" class="hidden" style="margin-top:0.5rem;">
+          <div>
+            <label class="inline">
+              <input type="checkbox" id="skipInstructionsAfterFirst" checked />
+              Skip difficulty instructions after first card
+            </label>
+          </div>
+          <!-- Automatic mode -->
+          <div>
+            <label class="inline">
+              <input type="checkbox" id="autoGoodToggle" />
+              Enable automatic mode so each card is assigned
+              <select id="autoRatingSelect" style="width:auto;min-width:120px;">
+                <option value="again">Again</option>
+                <option value="hard">Hard</option>
+                <option value="good" selected>Good</option>
+                <option value="easy">Easy</option>
+                <option value="tomorrow">Show again tomorrow</option>
+              </select>
+              <span class="badge">New</span>
+            </label>
+          </div>
+          <div style="margin-top:0.5rem;">
+            <label class="inline" for="handsFreeNextDelaySeconds">
+              Delay after rating before next question
+            </label>
+            <input type="number" id="handsFreeNextDelaySeconds" min="0" max="30" value="2" style="width:60px;" />
+            <span>seconds</span>
+          </div>
+          <!-- NEW: auto study-ahead options -->
+          <div style="margin-top:0.5rem;">
+            <label class="inline">
+              <input type="checkbox" id="autoEnterStudyAhead" />
+              After I finish all due cards, automatically enter study-ahead mode
+            </label>
+          </div>
+          <div>
+            <label class="inline">
+              <input type="checkbox" id="loopStudyAhead" />
+              In study-ahead mode, keep looping the deck automatically
+            </label>
+          </div>
+          <div style="margin-top:0.5rem;">
+            <strong>Hands-free answer behavior:</strong>
+            <div class="row" style="margin-top:0.25rem;">
+              <div class="inline">
+                <input type="radio" name="answerMode" id="answerModeDelay" value="delay" checked />
+                <label for="answerModeDelay">Wait</label>
+                <input type="number" id="answerDelaySeconds" min="1" max="60" value="4" style="width:60px;" />
+                <span>seconds before answer</span>
+              </div>
+              <div class="inline">
+                <input type="radio" name="answerMode" id="answerModeVoice" value="voice" />
+                <label for="answerModeVoice">Play answer after I speak</label>
+              </div>
+            </div>
+          </div>
+          <!-- NEW: study-ahead answer gap control -->
+          <div style="margin-top:0.5rem;">
+            <label class="inline" for="studyAheadGapSeconds">
+              Study-ahead: delay after answer before next question
+            </label>
+            <input type="number" id="studyAheadGapSeconds" min="1" max="60" value="4" style="width:60px;" />
+            <span>seconds</span>
+          </div>
         </div>
       </div>
 
@@ -762,15 +929,8 @@ input[type="number"]:focus{
         <div class="row">
           <button id="startVoiceBtn">Start Hands-Free Study</button>
           <button id="startSilentBtn" class="secondary">Start Silent Study</button>
+
         </div>
-        <button id="debugNativeQueueBtn" class="secondary small" type="button">
-  Debug Native Queue
-</button>
-
-
-        <button id="openInstructionsBtn" class="secondary small" type="button">
-  Instructions / Voice Commands
-</button>
 
         <p style="font-size:0.85rem;color:#9ca3af;margin-top:0.5rem;">
           Voice commands (hands-free): "again", "hard", "good", "easy", "go to the next card",
@@ -817,10 +977,22 @@ input[type="number"]:focus{
           <button id="voiceEditToggleBtn" class="secondary small">Edit Card</button>
         </div>
         <div id="voiceEditPanel" class="hidden" style="margin-top:0.75rem;">
+          <label for="voiceEditQuestionLang">Question language (TTS):</label>
+<select id="voiceEditQuestionLang"></select>
+
+<label for="voiceEditQuestion">Edit question:</label>
+<textarea id="voiceEditQuestion" ...></textarea>
+
+<label for="voiceEditAnswerLang">Answer language (TTS):</label>
+<select id="voiceEditAnswerLang"></select>
+
+<label for="voiceEditAnswer">Edit answer:</label>
+<textarea id="voiceEditAnswer" ...></textarea>
+
           <label for="voiceEditQuestion">Edit question:</label>
-          <textarea id="voiceEditQuestion"></textarea>
+          <textarea id="voiceEditQuestion" spellcheck="true" autocorrect="on" autocomplete="on" autocapitalize="sentences"></textarea>
           <label for="voiceEditAnswer">Edit answer:</label>
-          <textarea id="voiceEditAnswer"></textarea>
+          <textarea id="voiceEditAnswer" spellcheck="true" autocorrect="on" autocomplete="on" autocapitalize="sentences"></textarea>
           <div style="margin-top:0.5rem;">
             <button id="voiceSaveEditBtn">Save</button>
             <button id="voiceCancelEditBtn" class="secondary">Cancel</button>
@@ -851,9 +1023,21 @@ input[type="number"]:focus{
         </div>
         <div id="silentEditPanel" class="hidden" style="margin-top:0.75rem;">
           <label for="silentEditQuestion">Edit question:</label>
-          <textarea id="silentEditQuestion"></textarea>
+          <textarea id="silentEditQuestion" spellcheck="true" autocorrect="on" autocomplete="on" autocapitalize="sentences"></textarea>
+          <label for="silentEditQuestionLang">Question language (TTS):</label>
+<select id="silentEditQuestionLang"></select>
+
+<label for="silentEditQuestion">Edit question:</label>
+<textarea id="silentEditQuestion" ...></textarea>
+
+<label for="silentEditAnswerLang">Answer language (TTS):</label>
+<select id="silentEditAnswerLang"></select>
+
+<label for="silentEditAnswer">Edit answer:</label>
+<textarea id="silentEditAnswer" ...></textarea>
+
           <label for="silentEditAnswer">Edit answer:</label>
-          <textarea id="silentEditAnswer"></textarea>
+          <textarea id="silentEditAnswer" spellcheck="true" autocorrect="on" autocomplete="on" autocapitalize="sentences"></textarea>
           <div style="margin-top:0.5rem;">
             <button id="silentSaveEditBtn">Save</button>
             <button id="silentCancelEditBtn" class="secondary">Cancel</button>
@@ -909,14 +1093,20 @@ input[type="number"]:focus{
     </div>
 
     <div style="margin-top:0.75rem;">
-      <label for="addCardModalQuestion">Question</label>
-      <textarea id="addCardModalQuestion" placeholder="Enter question"></textarea>
-    </div>
+  <label for="addCardModalQuestionLang">Question language (TTS)</label>
+  <select id="addCardModalQuestionLang"></select>
 
-    <div style="margin-top:0.75rem;">
-      <label for="addCardModalAnswer">Answer</label>
-      <textarea id="addCardModalAnswer" placeholder="Enter answer"></textarea>
-    </div>
+  <label for="addCardModalQuestion">Question</label>
+  <textarea id="addCardModalQuestion" placeholder="Enter question" spellcheck="true" autocorrect="on" autocomplete="on" autocapitalize="sentences"></textarea>
+</div>
+
+<div style="margin-top:0.75rem;">
+  <label for="addCardModalAnswerLang">Answer language (TTS)</label>
+  <select id="addCardModalAnswerLang"></select>
+
+  <label for="addCardModalAnswer">Answer</label>
+  <textarea id="addCardModalAnswer" placeholder="Enter answer" spellcheck="true" autocorrect="on" autocomplete="on" autocapitalize="sentences"></textarea>
+</div>
 
     <div class="row" style="margin-top:0.75rem;">
       <button id="addCardModalSaveBtn" type="button">Save Card</button>
@@ -948,21 +1138,76 @@ input[type="number"]:focus{
         <li><strong>Good</strong> — you remembered normally (standard progress).</li>
         <li><strong>Easy</strong> — you remembered instantly (faster progress).</li>
       </ul>
+            <hr style="border:0;border-top:1px solid #111827;margin:1rem 0;" />
+
+      <h3>⚙️ Choosing Study Options</h3>
+      <p style="color:#9ca3af;margin-top:0.25rem;">
+        ZenCards can run fully hands-free (audio + voice commands) or silent (tap to reveal + rate). These settings let you match your study style.
+      </p>
+
+      <ul style="margin-top:0.5rem;">
+        <li>
+          <strong>Hands-Free Study</strong> — best when you want audio + speaking (driving/walking/eyes-free).
+          Use voice commands like <em>"repeat question"</em> and when prompted, rate with <em>again / hard / good / easy</em>.
+        </li>
+        <li>
+          <strong>Silent Study</strong> — Traditional flashcards.
+          Tap <em>Show Answer</em>, then rate with the buttons.
+        </li>
+      </ul>
+
+      <p style="color:#9ca3af;margin-top:0.75rem;margin-bottom:0.25rem;">
+        <strong>Recommended presets (these are all for hands free study):</strong>
+      </p>
+      <ul>
+        <li>
+          <strong>In a place you can speak? Navigate to study options and set to play answer after you speak, do not check off automatic rating mode.</strong>
+
+        </li>
+        <li>
+          <strong>Unable to speak? Play answer after X amount of seconds and set to automatic rating mode in study options.
+
+        </li>
+        <li>
+          <strong>Want some extra review? Enter study-ahead mode when prompted once completed your due cards for that deck. </strong>
+         
+        </li>
+      </ul>
+
+      <p style="color:#9ca3af;margin-top:0.75rem;margin-bottom:0.25rem;">
+        <strong>Timing controls:</strong>
+      </p>
+      <ul>
+        <li>
+          <strong>Delay after rating before next question</strong> — adds breathing room between cards in hands-free mode. We recommend 5+ seconds for maximal retention.
+        </li>
+        <li>
+          <strong>Hands-free answer behavior</strong> — either <em>wait X seconds</em> or <em>play answer after I speak</em>. If choosing to wait X amount of seconds after answers, give yourself enough time to process the question for maximal retention.
+        </li>
+        <li>
+          <strong>Answer delay after I stop speaking</strong> — set to <strong>0</strong> for instant (default), or increase it if you want a pause. We recommend 5+ seconds to give yourself time to recall and process your cards for maximal retention. 
+        </li>
+      </ul>
+
+      <p style="color:#9ca3af;margin-top:0.75rem;">
+        Tip: Open <strong>Main Menu → Study Options</strong> to customize these. If you’re new, keep defaults until you’ve done ~20 cards.
+      </p>
+
 
       <hr style="border:0;border-top:1px solid #111827;margin:1rem 0;" />
 
       <h3>🎤 When to say voice commands</h3>
       <ul>
-        <li><strong>After the question</strong>: you can say <em>repeat question</em> or <em>go to next card</em>.</li>
-        <li><strong>After the answer</strong>: say your rating (<em>again / hard / good / easy</em>).</li>
-        <li><strong>Any time</strong>: <em>pause study session</em>, <em>resume study session</em>, <em>go to the main menu</em>.</li>
+        <li><strong>After the question</strong>: you can say <em>repeat question or mute microphone </em> or <em></em>.</li>
+        <li><strong>After the answer</strong>: say your rating when prompted (<em>again / hard / good / easy</em>).</li>
+        <li><strong>Any time</strong>: <em>"pause study session"</em>, <em>"resume study session"</em>, <em>"go to the main menu"</em>.</li>
       </ul>
 
       <hr style="border:0;border-top:1px solid #111827;margin:1rem 0;" />
 
-      <h3>➡️ Next Card</h3>
+      <h3> Important</h3>
       <p style="color:#9ca3af;margin-top:0.25rem;">
-        Say <strong>“go to next card”</strong> to skip the current card and immediately move forward.
+        Say <strong></strong> ZenCards requires exact wording of these voice commands for a smooth user experience. New users- navigate to study options and settings to customize your study session. 
       </p>
 
       <hr style="border:0;border-top:1px solid #111827;margin:1rem 0;" />
@@ -982,7 +1227,6 @@ input[type="number"]:focus{
       <h3>🗣️ Full voice command list</h3>
       <ul>
         <li><strong>again</strong>, <strong>hard</strong>, <strong>good</strong>, <strong>easy</strong> — rate the card</li>
-        <li><strong>go to next card</strong> — skip ahead</li>
         <li><strong>repeat question</strong></li>
         <li><strong>repeat answer</strong></li>
         <li><strong>pause study session</strong></li>
@@ -996,450 +1240,158 @@ input[type="number"]:focus{
 </div>
 
   <script>
+    // ✅ Fix BFCache (Back button) issues: force a clean reload when restored
+window.addEventListener("pageshow", (e) => {
+  if (e.persisted) {
+    console.log("[BFCache] Restored from back/forward cache -> reloading");
+    window.location.reload();
+  }
+});
+
     // ===================== SUPABASE CONFIG =====================
 const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
     const { createClient } = window.supabase;
-     window.supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-    storage: window.localStorage,
-    storageKey: "zencards-auth",
-  },
-});
-
-// Simple in-memory cache so we don't call TTS twice
-const cardAudioCache = {}; // key: cardId-side-voice-speed → url
-// --- Make sure our native plugins are registered on the JS side ---
-// ---- Native plugins / environment wiring ----
-// ---- Native plugins / environment wiring ----
-// --- Make sure our native plugins are registered on the JS side ---
-// ---- Native plugins / environment wiring ----
-let isNativeIOS = false;
-let NativeAudioPlayer = null;
-
-function setupNativePlugins() {
-  try {
-    const cap = window.Capacitor;
-
-    if (!cap || typeof cap.getPlatform !== "function") {
-      console.log("[NativeEnv] Capacitor not ready yet or getPlatform missing");
-      isNativeIOS = false;
-      NativeAudioPlayer = null;
-      return;
-    }
-
-    const platform = cap.getPlatform();          // "ios", "android", "web", etc.
-    const plugins = cap.Plugins || {};
-
-    console.log("[NativeEnv] platform =", platform);
-    console.log("[NativeEnv] plugins available =", Object.keys(plugins));
-
-    // The Swift plugin uses jsName = "NativeAudioPlayer"
-    NativeAudioPlayer = plugins.NativeAudioPlayer || null;
-
-    console.log("[NativeEnv] NativeAudioPlayer =", NativeAudioPlayer);
-
-    // We only consider ourselves "native iOS" when:
-    //  - platform is "ios"
-    //  - and the plugin object actually exists
-    isNativeIOS = platform === "ios" && !!NativeAudioPlayer;
-
-    console.log("[NativeEnv] setup complete", {
-      isNativeIOS,
-      hasNativeAudioPlayer: !!NativeAudioPlayer,
+    window.supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storage: window.localStorage,
+        storageKey: "zencards-auth",
+      },
     });
-  } catch (err) {
-    console.error("[NativeEnv] setupNativePlugins failed:", err);
-    isNativeIOS = false;
-    NativeAudioPlayer = null;
-  }
-}
-// Re-check once the bridge is ready (iOS timing fix)
-window.addEventListener("capacitorNativeBridgeReady", () => {
-  console.log("[NativeEnv] capacitorNativeBridgeReady -> re-setup plugins");
-  setupNativePlugins();
-});
 
-// Also re-check on DOM ready just in case
-document.addEventListener("DOMContentLoaded", () => {
-  setupNativePlugins();
-});
+    // ===== Delete Account Modal =====
+    function showDeleteAccountModal() {
+      const modal = document.createElement('div');
+      modal.style.position = 'fixed';
+      modal.style.top = '0';
+      modal.style.left = '0';
+      modal.style.width = '100vw';
+      modal.style.height = '100vh';
+      modal.style.background = 'rgba(0,0,0,0.45)';
+      modal.style.display = 'flex';
+      modal.style.alignItems = 'center';
+      modal.style.justifyContent = 'center';
+      modal.style.zIndex = '20000';
+      modal.innerHTML = `
+        <div style="background:#1e293b;padding:2rem 2.5rem;border-radius:1rem;max-width:95vw;width:350px;box-shadow:0 8px 32px #000a;">
+          <h2 style="color:#fff;margin-bottom:1rem;">Delete Account</h2>
+          <p style="color:#f87171;margin-bottom:1rem;">This will permanently delete your account and all your data. This cannot be undone.</p>
+          <input id="deleteAccountPassword" type="password" placeholder="Enter your password" style="width:100%;padding:0.6rem;margin-bottom:1rem;border-radius:0.5rem;border:1px solid #334155;background:#0f172a;color:#fff;" />
+          <div id="deleteAccountError" style="color:#f87171;font-size:0.95em;margin-bottom:0.5rem;display:none;"></div>
+          <button id="confirmDeleteAccountBtn" class="btn danger" style="width:100%;margin-bottom:0.5rem;">Delete My Account</button>
+          <button id="cancelDeleteAccountBtn" class="btn secondary" style="width:100%;background:#334155;color:#fff;">Cancel</button>
+        </div>
+      `;
+      document.body.appendChild(modal);
 
-// run once at boot
-setupNativePlugins();
-window.setupNativePlugins = setupNativePlugins;
-
-// Simple in-memory cache so we don’t call TTS twice
-
-async function getOrGenerateAudio(card, side) {
-  const voice = "alloy";
-  const speed = 1.0;
-
-  const key = `${card.id}-${side}-${voice}-${speed}`;
-  if (cardAudioCache[key]) {
-    console.log("[TTS] cache hit for", key, "->", cardAudioCache[key]);
-    return cardAudioCache[key];
-  }
-
-  const text = side === "question" ? card.question : card.answer;
-
-  const payload = {
-    cardId: card.id,
-    side,
-    text,
-    voice,
-    speed,
-  };
-
-  console.log("[TTS] payload to tts-generate:", payload);
-
-  try {
-    const { data, error } = await window.supabaseClient.functions.invoke(
-      "tts-generate",
-      { body: payload }
-    );
-
-    console.log("[TTS] invoke result:", { data, error });
-
-    if (error) {
-      console.error("[TTS] supabase functions.invoke error:", error);
-      return null;
+      document.getElementById('cancelDeleteAccountBtn').onclick = () => modal.remove();
+      document.getElementById('deleteAccountPassword').onkeydown = (e) => { if (e.key === 'Enter') document.getElementById('confirmDeleteAccountBtn').click(); };
+      document.getElementById('confirmDeleteAccountBtn').onclick = async () => {
+        const password = document.getElementById('deleteAccountPassword').value;
+        const errorDiv = document.getElementById('deleteAccountError');
+        errorDiv.style.display = 'none';
+        if (!password) {
+          errorDiv.textContent = 'Password required.';
+          errorDiv.style.display = 'block';
+          return;
+        }
+        // Re-authenticate user
+        const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+        if (!user || userError) {
+          errorDiv.textContent = 'Could not verify user.';
+          errorDiv.style.display = 'block';
+          return;
+        }
+        const { error: signInError } = await supabaseClient.auth.signInWithPassword({ email: user.email, password });
+        if (signInError) {
+          errorDiv.textContent = 'Incorrect password.';
+          errorDiv.style.display = 'block';
+          return;
+        }
+        // Confirm deletion
+        if (!confirm('Are you sure you want to permanently delete your account and cancel your subscription? This cannot be undone.')) return;
+        // Call Supabase Edge Function to delete account and cancel subscription
+        try {
+          console.log('[DeleteAccount] Attempting to call edge function...');
+          const { data: sessionData } = await supabaseClient.auth.getSession();
+          const accessToken = sessionData?.session?.access_token || '';
+          const resp = await fetch('https://elpfcnnrripftxoqeckv.supabase.co/functions/v1/delete-account', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${accessToken}`
+            },
+            body: JSON.stringify({ user_id: user.id, email: user.email })
+          });
+          console.log('[DeleteAccount] Response status:', resp.status);
+          const text = await resp.text();
+          console.log('[DeleteAccount] Raw response:', text);
+          let result = {};
+          try { result = JSON.parse(text); } catch (err) { result = { error: 'Invalid JSON response', raw: text }; }
+          if (!resp.ok || result.error) {
+            errorDiv.textContent = result.error || 'Failed to delete account. Please contact support.';
+            errorDiv.style.display = 'block';
+            return;
+          }
+          await supabaseClient.auth.signOut();
+          modal.remove();
+          alert('Your account and subscription have been deleted.');
+          window.location.reload();
+        } catch (e) {
+          console.error('[DeleteAccount] Exception:', e);
+          errorDiv.textContent = 'Failed to delete account. Please contact support.';
+          errorDiv.style.display = 'block';
+        }
+      };
     }
 
-    if (!data || !data.audio_url) {
-      console.error("[TTS] tts-generate missing audio_url:", data);
-      return null;
-    }
+    document.getElementById('deleteAccountBtn')?.addEventListener('click', showDeleteAccountModal);
 
-    const url = data.audio_url;
-    console.log("[TTS] got audio_url from tts-generate:", url);
-
-    cardAudioCache[key] = url;
-    return url;
-  } catch (err) {
-    console.error("[TTS] invoke threw:", err);
-    return null;
-  }
-}
-// Cache for non-card prompts (instructions, "Going to main menu", etc.)
-const textAudioCache = {}; // key: voice-speed-textHash -> url
-
-function hashText(s) {
-  // tiny stable hash for cache keys (not crypto)
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return String(h >>> 0);
-}
-
-async function getOrGenerateAudioForText(text, opts = {}) {
-  const voice = opts.voice || "alloy";
-  const speed = typeof opts.speed === "number" ? opts.speed : 1.0;
-
-  const clean = String(text || "").trim();
-  if (!clean) return null;
-
-  const key = `${voice}-${speed}-${hashText(clean)}`;
-  if (textAudioCache[key]) return textAudioCache[key];
-
-  const payload = {
-    // Use a stable synthetic id so your edge function can still store/cache if it wants
-    cardId: `misc_${hashText(clean)}`,
-    side: "misc",
-    text: clean,
-    voice,
-    speed,
-  };
-
-  try {
-    const { data, error } = await window.supabaseClient.functions.invoke(
-      "tts-generate",
-      { body: payload }
-    );
-    if (error) {
-      console.error("[TTS] text invoke error:", error);
-      return null;
-    }
-    const url = data?.audio_url;
-    if (!url) {
-      console.error("[TTS] text missing audio_url:", data);
-      return null;
-    }
-    textAudioCache[key] = url;
-    return url;
-  } catch (e) {
-    console.error("[TTS] text invoke threw:", e);
-    return null;
-  }
-}
-async function playPromptAudio(text, onEnd) {
-  try {
-    // Prefer native MP3 playback when available (background-capable)
-    if (isNativeIOS && NativeAudioPlayer) {
-      const url = await getOrGenerateAudioForText(text, { purpose: "prompt" });
-      if (url) {
-        const ok = await nativePlaySingleUrl(url, onEnd);
-        if (ok) return;
+    // On every session change, sync to Capacitor Preferences (native only)
+    (async function setupSessionSync() {
+      const isNative = !!window.Capacitor || !!window.cordova || !!window.webkit?.messageHandlers?.bridge;
+      if (!isNative) return;
+      try {
+        const { Preferences } = await import('@capacitor/preferences');
+        window.supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+          try {
+            if (session) {
+              await Preferences.set({ key: 'zencards-auth', value: localStorage.getItem('zencards-auth') || '' });
+            } else {
+              await Preferences.remove({ key: 'zencards-auth' });
+            }
+          } catch (e) {
+            console.warn('[Capacitor] Could not sync session to Preferences:', e);
+          }
+        });
+      } catch (e) {
+        console.warn('[Capacitor] Could not set up Preferences sync:', e);
       }
-      // fallthrough if url missing or nativePlaySingleUrl returned false
-    }
+    })();
+// ===================== BFCache SAFETY (Safari/iOS, back button) =====================
+// If Safari restores this page from BFCache, JS state can be stale.
+// Force a hard reload so auth + UI + listeners re-bootstrap cleanly.
+window.addEventListener("pageshow", (event) => {
+  const nav = performance.getEntriesByType?.("navigation")?.[0];
+  const isBFCache =
+    event.persisted === true ||
+    (nav && nav.type === "back_forward") ||
+    (performance && performance.navigation && performance.navigation.type === 2);
 
-    // Web fallback
-    speak(text, onEnd);
-  } catch (e) {
-    console.warn("playPromptAudio failed, falling back to speak:", e);
-    speak(text, onEnd);
+  if (isBFCache) {
+    console.warn("[BFCache] pageshow restore detected -> hard reload");
+    window.location.reload();
   }
-}
+});
 
+// ✅ Prevent double-init on iOS BFCache / pageshow
+window.__zc_app_inited = window.__zc_app_inited || false;
+window.__zc_auth_sub = window.__zc_auth_sub || null;
+window.__zc_last_healthcheck_ms = window.__zc_last_healthcheck_ms || 0;
 
-
-let nativeAudioGeneration = 0;
-let nativeEndedSubs = [];
-let nativeEndedWatchdogId = null;
-
-async function nativePlaySingleUrl(url, onEnd) {
-  if (!isNativeIOS || !NativeAudioPlayer || !url) return false;
-
-  nativeAudioGeneration++;
-  const myGen = nativeAudioGeneration;
-
-  // cleanup helper
-  const cleanup = async () => {
-    if (nativeEndedWatchdogId) {
-      clearTimeout(nativeEndedWatchdogId);
-      nativeEndedWatchdogId = null;
-    }
-    for (const sub of nativeEndedSubs) {
-      try { await sub?.remove?.(); } catch (_) {}
-    }
-    nativeEndedSubs = [];
-  };
-
-  // stop previous cleanly + remove old listeners
-  try { await cleanup(); } catch (_) {}
-  try { await NativeAudioPlayer.stop(); } catch (_) {}
-
-  // One unified "ended" handler (ignore stale generations)
-  const ended = async () => {
-    if (myGen !== nativeAudioGeneration) return;
-    await cleanup();
-    onEnd && onEnd();
-  };
-
-  // Listen to multiple possible event names (plugin implementations vary)
-  if (typeof NativeAudioPlayer.addListener === "function") {
-    try {
-      // Your current expected event
-      nativeEndedSubs.push(await NativeAudioPlayer.addListener("trackEnded", ended));
-    } catch (_) {}
-
-    try {
-      // Common alternative names some people use
-      nativeEndedSubs.push(await NativeAudioPlayer.addListener("ended", ended));
-    } catch (_) {}
-
-    try {
-      nativeEndedSubs.push(await NativeAudioPlayer.addListener("playbackEnded", ended));
-    } catch (_) {}
-
-    try {
-      nativeEndedSubs.push(await NativeAudioPlayer.addListener("audioEnded", ended));
-    } catch (_) {}
-  }
-
-  // Watchdog: if native never fires an ended event, don't hang forever.
-  // 90s is conservative (covers long prompts). Tune later.
-  nativeEndedWatchdogId = setTimeout(() => {
-    if (myGen !== nativeAudioGeneration) return;
-    console.warn("[NativeAudio] Watchdog fired — forcing onEnd() so flow continues.");
-    ended();
-  }, 90000);
-
-  // Start playback
-  await NativeAudioPlayer.setQueue({ urls: [url] });
-  await NativeAudioPlayer.play();
-
-  return true;
-}
-
-async function playCardSideAudio(card, side, onEnd) {
-  const plainText = getPlainTextFromCard(
-    side === "question" ? card.question : card.answer
-  );
-
-  // iOS native path: use MP3 + NativeAudioPlayer
-  if (isNativeIOS && NativeAudioPlayer) {
-    try {
-      const url = await getOrGenerateAudio(card, side);
-      if (!url) throw new Error("No audio_url from TTS function");
-
-      const ok = await nativePlaySingleUrl(url, onEnd);
-      if (ok) return;
-    } catch (err) {
-      console.error("[NativeAudio] failed, falling back to WEB TTS:", err);
-      // fall through
-    }
-  }
-
-  // Web fallback only (speechSynthesis)
-  speakWithWebTts(plainText, onEnd);
-}
-
-
-
-// ---- NativeAudioPlayer plugin detection (for background audio) ----
-// === Native iOS / plugin detection ===
-
-async function playWithNativeAudioPlayer(cards) {
-  console.log(
-    "[NativeAudio] playWithNativeAudioPlayer called. isNativeIOS =",
-    isNativeIOS,
-    "cards.length =",
-    cards ? cards.length : 0
-  );
-
-  // If plugin isn't actually available, bail out and let caller fall back
-  if (!isNativeIOS || !NativeAudioPlayer) {
-    console.warn(
-      "[NativeAudio] NativeAudioPlayer not available; cannot use background queue."
-    );
-    return false;
-  }
-
-  // Build initial batch (e.g., first 10 cards)
-  const BATCH_SIZE = 10;
-  const initialCards = cards.slice(0, BATCH_SIZE);
-
-  const urls = [];
-  for (const card of initialCards) {
-    const qUrl = await getOrGenerateAudio(card, "question");
-    const aUrl = await getOrGenerateAudio(card, "answer");
-
-    // Only push non-null URLs to the queue
-    if (qUrl) urls.push(qUrl);
-    if (aUrl) urls.push(aUrl);
-  }
-
-  console.log("[NativeAudio] Initial queue URLs count =", urls.length);
-
-  // If TTS completely failed, let caller fall back to normal voice loop
-  if (!urls.length) {
-    console.error(
-      "[NativeAudio] No MP3 URLs available for initial batch; cannot start background queue."
-    );
-    return false;
-  }
-
-  // Optional: clear any old queue
-  if (typeof NativeAudioPlayer.stop === "function") {
-    try {
-      await NativeAudioPlayer.stop();
-    } catch (e) {
-      console.warn("[NativeAudio] stop() before setQueue failed:", e);
-    }
-  }
-
-  try {
-    await NativeAudioPlayer.setQueue({ urls });
-    await NativeAudioPlayer.play();
-
-    // Set up listeners once per session
-    setupNativeAudioListeners(cards);
-
-    return true; // ✅ background audio started
-  } catch (e) {
-    console.error("[NativeAudio] Failed to start playback:", e);
-    return false;
-  }
-}
-
-// Single entry point: decides native iOS vs normal web behavior
-// Single entry point: decides native iOS vs normal web behavior
-async function startDeckPlayback(cards) {
-  // Option A: always use the normal JS-controlled flow.
-  // Audio output will still be native/backgrounded because playCardSideAudio() handles that.
-  console.log("[NativeAudio] Option A: using runVoiceLoop() (single-track playback)");
-  runVoiceLoop();
-}
-
-let currentAudioIndex = 0; // 0 = first question audio in queue
-let currentCardIndex = 0;  // 0 = first card
-let lastNextTapTime = 0;
-let tapCount = 0;
-
-async function maybePrefetchMore(cards) {
-  if (!isNativeIOS) return;
-
-  const PREFETCH_AHEAD = 4; // when fewer than 4 cards remain, fetch more
-
-  const cardsRemaining = cards.length - currentCardIndex - 1;
-  if (cardsRemaining > PREFETCH_AHEAD) return;
-
-  const start = currentCardIndex + 1;
-  const end = Math.min(cards.length, start + 8);
-  const nextBatch = cards.slice(start, end);
-
-  const urls = [];
-  for (const card of nextBatch) {
-    const qUrl = await getOrGenerateAudio(card, "question");
-    const aUrl = await getOrGenerateAudio(card, "answer");
-    if (qUrl) urls.push(qUrl);
-    if (aUrl) urls.push(aUrl);
-  }
-
-  if (urls.length > 0) {
-    await NativeAudioPlayer.enqueue({ urls });
-  } else {
-    console.warn("[NativeAudio] No URLs to enqueue in prefetch batch.");
-  }
-}
-
-
-function setupNativeAudioListeners(cards) {
-  if (!isNativeIOS || !NativeAudioPlayer) return;
-
-  console.log("[NativeAudio] Setting up listeners (Option A)");
-
-  // ONLY remote commands, no trackEnded-driven progression
-  NativeAudioPlayer.addListener("remoteCommand", (info) => {
-    const type = info.type;
-    console.log("[NativeAudio] remoteCommand:", type);
-
-    if (type === "next") {
-      handleNextTapAsRating(cards);
-    }
-  });
-}
-
-function handleNextTapAsRating(cards) {
-  const now = Date.now();
-  const delta = now - lastNextTapTime;
-
-  if (delta < 700) {
-    tapCount += 1;
-  } else {
-    tapCount = 1;
-  }
-
-  lastNextTapTime = now;
-
-  setTimeout(() => {
-    if (tapCount === 1) {
-      rateCurrentCard(cards[currentCardIndex], "good"); // 1 tap
-    } else if (tapCount >= 2) {
-      rateCurrentCard(cards[currentCardIndex], "easy"); // 2 taps
-    }
-    tapCount = 0;
-  }, 500);
-}
-
-// You already have SRS logic; just hook into it:
-function rateCurrentCard(card, rating) {
-  // Your existing code: update SRS schedule, save to Supabase, etc.
-}
 
 window.setSyncLock = window.setSyncLock || function () {};
 window.lockUI = window.lockUI || function () {};
@@ -1471,7 +1423,7 @@ async function signOutFromApp() {
     pendingSaveBeforeRemote = false;
 
     console.log("[LOGOUT] done, redirecting to index.html");
-    window.location.replace("index.html");
+    window.location.replace("index.html"); // Only redirect on explicit logout
   } catch (e) {
     console.error("[LOGOUT] failed:", e);
     alert("Logout failed. Check console.");
@@ -1629,6 +1581,8 @@ function getCurrentState() {
     decks = [{
       id: "deck1",
       name: "Sample Deck",
+      qLang: "en-US",
+aLang: "en-US",
       cards: [
         { id: "c1", question: "What does DOMS stand for?", answer: "Delayed onset muscle soreness." },
         { id: "c2", question: "In a dumbbell incline press, what area of the chest is emphasized?", answer: "The upper chest, especially the clavicular head of the pectoralis major." }
@@ -1874,31 +1828,107 @@ function restoreLastDeckSelection() {
     if (deckSelect) deckSelect.value = lastDeckId;
   }
 }
+async function ensureSessionHealthy({ reason = "unknown", redirectOnFail = true } = {}) {
+  // throttle: don't spam refresh calls
+  const now = Date.now();
+  if (now - (window.__zc_last_healthcheck_ms || 0) < 1500) return true;
+  window.__zc_last_healthcheck_ms = now;
+
+  try {
+    // Try to refresh tokens (safe even if already fresh)
+    try { await supabaseClient.auth.refreshSession(); } catch (_) {}
+
+    const { data: sessData } = await supabaseClient.auth.getSession();
+    const session = sessData?.session || null;
+
+    if (!session) {
+      console.warn("[AUTH] ensureSessionHealthy: no session", { reason });
+      // Do not redirect to index.html on app version; show message instead
+      showSessionError("No session found. Please log in again.");
+      return false;
+    }
+
+    const { data: userData, error: userErr } = await supabaseClient.auth.getUser();
+    if (userErr || !userData?.user) {
+      console.warn("[AUTH] ensureSessionHealthy: getUser failed", {
+        reason,
+        userErr: userErr ? { message: userErr.message, name: userErr.name, status: userErr.status } : null
+      });
+
+      // If the session is present but user lookup fails, it's usually a broken token state.
+      // Clear all Supabase auth tokens and force relogin.
+      try {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const k = localStorage.key(i);
+          if (k && (k.endsWith("-auth-token") || k === "zencards-auth")) {
+            localStorage.removeItem(k);
+          }
+        }
+      } catch (_) {}
+      try { await supabaseClient.auth.signOut(); } catch (_) {}
+
+      // Do not redirect to index.html on app version; show message instead
+      showSessionError("Session invalid or expired. Please log in again.");
+      return false;
+    }
+
+    // Good state: keep globals aligned
+    currentUser = userData.user;
+    return true;
+  } catch (e) {
+    console.warn("[AUTH] ensureSessionHealthy crashed", { reason, e });
+    // Do not redirect to index.html on app version; show message instead
+    showSessionError("Session error. Please log in again.");
+    return false;
+  }
+}
 
 async function initAppSession() {
-  console.log("[BOOT] initAppSession()");
-    setupNativePlugins();
-    initNativeVoicePlugin();
+    // ✅ install auth listener once
+  if (!window.__zc_auth_sub) {
+    const { data } = supabaseClient.auth.onAuthStateChange((event, session) => {
+      console.log("[AUTH] event:", event, { hasSession: !!session });
 
+      if (event === "SIGNED_OUT") {
+         if (isSigningOut) return; 
+        currentUser = null;
+        hasLoadedRemote = false;
+        window.location.replace("index.html");
+        return;
+      }
 
-  // 1) Check session first (fast)
-  const { data: sessionData, error: sessErr } = await supabaseClient.auth.getSession();
-  const session = sessionData?.session || null;
+      if (session?.user) {
+        currentUser = session.user;
+        if (userEmailLabel) userEmailLabel.textContent = currentUser.email || "";
+        if (authLoggedIn) authLoggedIn.classList.remove("hidden");
+      }
+    });
 
-  console.log("[BOOT] getSession()", {
-    hasSession: !!session,
-    sessErr: sessErr ? { message: sessErr.message, name: sessErr.name } : null
-  });
-
-  // 2) If no session → go back to landing/login page
-  if (!session) {
-    console.warn("[BOOT] No session. Redirecting to index.html");
-    window.location.replace("index.html");
-    return;
+    window.__zc_auth_sub = data?.subscription || null;
   }
 
-  // 3) Set currentUser + show UI
-  currentUser = session.user;
+  console.log("[BOOT] initAppSession()");
+ 
+  // 1) Check session first (fast)
+  // ✅ Heal / verify session before deciding
+const ok = await ensureSessionHealthy({ reason: "boot", redirectOnFail: false });
+if (!ok) {
+  console.warn("[BOOT] Session not healthy. Not redirecting to index.html (app mode)");
+  // showSessionError will handle UI
+  return;
+}
+
+// Session is healthy here
+const { data: sessionData } = await supabaseClient.auth.getSession();
+const session = sessionData?.session || null;
+
+if (!session?.user) {
+  console.warn("[BOOT] No session user after healthy check. Not redirecting to index.html (app mode)");
+  showSessionError("No user found in session. Please log in again.");
+  return;
+}
+
+currentUser = session.user;
 
   if (userEmailLabel) userEmailLabel.textContent = currentUser.email || "";
   if (authLoggedIn) authLoggedIn.classList.remove("hidden");
@@ -1908,6 +1938,8 @@ async function initAppSession() {
   refreshDeckSelect();
   restoreLastDeckSelection();
   refreshCardsList();
+  refreshCardLanguageDropdownsForCurrentDeck(null);
+
 
   // 5) Load remote once (this will set hasLoadedRemote=true in finally)
   await loadStateFromSupabase();
@@ -1916,6 +1948,8 @@ async function initAppSession() {
   refreshDeckSelect();
   restoreLastDeckSelection();
   refreshCardsList();
+  refreshCardLanguageDropdownsForCurrentDeck(null);
+
 
   console.log("[BOOT] done", { hasLoadedRemote, userId: currentUser?.id });
 }
@@ -2115,6 +2149,36 @@ async function initAppSession() {
     }
 
     // ===================== DECK & CARD UI =====================
+    const editDeckNameBtn = document.getElementById("editDeckNameBtn");
+
+function updateEditDeckNameBtnState() {
+  if (!editDeckNameBtn) return;
+  // Disable if no deck is selected or no decks exist
+  editDeckNameBtn.disabled = !selectedDeckId || !getDeckById(selectedDeckId);
+}
+
+if (editDeckNameBtn) {
+  editDeckNameBtn.addEventListener("click", () => {
+    if (!selectedDeckId) return;
+    const deck = getDeckById(selectedDeckId);
+    if (!deck) return;
+    const newName = prompt("Edit deck name:", deck.name);
+    if (newName && newName.trim() && newName.trim() !== deck.name) {
+      deck.name = newName.trim();
+      saveDecks();
+      refreshDeckSelect();
+      refreshCardsList();
+    }
+    updateEditDeckNameBtnState();
+  });
+}
+
+// Call this after deck select is refreshed
+const _origRefreshDeckSelect = refreshDeckSelect;
+refreshDeckSelect = function() {
+  _origRefreshDeckSelect.apply(this, arguments);
+  updateEditDeckNameBtnState();
+};
     const deckSelect = document.getElementById("deckSelect");
     const newDeckNameInput = document.getElementById("newDeckName");
     const addDeckBtn = document.getElementById("addDeckBtn");
@@ -2140,9 +2204,42 @@ if (newDeckNameInput) {
     const updateCardBtn = document.getElementById("updateCardBtn");
     const cardsListDiv = document.getElementById("cardsList");
     const selectedCardInfo = document.getElementById("selectedCardInfo");
+    // Main editor language selects
+const cardQuestionLangSelect = document.getElementById("cardQuestionLang");
+const cardAnswerLangSelect = document.getElementById("cardAnswerLang");
+
+// Add Card Modal language selects
+const addCardModalQuestionLangSelect = document.getElementById("addCardModalQuestionLang");
+const addCardModalAnswerLangSelect = document.getElementById("addCardModalAnswerLang");
+
+// Inline edit language selects (if you added them)
+const silentEditQuestionLangSelect = document.getElementById("silentEditQuestionLang");
+const silentEditAnswerLangSelect   = document.getElementById("silentEditAnswerLang");
+const voiceEditQuestionLangSelect  = document.getElementById("voiceEditQuestionLang");
+const voiceEditAnswerLangSelect    = document.getElementById("voiceEditAnswerLang");
+
     // ===== Move card UI =====
 const moveDeckSelect = document.getElementById("moveDeckSelect");
 const moveCardBtn = document.getElementById("moveCardBtn");
+
+function refreshCardLanguageDropdownsForCurrentDeck(cardObj = null) {
+  const deck = getDeckById(selectedDeckId);
+
+  // Main editor
+  fillLangSelect(cardQuestionLangSelect, getDefaultQLangFor(deck, cardObj));
+  fillLangSelect(cardAnswerLangSelect, getDefaultALangFor(deck, cardObj));
+
+  // Add modal
+  fillLangSelect(addCardModalQuestionLangSelect, getDefaultQLangFor(deck, cardObj));
+  fillLangSelect(addCardModalAnswerLangSelect, getDefaultALangFor(deck, cardObj));
+
+  // Inline edit (optional)
+  fillLangSelect(silentEditQuestionLangSelect, getDefaultQLangFor(deck, cardObj));
+  fillLangSelect(silentEditAnswerLangSelect, getDefaultALangFor(deck, cardObj));
+  fillLangSelect(voiceEditQuestionLangSelect, getDefaultQLangFor(deck, cardObj));
+  fillLangSelect(voiceEditAnswerLangSelect, getDefaultALangFor(deck, cardObj));
+}
+
 
 function refreshMoveDeckSelect() {
   if (!moveDeckSelect) return;
@@ -2294,6 +2391,49 @@ function getLastMode() {
     function getDeckById(id) {
       return decks.find(d => d.id === id) || null;
     }
+    // ===== Languages for TTS dropdowns =====
+const ZC_LANGS = [
+  ["en-US", "English (US)"],
+  ["en-GB", "English (UK)"],
+  ["es-ES", "Spanish (Spain)"],
+  ["es-MX", "Spanish (Mexico)"],
+  ["fr-FR", "French"],
+  ["de-DE", "German"],
+  ["it-IT", "Italian"],
+  ["pt-PT", "Portuguese (Portugal)"],
+  ["pt-BR", "Portuguese (Brazil)"],
+  ["ru-RU", "Russian"],
+  ["ja-JP", "Japanese"],
+  ["zh-CN", "Chinese (Mandarin)"],
+  ["ko-KR", "Korean"],
+  ["ar-SA", "Arabic"],
+  ["hi-IN", "Hindi"],
+];
+
+function fillLangSelect(selectEl, defaultValue = "en-US") {
+  if (!selectEl) return;
+  selectEl.innerHTML = "";
+  for (const [code, label] of ZC_LANGS) {
+    const opt = document.createElement("option");
+    opt.value = code;
+    opt.textContent = label;
+    selectEl.appendChild(opt);
+  }
+  selectEl.value = defaultValue;
+  if (selectEl.value !== defaultValue) {
+    // fallback if default isn't in list
+    selectEl.value = "en-US";
+  }
+}
+
+// returns the best default based on deck/card
+function getDefaultQLangFor(deck, card) {
+  return (card && card.qLang) || (deck && deck.qLang) || "en-US";
+}
+function getDefaultALangFor(deck, card) {
+  return (card && card.aLang) || (deck && deck.aLang) || "en-US";
+}
+
 
    // New: compute TOTAL counts per deck (new / learning / review)
 // - new: no schedule yet
@@ -2345,13 +2485,11 @@ function rebuildDeckUI() {
     opt.value = deck.id;
 
     const counts = getDeckPhaseCounts(deck);
-    // Format: Deck name (new / learning / review)
     opt.textContent = `${deck.name} (${counts.newCount}/${counts.learningCount}/${counts.reviewCount})`;
-
     deckSelect.appendChild(opt);
   });
 
-  // Preserve previously selected deck if possible
+  // ✅ Preserve previously selected deck if possible
   if (!selectedDeckId && decks.length > 0) {
     selectedDeckId = decks[0].id;
   }
@@ -2368,8 +2506,100 @@ function rebuildDeckUI() {
   } else {
     selectedDeckId = null;
   }
+
   refreshMoveDeckSelect();
 }
+
+// --- Web Speech API TTS for cards ---
+// --- Daniel voice cache ---
+window._danielVoice = null;
+
+function cacheDanielVoice() {
+  const voices = window.speechSynthesis.getVoices();
+  for (let v of voices) {
+    if (v.name === "Daniel") {
+      window._danielVoice = v;
+      break;
+    }
+  }
+}
+
+function getActiveDeckAndCardForTts() {
+  const deck = currentDeckId ? getDeckById(currentDeckId) : null;
+  const card = currentCard || null;
+  return { deck, card };
+}
+
+function speakCurrentAnswerWithLang(onEnd) {
+  const { deck, card } = getActiveDeckAndCardForTts();
+  const { aLang } = getCardLangs(deck, card);
+
+  const answer = getPlainTextFromCard(card?.answer || "");
+  if (!answer.trim()) {
+    if (onEnd) onEnd();
+    return;
+  }
+
+  speakWithWebTts(answer, onEnd, { lang: aLang });
+}
+
+function speakCurrentQuestionWithLang(onEnd) {
+  const { deck, card } = getActiveDeckAndCardForTts();
+  const { qLang } = getCardLangs(deck, card);
+
+  const question = getPlainTextFromCard(card?.question || "");
+  if (!question.trim()) {
+    if (onEnd) onEnd();
+    return;
+  }
+
+  speakWithWebTts(question, onEnd, { lang: qLang });
+}
+
+
+
+function getCardLangs(deck, card) {
+  const qLang = (card && card.qLang) || (deck && deck.qLang) || "en-US";
+  const aLang = (card && card.aLang) || (deck && deck.aLang) || "en-US";
+  return { qLang, aLang };
+}
+
+function speakPlainAnswerWithCardLang(prefixText = "", onEnd) {
+  const { deck, card } = getActiveDeckAndCardForTts();
+  if (!card) { if (onEnd) onEnd(); return; }
+
+  const { aLang } = getCardLangs(deck, card);
+  const answer = getPlainTextFromCard(card.answer || "");
+  if (!answer.trim()) { if (onEnd) onEnd(); return; }
+
+  const textToSpeak = prefixText ? (prefixText + answer) : answer;
+  speakWithWebTts(textToSpeak, onEnd, { lang: aLang });
+}
+
+
+if (typeof window.speechSynthesis !== 'undefined') {
+  window.speechSynthesis.onvoiceschanged = cacheDanielVoice;
+  cacheDanielVoice();
+}
+
+window.speakCardText = function(questionRaw, answerRaw, deckId, cardObj) {
+  const deck = deckId ? getDeckById(deckId) : null;
+  const { qLang, aLang } = getCardLangs(deck, cardObj);
+
+  const question = getPlainTextFromCard(questionRaw);
+  const answer = getPlainTextFromCard(answerRaw);
+
+  // Speak question, then answer after 3s pause, using your unified TTS with correct languages
+  speakWithWebTts(question, () => {
+    if (answer && answer.trim()) {
+     speakWithWebTts("Answer.", () => {
+  setTimeout(() => speakWithWebTts(answer), 400);
+});
+    }
+  }, { lang: qLang });
+};
+
+
     // Format the next due date for a given card
     function formatDueDate(deckId, cardId) {
       const key = scheduleKey(deckId, cardId);
@@ -2415,7 +2645,7 @@ function rebuildDeckUI() {
       updateCardBtn.disabled = true;
       if (!deck) return;
 
-      deck.cards.forEach(card => {
+      [...deck.cards].reverse().forEach(card => {
         const row = document.createElement("div");
         row.className = "cardRow";
 
@@ -2431,20 +2661,35 @@ function rebuildDeckUI() {
         row.appendChild(dueSpan);
 
         // Actions column (Edit / Delete)
+
         const actionsDiv = document.createElement("div");
         actionsDiv.className = "cardActions";
+
+        // Play (TTS) button
+        const playBtn = document.createElement("button");
+        playBtn.textContent = "🔊";
+        playBtn.title = "Play card (TTS)";
+        playBtn.className = "secondary small";
+       playBtn.addEventListener("click", () => {
+  window.speakCardText(card.question, card.answer, selectedDeckId, card);
+});
+        actionsDiv.appendChild(playBtn);
 
         const editBtn = document.createElement("button");
         editBtn.textContent = "Edit";
         editBtn.className = "secondary small";
         editBtn.addEventListener("click", () => {
-          selectedCardId = card.id;
-          cardQuestionInput.value = card.question;
-          cardAnswerInput.value = card.answer;
-          selectedCardInfo.textContent = `Editing card: ${card.id}`;
-          updateCardBtn.disabled = false;
-          refreshMoveDeckSelect();
-        });
+  selectedCardId = card.id;
+  cardQuestionInput.value = card.question;
+  cardAnswerInput.value = card.answer;
+
+  refreshCardLanguageDropdownsForCurrentDeck(card);
+
+  selectedCardInfo.textContent = `Editing card: ${card.id}`;
+  updateCardBtn.disabled = false;
+  refreshMoveDeckSelect();
+});
+
         actionsDiv.appendChild(editBtn);
 
         const deleteBtn = document.createElement("button");
@@ -2495,7 +2740,7 @@ function rebuildDeckUI() {
 
   console.log("Creating deck:", { id, name });
 
-  decks.push({ id, name, cards: [] });
+ decks.push({ id, name, qLang: "en-US", aLang: "en-US", cards: [] });
 
   console.log("Decks after push:", decks);
 
@@ -2541,6 +2786,7 @@ function rebuildDeckUI() {
   selectedDeckId = deckSelect.value;
   saveLastDeckId(selectedDeckId);
   refreshCardsList();
+  refreshCardLanguageDropdownsForCurrentDeck(null);
 });
 
     addCardBtn.addEventListener("click", () => {
@@ -2550,7 +2796,11 @@ function rebuildDeckUI() {
       const deck = getDeckById(selectedDeckId);
       if (!deck) return;
       const id = "c_" + Date.now();
-      deck.cards.push({ id, question: q, answer: a });
+const qLang = cardQuestionLangSelect?.value || null;
+const aLang = cardAnswerLangSelect?.value || null;
+
+deck.cards.push({ id, question: q, answer: a, qLang, aLang });
+
       saveDecks();
       cardQuestionInput.value = "";
       cardAnswerInput.value = "";
@@ -2571,10 +2821,16 @@ function rebuildDeckUI() {
       const card = deck.cards.find(c => c.id === selectedCardId);
       if (!card) return;
       card.question = q;
+      card.qLang = cardQuestionLangSelect?.value || null;
+card.aLang = cardAnswerLangSelect?.value || null;
       card.answer = a;
       saveDecks();
       refreshCardsList();
-      selectedCardInfo.textContent = `Updated card: ${selectedCardId}`;
+      cardQuestionInput.value = "";
+      cardAnswerInput.value = "";
+      selectedCardId = null;
+      selectedCardInfo.textContent = "";
+      updateCardBtn.disabled = true;
     });
     if (moveCardBtn) {
   moveCardBtn.addEventListener("click", () => {
@@ -2674,7 +2930,7 @@ function rebuildDeckUI() {
           if (!q || !a) continue;
 
           const id = "c_" + timestamp + "_" + imported;
-          deck.cards.push({ id, question: q, answer: a });
+          deck.cards.push({ id, question: q, answer: a, qLang: null, aLang: null });
           imported++;
         }
 
@@ -2701,23 +2957,6 @@ function rebuildDeckUI() {
 
     // ===================== TTS & STT =====================
     const statusDiv = document.getElementById("status");
-    // Prefer native iOS TTS when running inside the Capacitor app
-// Prefer native iOS TTS when running inside the Capacitor app
-
-// ===== Native environment flags (SAFE; never crash) =====
-const cap = window.Capacitor;
-const isNativeApp =
-  !!cap && (typeof cap.isNativePlatform === "function"
-    ? cap.isNativePlatform()
-    : (typeof cap.getPlatform === "function" && cap.getPlatform() !== "web"));
-
-const nativeTts =
-  cap?.Plugins?.NativeTTS || null;  // only if you actually have this plugin
-
-console.log("[BOOT] isNativeApp =", isNativeApp, "nativeTts =", !!nativeTts);
-
-
-// ========== RENDER HELPERS FOR IMAGES + MATH ==========
 
 // Takes card text (which may contain HTML/LaTeX) and renders it into an element.
 // Then asks MathJax to typeset any equations in that element.
@@ -2747,41 +2986,6 @@ function getPlainTextFromCard(raw) {
     // Every time we start or forcibly stop TTS, bump this.
 // Old TTS callbacks check this and no-op if they're "stale".
 let speakGeneration = 0;
-
-
-    // ===== Native iOS VoiceCommands plugin (Capacitor) =====
-    // ===== Native iOS VoiceCommands plugin (Capacitor) =====
-let nativeVoicePlugin = null;
-let nativeVoiceActiveCallback = null;
-let usingNativeVoice = false;
-
-function initNativeVoicePlugin() {
-  if (!window.Capacitor || !window.Capacitor.Plugins) return;
-  if (!window.Capacitor.Plugins.VoiceCommands) return;
-
-  // Already wired once
-  if (nativeVoicePlugin) return;
-
-  nativeVoicePlugin = window.Capacitor.Plugins.VoiceCommands;
-  usingNativeVoice = true;
-  console.log("Using native iOS VoiceCommands plugin");
-
-  nativeVoicePlugin.addListener("speechResult", (data) => {
-    const text = (data && data.text) || "";
-    const isFinal = !!(data && data.isFinal);
-    if (!text) return;
-
-    if (isFinal && nativeVoiceActiveCallback) {
-      const cb = nativeVoiceActiveCallback;
-      nativeVoiceActiveCallback = null;
-      cb(text);
-    }
-  });
-}
-
-// optional: expose for console testing
-window.initNativeVoicePlugin = initNativeVoicePlugin;
-
 
     // ===== Browser Web SpeechRecognition fallback =====
     const SpeechRecognition =
@@ -2833,7 +3037,7 @@ function getTtsSettingsObj() {
   let s = {};
   try { s = raw ? JSON.parse(raw) : {}; } catch { s = {}; }
 
-  if (typeof s.rate !== "number") s.rate = 1.0;
+  if (typeof s.rate !== "number") s.rate = 0.8;
   if (typeof s.volume !== "number") s.volume = 1.0;
   if (typeof s.answerDelayAfterSpeechSec !== "number") s.answerDelayAfterSpeechSec = 0;
 
@@ -2853,6 +3057,8 @@ function saveTtsSettingsObj(s) {
   localStorage.setItem(TTS_SETTINGS_KEY, JSON.stringify(out));
 }
 
+    const toggleStudyOptionsBtn = document.getElementById("toggleStudyOptionsBtn");
+    const studyOptionsPanel = document.getElementById("studyOptionsPanel");
     const toggleAudioSettingsBtn = document.getElementById("toggleAudioSettingsBtn");
     const audioSettingsPanel = document.getElementById("audioSettingsPanel");
     const ttsRateInput = document.getElementById("ttsRateInput");
@@ -2895,6 +3101,19 @@ if (answerDelayAfterSpeechSecInput) {
   // keep existing value unless you set it elsewhere
   saveTtsSettingsObj(current);
 }
+
+    if (toggleStudyOptionsBtn && studyOptionsPanel) {
+      toggleStudyOptionsBtn.addEventListener("click", () => {
+        const isHidden = studyOptionsPanel.classList.contains("hidden");
+        if (isHidden) {
+          studyOptionsPanel.classList.remove("hidden");
+          toggleStudyOptionsBtn.textContent = "Hide";
+        } else {
+          studyOptionsPanel.classList.add("hidden");
+          toggleStudyOptionsBtn.textContent = "Show";
+        }
+      });
+    }
 
     if (toggleAudioSettingsBtn && audioSettingsPanel) {
       toggleAudioSettingsBtn.addEventListener("click", () => {
@@ -2946,41 +3165,22 @@ if (answerDelayAfterSpeechSecInput) {
 }
 
     // Helper: stop all audio + listening
-    async function stopAllAudio() {
-  // Bump generation so any in-flight TTS callbacks ignore their finish
+   // Helper: stop all audio + listening + any timers that can restart speech
+async function stopAllAudio() {
+  // Invalidate any in-flight TTS callbacks
   speakGeneration++;
   clearAnswerAfterSpeechDelay();
+    clearAutoGoodNextCardTimer();
 
-  // Stop native iOS TTS (if present)
-  if (nativeTts) {
-    try { await nativeTts.stop?.(); } catch (e) { console.error("Error stopping NativeTTS:", e); }
-  }
-
-  // ✅ Stop native audio player (and invalidate stale trackEnded callbacks)
-  if (isNativeIOS && NativeAudioPlayer) {
-    try {
-      nativeAudioGeneration++; // invalidate any pending trackEnded callbacks
-      await NativeAudioPlayer.stop();
-    } catch (e) {
-      console.error("Error stopping NativeAudioPlayer:", e);
-    }
-    currentAudioIndex = 0;
-    currentCardIndex = 0;
-  }
 
   // Stop browser TTS
   if (window.speechSynthesis) {
-    try { window.speechSynthesis.cancel(); } catch (e) { console.error("Error cancelling browser speech:", e); }
+    try { window.speechSynthesis.cancel(); } catch (e) {}
   }
 
   isSpeaking = false;
 
-  // Stop speech recognition
-  if (nativeVoicePlugin) {
-    try { await nativeVoicePlugin.stop?.(); } catch (e) { console.error("Error stopping native voice plugin:", e); }
-    nativeVoiceActiveCallback = null;
-  }
-
+  // Stop browser speech recognition
   if (recognition) {
     try {
       keepListening = false;
@@ -2988,122 +3188,22 @@ if (answerDelayAfterSpeechSecInput) {
       recognition.onerror = null;
       recognition.onend = null;
       recognition.stop();
-    } catch (e) {
-      console.error("Error stopping recognition:", e);
-    }
+    } catch (e) {}
   }
 }
 
   // Wrapper: choose NativeTTS (iOS app) or browser TTS (web)
 function speak(text, onEnd) {
-  // Sync UI controls
-  if (ttsRateInput) {
-    const v = parseFloat(ttsRateInput.value);
-    if (!isNaN(v)) ttsRate = Math.max(0.5, Math.min(2, v));
-  }
-  if (ttsVolumeInput) {
-    const v = parseFloat(ttsVolumeInput.value);
-    if (!isNaN(v)) ttsVolume = Math.max(0, Math.min(1, v));
-  }
-
-  // stop mic before speaking
-  if (nativeVoicePlugin) {
-    try { nativeVoicePlugin.stop(); } catch (_) {}
-    nativeVoiceActiveCallback = null;
-  }
-  if (recognition) {
-    try {
-      keepListening = false;
-      recognition.onresult = null;
-      recognition.onerror = null;
-      recognition.onend = null;
-      recognition.stop();
-    } catch (_) {}
-  }
-
-  // ✅ iOS app path: MP3 via NativeAudioPlayer (background-safe)
-  if (isNativeIOS && NativeAudioPlayer) {
-    speakGeneration++;
-    const myGeneration = speakGeneration;
-
-    isSpeaking = true;
-    setStatus("Speaking...");
-
-    (async () => {
-      const url = await getOrGenerateAudioForText(text, { voice: "alloy", speed: 1.0 });
-     if (!url) {
-  console.warn("[TTS] MP3 missing. Trying web TTS fallback...");
-
-  // Web TTS might be unavailable in iOS WKWebView; still don't hang.
-  let finished = false;
-  const failSafe = setTimeout(() => {
-    if (finished) return;
-    finished = true;
-    console.warn("[TTS] webTTS fallback watchdog fired — forcing onEnd()");
-    isSpeaking = false;
-    setStatus("");
-    onEnd && onEnd();
-  }, 4000);
-
-  speakWithWebTts(text, () => {
-    if (finished) return;
-    finished = true;
-    clearTimeout(failSafe);
-    if (myGeneration !== speakGeneration) return;
-    isSpeaking = false;
-    setStatus("");
-    onEnd && onEnd();
-  });
-
-  return;
-}
-
-      await nativePlaySingleUrl(url, () => {
-        if (myGeneration !== speakGeneration) return;
-        isSpeaking = false;
-        setStatus("");
-        onEnd && onEnd();
-      });
-    })().catch((e) => {
-      console.error("[TTS] native MP3 speak crashed:", e);
-      speakWithWebTts(text, onEnd);
-    });
-
-    return;
-  }
-
-  // Web path
   speakWithWebTts(text, onEnd);
 }
-function speakSafe(text, onEnd) {
-  // iOS native path: generate MP3 and play via NativeAudioPlayer (background-safe)
-  if (isNativeIOS && NativeAudioPlayer) {
-    (async () => {
-      try {
-        const url = await getOrGenerateAudioForText(text, { voice: "alloy", speed: 1.0 });
-        if (!url) {
-          // fallback if mp3 generation fails
-          speak(text, onEnd);
-          return;
-        }
-        await nativePlaySingleUrl(url, () => {
-          if (onEnd) onEnd();
-        });
-      } catch (e) {
-        console.error("[speakSafe] native path failed:", e);
-        speak(text, onEnd);
-      }
-    })();
-    return;
-  }
 
-  // web path
-  speak(text, onEnd);
+function speakSafe(text, onEnd) {
+  speakWithWebTts(text, onEnd);
 }
 
-
 // Pure browser TTS (this is basically your old speak() body)
-function speakWithWebTts(text, onEnd) {
+function speakWithWebTts(text, onEnd, opts = {}) {
+  const { lang = "en-US" } = opts;
   if (!window.speechSynthesis) {
     setStatus("Text-to-speech not supported in this browser.");
     if (onEnd) onEnd();
@@ -3121,32 +3221,118 @@ function speakWithWebTts(text, onEnd) {
   speakGeneration++;
   const myGeneration = speakGeneration;
 
-  const utt = new SpeechSynthesisUtterance(text);
+  // Expand acronyms (2+ consecutive capital letters) to spaced letters for TTS
+  function expandAcronyms(str) {
+    return str.replace(/\b([A-Z]{2,})\b/g, (m) => m.split('').join(' '));
+  }
 
-  // Use the *same* volume & rate for intro, questions, and answers.
-  utt.rate = ttsRate || 1.0;
-  utt.volume = typeof ttsVolume === "number" ? ttsVolume : 1.0;
+  const processedText = addCognitivePauses(expandAcronyms(text));
 
-  utt.onstart = () => {
-    if (myGeneration !== speakGeneration) return;
-    isSpeaking = true;
-    setStatus("Speaking...");
-  };
+  // Split text into segments, keeping delimiters
+  const segments = [];
+  let regex = /([^.,]+)([.,]?)/g;
+  let match;
+  while ((match = regex.exec(processedText)) !== null) {
+    const phrase = match[1].trim();
+    const delim = match[2];
+segments.push({
+  text: phrase + (delim || ""),
+  pause: delim === '.' ? 700 : delim === ',' ? 350 : 0
+});
+  }
+  function addCognitivePauses(str) {
+  return str
+    // pause after numbers
+    .replace(/(\d+)/g, "$1,")
 
-  const finish = () => {
-    if (myGeneration !== speakGeneration) return;
-    isSpeaking = false;
-    setStatus("");
-    if (onEnd) onEnd();
-  };
+    // pause after list words
+    .replace(/\b(and|or|but|because|so|which|that)\b/gi, "$1,")
 
-  utt.onend = finish;
-  utt.onerror = (err) => {
-    console.error("TTS error:", err);
-    finish();
-  };
+    // pause after definitions
+    .replace(/\bis\b/gi, "is,")
 
-  window.speechSynthesis.speak(utt);
+    // pause after “for example / such as”
+    .replace(/\b(for example|such as)\b/gi, "$1,");
+}
+
+
+  function getPreferredVoice() {
+  const voices = window.speechSynthesis.getVoices();
+
+  // 1) Prefer voices that match the requested language
+  // Match either exact lang (e.g., "es-ES") or prefix (e.g., "es")
+  const langPrefix = String(lang).split("-")[0];
+
+  const matching = voices.filter(v => {
+    if (!v || !v.lang) return false;
+    const vPrefix = v.lang.split("-")[0];
+    return v.lang === lang || vPrefix === langPrefix;
+  });
+
+  // 2) If user asked for English, keep your "Daniel, not Samantha" preference
+  if (langPrefix === "en") {
+    let preferredVoice = matching.find(v => v.name === "Daniel")
+      || matching.find(v => v.name === "Daniel (Enhanced)");
+
+    // fall back to any matching English voice that isn't Samantha
+    if (!preferredVoice) preferredVoice = matching.find(v => !v.name.toLowerCase().includes("samantha"));
+    if (!preferredVoice) preferredVoice = matching[0] || null;
+    return preferredVoice;
+  }
+
+  // 3) For non-English, just take the first matching voice (usually best pronunciation)
+  if (matching.length > 0) return matching[0];
+
+  // 4) Fallback: any voice at all (last resort)
+  return voices[0] || null;
+}
+
+  function startSpeaking() {
+    const preferredVoice = getPreferredVoice();
+    let idx = 0;
+    function speakSegment() {
+      if (idx >= segments.length) {
+        isSpeaking = false;
+        setStatus("");
+        if (onEnd) onEnd();
+        return;
+      }
+      const seg = segments[idx++];
+      const utt = new SpeechSynthesisUtterance(seg.text);
+      utt.lang = lang;
+      if (preferredVoice) {
+        utt.voice = preferredVoice;
+      }
+utt.rate = typeof ttsRate === "number" ? ttsRate : 0.75;
+      utt.pitch = 1.0;
+      utt.volume = typeof ttsVolume === "number" ? ttsVolume : 1.0;
+      utt.onstart = () => {
+        if (myGeneration !== speakGeneration) return;
+        isSpeaking = true;
+        setStatus("Speaking...");
+      };
+      utt.onend = () => {
+        if (myGeneration !== speakGeneration) return;
+        setTimeout(speakSegment, seg.pause);
+      };
+      utt.onerror = (err) => {
+        console.error("TTS error:", err);
+        setTimeout(speakSegment, seg.pause);
+      };
+      window.speechSynthesis.speak(utt);
+    }
+    speakSegment();
+  }
+
+  // Ensure voices are loaded before speaking
+  if (window.speechSynthesis.getVoices().length === 0) {
+    window.speechSynthesis.onvoiceschanged = function handler() {
+      window.speechSynthesis.onvoiceschanged = null;
+      startSpeaking();
+    };
+  } else {
+    startSpeaking();
+  }
 }
 
     function listenForCommand(callback) {
@@ -3154,22 +3340,6 @@ function speakWithWebTts(text, onEnd) {
   // Don’t listen while muted
   return;
 }
-      // 1) Prefer native iOS plugin when running inside the Capacitor app
-      if (nativeVoicePlugin) {
-        setStatus("Listening...");
-        // Save the callback for the next FINAL phrase from Swift
-        nativeVoiceActiveCallback = callback;
-
-        nativeVoicePlugin
-          .start()
-          .catch((err) => {
-            console.error("Native voice start failed:", err);
-            setStatus(
-              "Error starting native speech. You can still use silent mode."
-            );
-          });
-        return;
-      }
 
       // 2) Fallback: Browser Web SpeechRecognition
       if (!speechSupported || !recognition) {
@@ -3306,6 +3476,39 @@ function speakWithWebTts(text, onEnd) {
       if (dueCards.length === 0) return null;
       return dueCards[0];
     }
+    // ===================== STUDY PREFS (persist across sessions) =====================
+const STUDY_PREFS_KEY = "zc_studyPrefs";
+
+function getStudyPrefs() {
+  let p = {};
+  try { p = JSON.parse(localStorage.getItem(STUDY_PREFS_KEY) || "{}"); } catch { p = {}; }
+
+  // Defaults (match your current defaults)
+  if (typeof p.skipInstructionsAfterFirst !== "boolean") p.skipInstructionsAfterFirst = true;
+  if (typeof p.answerMode !== "string") p.answerMode = "delay"; // "delay" | "voice"
+  if (typeof p.answerDelaySec !== "number") p.answerDelaySec = 4;
+  if (typeof p.autoGoodMode !== "boolean") p.autoGoodMode = false;
+  if (typeof p.autoModeBehavior !== "string") p.autoModeBehavior = "good"; // again|hard|good|easy|tomorrow
+  if (typeof p.handsFreeNextDelaySec !== "number") p.handsFreeNextDelaySec = 2;
+  if (typeof p.studyAheadGapSec !== "number") p.studyAheadGapSec = 4;
+  if (typeof p.autoEnterStudyAhead !== "boolean") p.autoEnterStudyAhead = false;
+  if (typeof p.loopStudyAhead !== "boolean") p.loopStudyAhead = false;
+
+  // Clamp numeric values
+  p.answerDelaySec = Math.max(1, Math.min(60, Math.floor(p.answerDelaySec)));
+  p.handsFreeNextDelaySec = Math.max(0, Math.min(30, Math.floor(p.handsFreeNextDelaySec)));
+  p.studyAheadGapSec = Math.max(1, Math.min(60, Math.floor(p.studyAheadGapSec)));
+
+  return p;
+}
+
+function saveStudyPrefs(patch = {}) {
+  const cur = getStudyPrefs();
+  const next = { ...cur, ...patch };
+  localStorage.setItem(STUDY_PREFS_KEY, JSON.stringify(next));
+  return next;
+}
+
 
     // ===================== STUDY SESSION STATE =====================
     const mainMenuDiv = document.getElementById("mainMenu");
@@ -3322,12 +3525,13 @@ function speakWithWebTts(text, onEnd) {
     const answerModeDelayRadio = document.getElementById("answerModeDelay");
     const answerModeVoiceRadio = document.getElementById("answerModeVoice");
     const answerDelaySecondsInput = document.getElementById("answerDelaySeconds");
+      const handsFreeNextDelaySecondsInput = document.getElementById("handsFreeNextDelaySeconds");
     const studyAheadGapSecondsInput = document.getElementById("studyAheadGapSeconds");
 const autoEnterStudyAheadCheckbox = document.getElementById("autoEnterStudyAhead");
 const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
     const startVoiceBtn = document.getElementById("startVoiceBtn");
+
     const startSilentBtn = document.getElementById("startSilentBtn");
-    const debugNativeQueueBtn = document.getElementById("debugNativeQueueBtn");
 
 
     const silentUI = document.getElementById("silentUI");
@@ -3380,6 +3584,138 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
     let currentDeckId = null;
     let currentCard = null;
 
+    function applyStudyPrefsToUIAndState() {
+  const p = getStudyPrefs();
+
+  // UI controls
+  if (skipInstructionsAfterFirstCheckbox) skipInstructionsAfterFirstCheckbox.checked = !!p.skipInstructionsAfterFirst;
+
+  if (answerModeVoiceRadio && answerModeDelayRadio) {
+    answerModeVoiceRadio.checked = (p.answerMode === "voice");
+    answerModeDelayRadio.checked = (p.answerMode !== "voice");
+  }
+
+  if (answerDelaySecondsInput) answerDelaySecondsInput.value = String(p.answerDelaySec);
+
+  if (autoGoodToggle) autoGoodToggle.checked = !!p.autoGoodMode;
+
+  if (autoRatingSelect) autoRatingSelect.value = p.autoModeBehavior || "good";
+
+  if (handsFreeNextDelaySecondsInput) handsFreeNextDelaySecondsInput.value = String(p.handsFreeNextDelaySec);
+
+  if (studyAheadGapSecondsInput) studyAheadGapSecondsInput.value = String(p.studyAheadGapSec);
+
+  if (autoEnterStudyAheadCheckbox) autoEnterStudyAheadCheckbox.checked = !!p.autoEnterStudyAhead;
+  if (loopStudyAheadCheckbox) loopStudyAheadCheckbox.checked = !!p.loopStudyAhead;
+
+  // Make auto rating select enabled/disabled correctly
+  if (autoRatingSelect && autoGoodToggle) {
+    autoRatingSelect.disabled = !autoGoodToggle.checked;
+  }
+
+  // Hands-free next delay disabled when autoGoodMode is enabled (your existing behavior)
+  if (handsFreeNextDelaySecondsInput && autoGoodToggle) {
+    handsFreeNextDelaySecondsInput.disabled = autoGoodToggle.checked;
+  }
+
+  // State variables (these are what your runtime uses)
+  skipInstructionsAfterFirst = !!p.skipInstructionsAfterFirst;
+  answerMode = p.answerMode === "voice" ? "voice" : "delay";
+  answerDelayMs = p.answerDelaySec * 1000;
+
+  autoGoodMode = !!p.autoGoodMode;
+  autoModeBehavior = p.autoModeBehavior || "good";
+
+  handsFreeNextDelayMs = p.handsFreeNextDelaySec * 1000;
+  studyAheadGapMs = p.studyAheadGapSec * 1000;
+
+  autoEnterStudyAhead = !!p.autoEnterStudyAhead;
+  loopStudyAhead = !!p.loopStudyAhead;
+}
+function wireStudyPrefsListeners() {
+  if (skipInstructionsAfterFirstCheckbox) {
+    skipInstructionsAfterFirstCheckbox.addEventListener("change", () => {
+      const next = saveStudyPrefs({ skipInstructionsAfterFirst: !!skipInstructionsAfterFirstCheckbox.checked });
+      applyStudyPrefsToUIAndState();
+    });
+  }
+
+  if (answerModeVoiceRadio) {
+    answerModeVoiceRadio.addEventListener("change", () => {
+      if (answerModeVoiceRadio.checked) {
+        saveStudyPrefs({ answerMode: "voice" });
+        applyStudyPrefsToUIAndState();
+      }
+    });
+  }
+
+  if (answerModeDelayRadio) {
+    answerModeDelayRadio.addEventListener("change", () => {
+      if (answerModeDelayRadio.checked) {
+        saveStudyPrefs({ answerMode: "delay" });
+        applyStudyPrefsToUIAndState();
+      }
+    });
+  }
+
+  if (answerDelaySecondsInput) {
+    answerDelaySecondsInput.addEventListener("change", () => {
+      const sec = Math.max(1, Math.min(60, parseInt(answerDelaySecondsInput.value, 10) || 4));
+      answerDelaySecondsInput.value = String(sec);
+      saveStudyPrefs({ answerDelaySec: sec });
+      applyStudyPrefsToUIAndState();
+    });
+  }
+
+  if (autoGoodToggle) {
+    autoGoodToggle.addEventListener("change", () => {
+      saveStudyPrefs({ autoGoodMode: !!autoGoodToggle.checked });
+      applyStudyPrefsToUIAndState();
+    });
+  }
+
+  if (autoRatingSelect) {
+    autoRatingSelect.addEventListener("change", () => {
+      saveStudyPrefs({ autoModeBehavior: autoRatingSelect.value || "good" });
+      applyStudyPrefsToUIAndState();
+    });
+  }
+
+  if (handsFreeNextDelaySecondsInput) {
+    handsFreeNextDelaySecondsInput.addEventListener("change", () => {
+      const sec = Math.max(0, Math.min(30, parseInt(handsFreeNextDelaySecondsInput.value, 10) || 0));
+      handsFreeNextDelaySecondsInput.value = String(sec);
+      saveStudyPrefs({ handsFreeNextDelaySec: sec });
+      applyStudyPrefsToUIAndState();
+    });
+  }
+
+  if (studyAheadGapSecondsInput) {
+    studyAheadGapSecondsInput.addEventListener("change", () => {
+      const sec = Math.max(1, Math.min(60, parseInt(studyAheadGapSecondsInput.value, 10) || 4));
+      studyAheadGapSecondsInput.value = String(sec);
+      saveStudyPrefs({ studyAheadGapSec: sec });
+      applyStudyPrefsToUIAndState();
+    });
+  }
+
+  if (autoEnterStudyAheadCheckbox) {
+    autoEnterStudyAheadCheckbox.addEventListener("change", () => {
+      saveStudyPrefs({ autoEnterStudyAhead: !!autoEnterStudyAheadCheckbox.checked });
+      applyStudyPrefsToUIAndState();
+    });
+  }
+
+  if (loopStudyAheadCheckbox) {
+    loopStudyAheadCheckbox.addEventListener("change", () => {
+      saveStudyPrefs({ loopStudyAhead: !!loopStudyAheadCheckbox.checked });
+      applyStudyPrefsToUIAndState();
+    });
+  }
+}
+
+
+
     // ***** STATE MACHINE FOR CARD FLOW *****
     const StudyState = {
       IDLE: "idle",
@@ -3408,9 +3744,43 @@ let loopStudyAhead = false;       // from Study Options
     let answerMode = "delay";
     let answerDelayMs = 4000;
     let autoGoodMode = false;
+    let handsFreeNextDelayMs = 2000;
+    // Disable handsFreeNextDelaySecondsInput when autoGood is enabled
+    if (handsFreeNextDelaySecondsInput && autoGoodToggle) {
+      function updateHandsFreeDelayEnabled() {
+        handsFreeNextDelaySecondsInput.disabled = autoGoodToggle.checked;
+      }
+      autoGoodToggle.addEventListener('change', updateHandsFreeDelayEnabled);
+      updateHandsFreeDelayEnabled();
+      handsFreeNextDelaySecondsInput.addEventListener('input', () => {
+        handsFreeNextDelayMs = Math.max(0, Math.min(30, Number(handsFreeNextDelaySecondsInput.value))) * 1000;
+      });
+      // Initialize value
+      handsFreeNextDelayMs = Math.max(0, Math.min(30, Number(handsFreeNextDelaySecondsInput.value))) * 1000;
+    }
     let autoModeBehavior = "good"; // again | hard | good | easy | tomorrow
 
+    function runVoiceLoopAfterRating() {
+      setStudyState(StudyState.IDLE);
+      const autoGoodEnabled = !!autoGoodToggle?.checked;
+      const delayMs = Math.max(0, Number(handsFreeNextDelayMs || 0));
+      if (!autoGoodEnabled && delayMs > 0) {
+        setTimeout(() => {
+          if (!isPaused) runVoiceLoop();
+        }, delayMs);
+      } else {
+        runVoiceLoop();
+      }
+    }
+
     let studyAheadGapMs = 4000;
+    const difficultyPromptGraceMs = 1200;
+    let lastDifficultyPromptAt = 0;
+
+    function startDifficultyListening() {
+      lastDifficultyPromptAt = Date.now();
+      listenForCommand(handleVoiceTranscript);
+    }
     let inStudyAheadAnswerGap = false;
     let answerAfterSpeechTimerId = null;
 let answerAfterSpeechDueMs = 0;
@@ -3478,6 +3848,15 @@ const micMuteSecondsEl = document.getElementById("micMuteSeconds");
 
     // NEW: track delay window between question and answer in delay mode
     let questionDelayTimerId = null;
+    let autoGoodNextCardTimerId = null;
+
+function clearAutoGoodNextCardTimer() {
+  if (autoGoodNextCardTimerId !== null) {
+    clearTimeout(autoGoodNextCardTimerId);
+    autoGoodNextCardTimerId = null;
+  }
+}
+
 
     function clearStudyAheadGapTimer() {
       if (studyAheadGapTimerId !== null) {
@@ -3519,10 +3898,6 @@ function startMicMute(seconds) {
 
   // Stop any live listening immediately
   keepListening = false;
-  if (nativeVoicePlugin) {
-    try { nativeVoicePlugin.stop(); } catch (_) {}
-    nativeVoiceActiveCallback = null;
-  }
   if (recognition) {
     try { recognition.stop(); } catch (_) {}
   }
@@ -3560,10 +3935,13 @@ function startMicMute(seconds) {
     }
 
     async function showMainMenu() {
-     await stopAllAudio();
+    await stopAllAudio();
       clearStudyAheadGapTimer();
       clearQuestionDelayTimer();
+      clearAutoGoodNextCardTimer();
 
+
+      // Do NOT clear currentCard here, so it is preserved for resuming study
       currentMode = null;
       mainMenuDiv.classList.remove("hidden");
       studySectionDiv.classList.add("hidden");
@@ -3605,6 +3983,8 @@ async function openAddCardModal() {
   await stopAllAudio();
   clearStudyAheadGapTimer();
   clearQuestionDelayTimer();
+  refreshCardLanguageDropdownsForCurrentDeck(null);
+
 
   if (addCardModalStatus) addCardModalStatus.textContent = "";
   if (addCardModalQuestion) addCardModalQuestion.value = "";
@@ -3683,10 +4063,11 @@ document.addEventListener("keydown", (e) => {
       updateDeckBadge();
     }
 
-    backToMenuBtn.addEventListener("click", async () => {
-      await stopAllAudio();
-      showMainMenu();
-    });
+   backToMenuBtn.addEventListener("click", async () => {
+  await stopAllAudio();
+  showMainMenu();
+});
+
 
     pauseBtn.addEventListener("click", async () => {
   isPaused = true;
@@ -3698,6 +4079,8 @@ document.addEventListener("keydown", (e) => {
 await stopAllAudio(); 
   clearStudyAheadGapTimer();
   clearQuestionDelayTimer();
+  clearAutoGoodNextCardTimer();
+
 
   pauseBtn.disabled = true;
   resumeBtn.disabled = false;
@@ -3766,7 +4149,11 @@ if (addCardModalSaveBtn) {
     }
 
     const id = "c_" + Date.now();
-    deck.cards.push({ id, question: q, answer: a });
+const qLang = cardQuestionLangSelect?.value || null;
+const aLang = cardAnswerLangSelect?.value || null;
+
+deck.cards.push({ id, question: q, answer: a, qLang, aLang });
+
 
     saveDecks();
     refreshDeckSelect();
@@ -3784,6 +4171,7 @@ document.addEventListener("keydown", (e) => {
   }
 });
     
+   
     function endStudySession() {
   clearStudyAheadGapTimer();
   clearQuestionDelayTimer();
@@ -3796,25 +4184,34 @@ document.addEventListener("keydown", (e) => {
 }
 
     // ===================== INLINE EDIT HELPERS =====================
-    function updateCardTextInDeck(deckId, cardId, newQ, newA) {
-      const deck = getDeckById(deckId);
-      if (!deck) return null;
-      const card = deck.cards.find(c => c.id === cardId);
-      if (!card) return null;
-      card.question = newQ;
-      card.answer = newA;
-      saveDecks();
-      refreshDeckSelect();
-      return card;
-    }
+    function updateCardTextInDeck(deckId, cardId, newQ, newA, newQLang = null, newALang = null) {
+  const deck = getDeckById(deckId);
+  if (!deck) return null;
+  const card = deck.cards.find(c => c.id === cardId);
+  if (!card) return null;
+
+  card.question = newQ;
+  card.answer = newA;
+
+  // Save per-card language overrides (null means “use deck default”)
+  card.qLang = newQLang;
+  card.aLang = newALang;
+
+  saveDecks();
+  refreshDeckSelect();
+  return card;
+}
 
     // Silent mode inline edit
     silentEditToggleBtn.addEventListener("click", () => {
-      if (!currentCard) return;
-      silentEditQuestion.value = currentCard.question;
-      silentEditAnswer.value = currentCard.answer;
-      silentEditPanel.classList.remove("hidden");
-    });
+  if (!currentCard) return;
+  silentEditQuestion.value = currentCard.question;
+  silentEditAnswer.value = currentCard.answer;
+
+  refreshCardLanguageDropdownsForCurrentDeck(currentCard);
+
+  silentEditPanel.classList.remove("hidden");
+});
 
     silentCancelEditBtn.addEventListener("click", () => {
       silentEditPanel.classList.add("hidden");
@@ -3825,7 +4222,10 @@ document.addEventListener("keydown", (e) => {
       const q = silentEditQuestion.value.trim();
       const a = silentEditAnswer.value.trim();
       if (!q || !a) return;
-      const updated = updateCardTextInDeck(currentDeckId, currentCard.id, q, a);
+const qLang = silentEditQuestionLangSelect?.value || null;
+const aLang = silentEditAnswerLangSelect?.value || null;
+const updated = updateCardTextInDeck(currentDeckId, currentCard.id, q, a, qLang, aLang);
+
       if (!updated) return;
       currentCard = updated;
       setCardContent(silentQuestionText, currentCard.question);
@@ -3857,7 +4257,10 @@ setCardContent(voiceAnswerText, currentCard.answer);
       const q = voiceEditQuestion.value.trim();
       const a = voiceEditAnswer.value.trim();
       if (!q || !a) return;
-      const updated = updateCardTextInDeck(currentDeckId, currentCard.id, q, a);
+const qLang = voiceEditQuestionLangSelect?.value || null;
+const aLang = voiceEditAnswerLangSelect?.value || null;
+const updated = updateCardTextInDeck(currentDeckId, currentCard.id, q, a, qLang, aLang);
+
       if (!updated) return;
       currentCard = updated;
       setCardContent(voiceQuestionText, currentCard.question);
@@ -3906,7 +4309,7 @@ async function speakAndGoToMainMenu() {
       setStudyState(StudyState.SHOWING_QUESTION);
 
       hasSpokenCurrentQuestion = true;
-playCardSideAudio(currentCard, "question", () => {
+speakWithWebTts(getPlainTextFromCard(currentCard.question), () => {
   if (isPaused) return;
 
   if (answerMode === "delay") {
@@ -3928,15 +4331,7 @@ playCardSideAudio(currentCard, "question", () => {
     setStatus("Listening for your answer...");
     
     // Add small delay on iOS to allow audio to fully release and voice recognition to activate
-    if (isNativeIOS) {
-      setTimeout(() => {
-        if (!isPaused && awaitingAnswerSignal) {
-          listenForCommand(handleVoiceTranscript);
-        }
-      }, 300);
-    } else {
-      listenForCommand(handleVoiceTranscript);
-    }
+    listenForCommand(handleVoiceTranscript);
   }
 });
     }
@@ -4097,7 +4492,6 @@ function isMainMenuCommand(text) {
   return (
     t.includes("main menu") ||
     (t.includes("menu") && t.includes("main")) ||
-    t.includes("go back") ||
     t.includes("back to menu") ||
     t.includes("back to the menu") ||
     t.includes("go to the menu") ||
@@ -4124,45 +4518,38 @@ async function handleGlobalVoiceCommands(text) {
 
   // 🔁 Repeat answer — allowed whenever we've already shown an answer
   if (t.includes("repeat answer") && currentMode === "voice" && currentCard) {
-    const plainAnswer = getPlainTextFromCard(currentCard.answer);
-    speakSafe("Answer: " + plainAnswer, () => {
-      if (isPaused) return;
+  speakPlainAnswerWithCardLang("", () => {
+    if (isPaused) return;
 
-      // If we're in study-ahead + gap, restart the gap window
-      if (noScheduleChanges && studyAheadSession && inStudyAheadAnswerGap) {
-        startStudyAheadAnswerWindow(true);
-        return;
-      }
+    if (noScheduleChanges && studyAheadSession && inStudyAheadAnswerGap) {
+      startStudyAheadAnswerWindow(true);
+      return;
+    }
 
-      // If we are waiting for difficulty in normal mode, just re-prompt
-      if (awaitingDifficulty && !noScheduleChanges) {
-        const detailed =
-          !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
-        hasSpokenInstructionsOnce = true;
-        const promptText = detailed
-          ? "How was that? Say again, hard, good, or easy."
-          : "How was that?";
-        speak(promptText, () => {
-          listenForCommand(handleVoiceTranscript);
-        });
-        return;
-      }
+    if (awaitingDifficulty && !noScheduleChanges) {
+      const detailed = !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
+      hasSpokenInstructionsOnce = true;
+      const promptText = detailed
+        ? "How was that? Say again, hard, good, or easy."
+        : "How was that?";
+      speak(promptText, () => startDifficultyListening());
+      return;
+    }
 
-      // If we're at post-completion choice, re-prompt main menu
-      if (awaitingPostCompletionChoice) {
-        speakSafe("Say main menu to go back.", () => {
-          listenForCommand(handleVoiceTranscript);
-        });
-        return;
-      }
-
-      // Otherwise, just keep listening for the next command
-      if (currentMode === "voice") {
+    if (awaitingPostCompletionChoice) {
+      speakSafe("Say main menu to go back.", () => {
         listenForCommand(handleVoiceTranscript);
-      }
-    });
-    return true;
-  }
+      });
+      return;
+    }
+
+    if (currentMode === "voice") {
+      listenForCommand(handleVoiceTranscript);
+    }
+  });
+  return true;
+}
+
 
   // 🧊 Pause study session – pause IMMEDIATELY (before speaking)
 if (
@@ -4240,6 +4627,37 @@ if (
  async function handleVoiceTranscript(text) {
   console.log("[VOICE] handleVoiceTranscript called with text:", text, { awaitingAnswerSignal, awaitingDifficulty, inAnswerAfterSpeechDelay });
   
+
+  // If paused, only allow resume command, ignore all other input (mic stays on)
+  if (isPaused) {
+    const t = text.toLowerCase();
+    if (
+      t.includes("resume study session") ||
+      (t.includes("resume") && (t.includes("study") || t.includes("session")))
+    ) {
+      speakSafe("Resuming study session.", () => {
+        isPaused = false;
+        pauseBtn.disabled = false;
+        resumeBtn.disabled = true;
+        if (currentMode === "voice") {
+          if (restartCardOnResumeVoice && currentCard) {
+            restartCardOnResumeVoice = false;
+            restartCurrentCardVoiceFlow();
+            return;
+          }
+          runVoiceLoop();
+        } else if (currentMode === "silent") {
+          runSilentLoop();
+        }
+      });
+    } else {
+      // Stay paused, keep listening indefinitely
+      setStatus("Paused. Say 'resume study session' or tap Resume.");
+      listenForCommand(handleVoiceTranscript);
+    }
+    return;
+  }
+
   // If we are waiting to play the answer after speech ended, ANY transcript resets the countdown
   if (inAnswerAfterSpeechDelay) {
     if (isNextCardCommand(text)) { handleNextCardSkip(); return; }
@@ -4298,6 +4716,13 @@ if (awaitingAnswerSignal && currentMode === "voice") {
 
     return; // important: don’t fall through
   }
+  
+  // ✅ If we get here while awaitingAnswerSignal is true, the user said something OTHER than "mute microphone"
+  // So proceed with playing the answer
+  console.log("[VOICE] User spoke in voice-answer mode (not mute), calling startOrResetAnswerAfterSpeechDelay");
+  awaitingAnswerSignal = false;
+  startOrResetAnswerAfterSpeechDelay();
+  return;
 }
 
   // If we were in the study-ahead answer gap, we no longer need a special case here;
@@ -4332,12 +4757,6 @@ if (awaitingAnswerSignal && currentMode === "voice") {
   }
 
   // If we're waiting for the user to say "I'm ready" in voice-answer mode
-  if (awaitingAnswerSignal) {
-  console.log("[VOICE] User spoke in voice-answer mode, calling startOrResetAnswerAfterSpeechDelay");
-  awaitingAnswerSignal = false;
-  startOrResetAnswerAfterSpeechDelay();
-  return;
-}
 
   // Difficulty / rating flow (normal, schedule-changing mode only)
   if (awaitingDifficulty) {
@@ -4361,29 +4780,52 @@ if (awaitingAnswerSignal && currentMode === "voice") {
     }
 
     const ratingKey = parseRatingFromText(text);
-    if (!ratingKey) {
+    const trimmed = (text || "").trim().toLowerCase();
+    const tooSoon = Date.now() - lastDifficultyPromptAt < difficultyPromptGraceMs;
+    const ratingWords = ["again", "hard", "good", "easy"].filter(w => trimmed.includes(w)).length;
+    const promptEcho =
+      trimmed.includes("how was that") ||
+      trimmed.includes("say again") ||
+      ratingWords >= 2;
+
+    if (ratingKey) {
+      if (promptEcho && tooSoon) {
+        startDifficultyListening();
+        return;
+      }
+    } else {
+      if (!trimmed || promptEcho || tooSoon) {
+        startDifficultyListening();
+        return;
+      }
       speak(
         "I didn't catch that. Please say again, hard, good, or easy.",
         () => {
-          listenForCommand(handleVoiceTranscript);
+          startDifficultyListening();
         }
       );
       return;
     }
 
     // Apply scheduling normally
-    const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
-    if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
-      queueCardForAgain(currentDeckId, currentCard);
-    }
+    // Apply scheduling normally (this records the rating)
+const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
+if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
+  queueCardForAgain(currentDeckId, currentCard);
+}
 
-    awaitingDifficulty = false;
-    if (voiceRatingButtons) {
-      voiceRatingButtons.classList.add("hidden");
-    }
-    setStudyState(StudyState.IDLE);
-    runVoiceLoop();
-    return;
+awaitingDifficulty = false;
+if (voiceRatingButtons) {
+  voiceRatingButtons.classList.add("hidden");
+}
+
+// ✅ NEW: echo the rating word with mic OFF, then continue
+echoRatingThenContinue(ratingKey, () => {
+  if (isPaused) return; // safety
+  runVoiceLoopAfterRating();
+});
+
+return;
   }
 
   // Fallback: keep listening for the next command in voice mode
@@ -4408,6 +4850,48 @@ if (awaitingAnswerSignal && currentMode === "voice") {
           return "mark each card as good";
       }
     }
+
+    // ✅ NEW: speak back the chosen rating (echo) with mic OFF, then continue
+function echoRatingThenContinue(ratingKey, next) {
+  // Normalize what we speak back (exactly the rating word)
+  const spoken =
+    ratingKey === "again" ? "again" :
+    ratingKey === "hard"  ? "hard"  :
+    ratingKey === "good"  ? "good"  :
+    ratingKey === "easy"  ? "easy"  :
+    null;
+
+  if (!spoken) {
+    // fallback: just continue
+    next && next();
+    return;
+  }
+
+  // Hard stop any active listening and prevent re-starts during the echo
+  keepListening = false;
+  if (recognition) {
+    try { recognition.stop(); } catch (_) {}
+  }
+
+  // Mic OFF during echo
+  const prevMicMuted = isMicMuted;
+  isMicMuted = true;
+
+  // Optional: disable onscreen rating buttons during echo (prevents accidental taps)
+  setVoiceRatingButtonsEnabled(false);
+
+  // Speak the rating word, then continue
+  speakWithWebTts(spoken, () => {
+    // Restore mic state
+    isMicMuted = prevMicMuted;
+
+    // Re-enable rating buttons (though you usually hide them right after)
+    setVoiceRatingButtonsEnabled(true);
+
+    next && next();
+  }, { lang: "en-US" });
+}
+
 function speakAnswerThenAskDifficulty() {
   if (!currentCard) return;
 
@@ -4419,60 +4903,79 @@ function speakAnswerThenAskDifficulty() {
   }
   setCardContent(voiceAnswerText, currentCard.answer);
 
-  // 🔊 NEW: use background-capable audio helper instead of speak(...)
-  playCardSideAudio(currentCard, "answer", () => {
-    if (isPaused) return;
+  // ✅ get language for the ANSWER
+  const deck = getDeckById(currentDeckId);
+  const { aLang } = getCardLangs(deck, currentCard);
 
-    // ===== STUDY-AHEAD HANDS-FREE: always respect the study-ahead gap and never ask for rating =====
-    if (noScheduleChanges && studyAheadSession) {
-      startStudyAheadAnswerWindow(false);
-      return;
-    }
+  // 🔊 Speak the answer in its language
+  speakWithWebTts(
+    getPlainTextFromCard(currentCard.answer),
+    async () => {
+      if (isPaused) return;
 
-    // ===== Automatic mode for pure hands-free, no commands =====
-    if (autoGoodMode) {
-      // Only schedule in normal mode; never schedule in noScheduleChanges mode
-      if (!noScheduleChanges) {
-        const behaviorRating = autoModeBehavior || "good";
-
-        if (autoModeBehavior === "tomorrow") {
-          applyTomorrowScheduling(currentDeckId, currentCard.id);
-        } else {
-          const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, behaviorRating);
-          if (
-            nextState &&
-            nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES
-          ) {
-            queueCardForAgain(currentDeckId, currentCard);
-          }
-        }
+      // ===== STUDY-AHEAD HANDS-FREE: always respect the study-ahead gap and never ask for rating =====
+      if (noScheduleChanges && studyAheadSession) {
+        startStudyAheadAnswerWindow(false);
+        return;
       }
 
-      // Just advance to the next card
-      setStudyState(StudyState.IDLE);
-      runVoiceLoop();
-      return;
-    }
+      // ===== Automatic mode for pure hands-free, no commands =====
+      if (autoGoodMode) {
+        // Only schedule in normal mode; never schedule in noScheduleChanges mode
+        if (!noScheduleChanges) {
+          const behaviorRating = autoModeBehavior || "good";
 
-    // ===== Normal hands-free flow: show rating buttons, prompt again/hard/good/easy, then listen =====
-    awaitingDifficulty = true;
-    if (voiceRatingButtons) {
-      voiceRatingButtons.classList.remove("hidden");
-    }
+          if (autoModeBehavior === "tomorrow") {
+            applyTomorrowScheduling(currentDeckId, currentCard.id);
+          } else {
+            const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, behaviorRating);
+            if (
+              nextState &&
+              nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES
+            ) {
+              queueCardForAgain(currentDeckId, currentCard);
+            }
+          }
+        }
 
-    const detailed = !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
-    hasSpokenInstructionsOnce = true;
+          // ✅ Auto-good mode: wait 5 seconds before the next question
+  setStudyState(StudyState.IDLE);
 
-    const promptText = detailed
-      ? "How was that? Say again, hard, good, or easy."
-      : "How was that?";
+  clearAutoGoodNextCardTimer();
+  autoGoodNextCardTimerId = setTimeout(() => {
+    autoGoodNextCardTimerId = null;
+    if (!isPaused) runVoiceLoop();
+  }, 5000);
 
-   setStatus(promptText);
+  return;
+      }
 
-playPromptAudio(promptText, () => {
-  if (!isPaused) listenForCommand(handleVoiceTranscript);
-});
-  });
+      // ===== Normal hands-free flow: show rating buttons, prompt again/hard/good/easy, then listen =====
+      awaitingDifficulty = true;
+      if (voiceRatingButtons) {
+        voiceRatingButtons.classList.remove("hidden");
+      }
+
+      const detailed = !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
+      hasSpokenInstructionsOnce = true;
+
+      const promptText = detailed
+        ? "How was that? Say again, hard, good, or easy."
+        : "How was that?";
+
+      setStatus(promptText);
+
+      // ✅ Speak the prompt in English (or change if you want)
+      speakWithWebTts(
+        promptText,
+        () => {
+          if (!isPaused) startDifficultyListening();
+        },
+        { lang: "en-US" }
+      );
+    },
+    { lang: aLang }
+  );
 }
 
     // NEW: Study-ahead answer window – gives you time to say "repeat answer" or "main menu"
@@ -4601,8 +5104,11 @@ playPromptAudio(promptText, () => {
 
       let nextCard = null;
 
-      // Study-ahead voice mode (no schedule changes, uses aheadQueue)
-      if (noScheduleChanges && allowAhead) {
+      // If resuming after main menu, show the same card first
+      if (currentCard && currentMode === null) {
+        nextCard = currentCard;
+        currentMode = "voice"; // or "silent" if needed
+      } else if (noScheduleChanges && allowAhead) {
         if (!aheadQueue || aheadQueue.length === 0) {
           aheadQueue = shuffleArray(getDueCardsForDeck(currentDeckId, true, false));
           aheadQueueIndex = 0;
@@ -4615,14 +5121,14 @@ playPromptAudio(promptText, () => {
       } else {
         // Normal schedule-changing mode with randomized mixing
         const dueCards = getDueCardsForDeck(currentDeckId, false, includeOverdue);
-const { overdue, due } = splitOverdueAndDue(currentDeckId, dueCards);
+        const { overdue, due } = splitOverdueAndDue(currentDeckId, dueCards);
 
-// 🚨 Always exhaust overdue cards first
-if (overdue.length > 0) {
-  nextCard = pickRandomNextCardNormal(overdue, lastId, false);
-} else {
-  nextCard = pickRandomNextCardNormal(due, lastId, false);
-}
+        // 🚨 Always exhaust overdue cards first
+        if (overdue.length > 0) {
+          nextCard = pickRandomNextCardNormal(overdue, lastId, false);
+        } else {
+          nextCard = pickRandomNextCardNormal(due, lastId, false);
+        }
       }
 
       if (!nextCard && !allowAhead) {
@@ -4711,35 +5217,38 @@ if (!noScheduleChanges && !autoGoodMode && voiceRatingButtons) {
 setStudyState(StudyState.SHOWING_QUESTION);
 
 // 🔊 Use the same MP3-capable helper for the question
-playCardSideAudio(currentCard, "question", () => {
-  if (isPaused) return;
+const { qLang } = getCardLangs(deck, currentCard);
 
-  if (answerMode === "delay") {
-    const delay = Math.max(
-      1,
-      Math.min(60, Math.floor(answerDelayMs / 1000))
-    );
+speakWithWebTts(
+  getPlainTextFromCard(currentCard.question),
+  () => {
+    if (isPaused) return;
 
-    // In auto mode we do NOT start listening here,
-    // so the mic isn't open while you're silently thinking.
-    if (!autoGoodMode) {
-      // start listening so "repeat question" etc. work before the answer
+    if (answerMode === "delay") {
+      const delay = Math.max(
+        1,
+        Math.min(60, Math.floor(answerDelayMs / 1000))
+      );
+
+      if (!autoGoodMode) {
+        listenForCommand(handleVoiceTranscript);
+      }
+
+      setStudyState(StudyState.WAITING_FOR_ANSWER);
+      questionDelayTimerId = setTimeout(() => {
+        if (!isPaused) {
+          speakAnswerThenAskDifficulty();
+        }
+      }, delay * 1000);
+    } else {
+      awaitingAnswerSignal = true;
+      setStudyState(StudyState.WAITING_FOR_ANSWER);
+      setStatus("Listening for your answer...");
       listenForCommand(handleVoiceTranscript);
     }
-
-    setStudyState(StudyState.WAITING_FOR_ANSWER);
-    questionDelayTimerId = setTimeout(() => {
-      if (!isPaused) {
-        speakAnswerThenAskDifficulty();
-      }
-    }, delay * 1000);
-  } else {
-    awaitingAnswerSignal = true;
-    setStudyState(StudyState.WAITING_FOR_ANSWER);
-    setStatus("Listening for your answer...");
-    listenForCommand(handleVoiceTranscript);
-  }
-});
+  },
+  { lang: qLang }
+);
     }
 
     // ===================== SILENT MODE =====================
@@ -4989,7 +5498,6 @@ setCardContent(voiceAnswerText, currentCard.answer);
 
     await stopAllAudio();
 
-
     if (!noScheduleChanges) {
       const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
       if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
@@ -4998,8 +5506,7 @@ setCardContent(voiceAnswerText, currentCard.answer);
     }
 
     voiceRatingButtons.classList.add("hidden");
-    setStudyState(StudyState.IDLE);
-    runVoiceLoop();
+    runVoiceLoopAfterRating();
   });
 }
 
@@ -5070,15 +5577,19 @@ startVoiceBtn.addEventListener("click", async () => {
   saveLastMode("voice");
   if (selectedDeckId) saveLastDeckId(selectedDeckId);
 
-  // ✅ Make sure native plugins are detected *right now*
-  try { setupNativePlugins(); } catch (_) {}
-  try { initNativeVoicePlugin(); } catch (_) {}
-
-  // ✅ Set autoGoodMode/options BEFORE any mic permission logic
+  // ✅ Set autoGoodMode/options EARLY so we can use it for conditional initialization
   autoModeBehavior = autoRatingSelect.value || "good";
   autoGoodMode = !!autoGoodToggle.checked;
   autoEnterStudyAhead = !!autoEnterStudyAheadCheckbox.checked;
   loopStudyAhead = !!loopStudyAheadCheckbox.checked;
+
+  // ✅ Determine answer mode (needed to decide if we need VoiceCommands)
+  const selectedAnswerMode = answerModeVoiceRadio.checked ? "voice" : "delay";
+
+  // ✅ Only initialize VoiceCommands if we actually need voice input
+  // Skip if in auto-good mode WITH delay answer (no STT needed)
+  // But DO initialize if answer mode is "voice" (need to detect when user speaks)
+  const needsVoiceCommands = !autoGoodMode || selectedAnswerMode === "voice";
 
   // ✅ Deck id: fall back to dropdown value if selectedDeckId isn't set
   currentDeckId = selectedDeckId || (deckSelect ? deckSelect.value : null);
@@ -5087,11 +5598,11 @@ startVoiceBtn.addEventListener("click", async () => {
     return;
   }
 
-  // ✅ Browser-only mic permission (NEVER in native app)
+
+  // ✅ Browser mic permission (web version: always request if needed)
   if (
-    !isNativeApp &&                   // ✅ key change
-    !nativeVoicePlugin &&             // not using native iOS STT plugin
-    !autoGoodMode &&                  // only needed when we actually need voice commands
+    (typeof isNativeApp === "undefined" || !isNativeApp) &&
+    needsVoiceCommands &&
     navigator.mediaDevices &&
     navigator.mediaDevices.getUserMedia
   ) {
@@ -5109,9 +5620,8 @@ startVoiceBtn.addEventListener("click", async () => {
     }
   }
 
-  // If there is NO native plugin and NO browser STT, and we are not in auto mode,
-  // then we can't do voice commands.
-  if (!nativeVoicePlugin && !speechSupported && !autoGoodMode) {
+  // If we need voice commands but have NO native plugin and NO browser STT, we can't proceed
+ if (needsVoiceCommands && !speechSupported) {
     alert("Speech recognition not supported in this environment.");
     return;
   }
@@ -5135,12 +5645,9 @@ startVoiceBtn.addEventListener("click", async () => {
   hasSpokenCurrentQuestion = false;
   hasSpokenCurrentAnswer = false;
 
-  // If auto mode is on, force delay mode (no STT needed)
-  if (autoGoodMode) {
-    answerMode = "delay";
-  } else {
-    answerMode = answerModeVoiceRadio.checked ? "voice" : "delay";
-  }
+  // Determine answer mode from user selection (NOT forced by autoGoodMode)
+  // autoGoodMode just changes HOW we rate, not WHEN we show the answer
+  answerMode = answerModeVoiceRadio.checked ? "voice" : "delay";
 
   const secs = parseInt(answerDelaySecondsInput.value, 10);
   answerDelayMs = isNaN(secs) ? 4000 : Math.max(1, Math.min(60, secs)) * 1000;
@@ -5173,9 +5680,6 @@ startVoiceBtn.addEventListener("click", async () => {
 }
 
  async function init() {
-  // 0) Setup native plugins first
-  try { setupNativePlugins(); } catch (e) { console.warn("setupNativePlugins failed:", e); }
-  try { initNativeVoicePlugin(); } catch (e) { console.warn("initNativeVoicePlugin failed:", e); }
 
   // 1) Check session early - if no session, redirect to login
   try {
@@ -5188,8 +5692,8 @@ startVoiceBtn.addEventListener("click", async () => {
     });
 
     if (!session) {
-      console.warn("[BOOT] No session. Redirecting to index.html");
-      window.location.replace("index.html");
+      console.warn("[BOOT] No session. Not redirecting to index.html (app mode)");
+      showSessionError("No session found. Please log in again.");
       return;
     }
 
@@ -5200,7 +5704,7 @@ startVoiceBtn.addEventListener("click", async () => {
 
   } catch (e) {
     console.error("[BOOT] Session check failed:", e);
-    window.location.replace("index.html");
+    showSessionError("Session check failed. Please log in again.");
     return;
   }
 
@@ -5217,6 +5721,31 @@ startVoiceBtn.addEventListener("click", async () => {
   } catch (e) {
     console.error("rebuildDeckUI (local) failed:", e);
   }
+
+// ===== Show session error UI =====
+function showSessionError(msg) {
+  let el = document.getElementById("sessionErrorMsg");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "sessionErrorMsg";
+    el.style.position = "fixed";
+    el.style.top = "0";
+    el.style.left = "0";
+    el.style.width = "100vw";
+    el.style.background = "#1e293b";
+    el.style.color = "#fff";
+    el.style.zIndex = "99999";
+    el.style.padding = "1.5rem 1rem";
+    el.style.textAlign = "center";
+    el.style.fontSize = "1.1rem";
+    el.style.fontWeight = "bold";
+    el.innerText = msg || "Session error. Please log in again.";
+    document.body.appendChild(el);
+  } else {
+    el.innerText = msg || "Session error. Please log in again.";
+    el.style.display = "block";
+  }
+}
 
   // 5) Load remote state (if logged in)
   try {
@@ -5237,76 +5766,12 @@ startVoiceBtn.addEventListener("click", async () => {
     console.error("init remote load failed", e);
     hasLoadedRemote = false;
   }
+   applyStudyPrefsToUIAndState();
+  wireStudyPrefsListeners();
 }
 
 init();
 
-if (debugNativeQueueBtn) {
-  debugNativeQueueBtn.addEventListener("click", async () => {
-    // 1) Make sure we’re actually running inside the native iOS app
-    if (!isNativeIOS || !NativeAudioPlayer) {
-      alert(
-        "NativeAudioPlayer not available.\n\n" +
-        "This debug button is only meaningful in the iOS app build " +
-        "(Capacitor WebView). If you're testing in a normal browser, " +
-        "it will just fall back to web TTS."
-      );
-      // Still try web TTS so you can see *something* happen
-      const deckId = selectedDeckId || getLastDeckId();
-      const deck = deckId ? getDeckById(deckId) : null;
-      if (!deck || !deck.cards || deck.cards.length === 0) {
-        alert("No cards in the current deck.");
-        return;
-      }
-      const webCards = deck.cards.slice(0, Math.min(10, deck.cards.length));
-      await playWithWebTTS(webCards);
-      return;
-    }
-
-    // 2) Use the CURRENTLY SELECTED DECK, not a nonexistent `cards` array
-    const deckId = selectedDeckId || getLastDeckId();
-    const deck = deckId ? getDeckById(deckId) : null;
-
-    if (!deck) {
-      alert("Select a deck first so I know which cards to play.");
-      return;
-    }
-    if (!deck.cards || deck.cards.length === 0) {
-      alert(`Deck "${deck.name}" has no cards yet.`);
-      return;
-    }
-
-    const sessionCards = deck.cards.slice(0, Math.min(10, deck.cards.length));
-
-     try {
-    await startDeckPlayback(sessionCards);
-    alert("✅ startDeckPlayback() finished without throwing.");
-  } catch (e) {
-    console.error("[DEBUG] startDeckPlayback failed:", e);
-
-    let msg = "";
-    try {
-      if (!e) {
-        msg = "No error object (e is null/undefined)";
-      } else if (typeof e === "string") {
-        msg = e;
-      } else if (e.message) {
-        msg = e.message;
-      } else {
-        msg = JSON.stringify(e);
-      }
-    } catch (jsonErr) {
-      msg = "Could not stringify error";
-    }
-
-    alert(
-      "startDeckPlayback failed.\n\n" +
-      "Raw type: " + (e ? typeof e : "null") + "\n\n" +
-      "Details: " + msg
-    );
-  }
-});
-}
 
   </script>
 </body>
