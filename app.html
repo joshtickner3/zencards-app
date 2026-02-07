@@ -4534,6 +4534,7 @@ async function handleGlobalVoiceCommands(text) {
       clearStudyAheadGapTimer();
       inStudyAheadAnswerGap = true;
       studyAheadRepeatAnswerActive = true;
+      pendingStudyAheadAdvance = false;
       stopListeningForCommand();
     }
      speakPlainAnswerWithCardLang("", () => {
@@ -4541,16 +4542,8 @@ async function handleGlobalVoiceCommands(text) {
 
          if (noScheduleChanges && studyAheadSession) {
       studyAheadRepeatAnswerActive = false;
-      if (pendingStudyAheadAdvance) {
-        pendingStudyAheadAdvance = false;
-        if (!isPaused && currentMode === "voice" && !awaitingPostCompletionChoice) {
-          runVoiceLoop();
-        }
-        return;
-      }
-      if (currentMode === "voice") {
-        listenForCommand(handleVoiceTranscript);
-      }
+      pendingStudyAheadAdvance = false;
+      startStudyAheadAnswerWindow(true);
       return;
     }
 
