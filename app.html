@@ -3233,25 +3233,32 @@ segments.push({
   pause: delim === '.' ? 700 : delim === ',' ? 350 : 0
 });
   }
- function addCognitivePauses(str) {
-  return str
-    // (A) Light pause after big numbers only when they’re followed by a unit/word
-    // e.g. "10 mg" -> "10, mg" (gives time to register)
-    .replace(/(\d+)\s+([a-zA-Z])/g, "$1, $2")
 
-    // (B) Pause BEFORE conjunctions when they connect full phrases
-    // Turn "... , and ..." into a better pacing cue, but do NOT touch "bread and butter"
-    // Heuristic: only add a pause if there's already a comma/semicolon/dash or long phrase before it.
-    .replace(/(.{18,})\s+(and|or|but|because|so|which|that)\s+/gi, "$1, $2 ")
+function addCognitivePauses(str) {
+  if (!str) return str;
 
-    // (C) Tiny pause after "is" ONLY when defining something (e.g. "X is Y.")
-    // Avoid "This is, really..." sounding weird.
-    .replace(/\b(is)\s+(a|an|the)\b/gi, "$1, $2")
+  // Words that should get a pause BEFORE they are spoken
+  const pauseWords = [
+    "and", "so", "but", "or", "if", "since", "as", "when",
+    "although", "while", "after", "before", "because",
+    "until", "for", "nor", "yet", "either"
+  ];
 
-    // (D) Pause AFTER example-introducers (these actually benefit from a beat)
-    .replace(/\b(for example|such as)\b/gi, "$1,");
+  // 1) Pause BEFORE conjunctions / transition words
+  // We insert a comma before the word if it is a standalone word
+  pauseWords.forEach(word => {
+    const re = new RegExp(`\\s+\\b(${word})\\b`, "gi");
+    str = str.replace(re, ", $1");
+  });
+
+  // 2) Pause BEFORE quoted text
+  // "something" or “something”
+  str = str
+    .replace(/\s+(")/g, ", $1")
+    .replace(/\s+(“)/g, ", $1");
+
+  return str;
 }
-
 
 
   function getPreferredVoice() {
