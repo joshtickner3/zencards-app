@@ -3258,7 +3258,7 @@ segments.push({
 
   // 2) If user asked for English, keep your "Daniel, not Samantha" preference
   if (langPrefix === "en") {
-    let preferredVoice = matching.find(v => v.name === "Daniel (Enhanced)")
+    let preferredVoice = matching.find(v => v.name === "Daniel")
       || matching.find(v => v.name === "Daniel (Enhanced)");
 
     // fall back to any matching English voice that isn't Samantha
