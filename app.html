@@ -3896,6 +3896,20 @@ function clearAutoGoodNextCardTimer() {
         questionDelayTimerId = null;
       }
     }
+
+    function startOrResetQuestionDelayTimer() {
+      clearQuestionDelayTimer();
+      const delay = Math.max(
+        1,
+        Math.min(60, Math.floor(answerDelayMs / 1000))
+      );
+      setStudyState(StudyState.WAITING_FOR_ANSWER);
+      questionDelayTimerId = setTimeout(() => {
+        if (!isPaused) {
+          speakAnswerThenAskDifficulty();
+        }
+      }, delay * 1000);
+    }
     function clearMicMuteTimer() {
   if (micMuteIntervalId !== null) {
     clearInterval(micMuteIntervalId);
@@ -4334,17 +4348,7 @@ speakWithWebTts(getPlainTextFromCard(currentCard.question), () => {
   if (isPaused) return;
 
   if (answerMode === "delay") {
-    const delay = Math.max(
-      1,
-      Math.min(60, Math.floor(answerDelayMs / 1000))
-    );
-
-    setStudyState(StudyState.WAITING_FOR_ANSWER);
-    questionDelayTimerId = setTimeout(() => {
-      if (!isPaused) {
-        speakAnswerThenAskDifficulty();
-      }
-    }, delay * 1000);
+    startOrResetQuestionDelayTimer();
   } else {
     // Voice answer mode: listen for user's speech to trigger answer playback
     awaitingAnswerSignal = true;
@@ -4685,6 +4689,14 @@ if (
     if (isNextCardCommand(text)) { handleNextCardSkip(); return; }
     if (normalizeCmdText(text).length > 0) {
       startOrResetAnswerAfterSpeechDelay();
+      return;
+    }
+  }
+
+  // If we are waiting to play the answer after a delay, reset the timer on any speech
+  if (currentMode === "voice" && answerMode === "delay" && questionDelayTimerId !== null) {
+    if (normalizeCmdText(text).length > 0) {
+      startOrResetQuestionDelayTimer();
       return;
     }
   }
@@ -5266,23 +5278,12 @@ speakWithWebTts(
   () => {
     if (isPaused) return;
 
-    if (answerMode === "delay") {
-      const delay = Math.max(
-        1,
-        Math.min(60, Math.floor(answerDelayMs / 1000))
-      );
-
-      if (!autoGoodMode) {
-        listenForCommand(handleVoiceTranscript);
-      }
-
-      setStudyState(StudyState.WAITING_FOR_ANSWER);
-      questionDelayTimerId = setTimeout(() => {
-        if (!isPaused) {
-          speakAnswerThenAskDifficulty();
+      if (answerMode === "delay") {
+        if (!autoGoodMode) {
+          listenForCommand(handleVoiceTranscript);
         }
-      }, delay * 1000);
-    } else {
+        startOrResetQuestionDelayTimer();
+      } else {
       awaitingAnswerSignal = true;
       setStudyState(StudyState.WAITING_FOR_ANSWER);
       setStatus("Listening for your answer...");
