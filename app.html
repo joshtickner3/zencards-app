@@ -4528,12 +4528,15 @@ async function handleGlobalVoiceCommands(text) {
 
   // 🔁 Repeat answer — allowed whenever we've already shown an answer
   if (t.includes("repeat answer") && currentMode === "voice" && currentCard) {
+    if (noScheduleChanges && studyAheadSession) {
+      clearStudyAheadGapTimer();
+      inStudyAheadAnswerGap = true;
+      stopListeningForCommand();
+    }
      speakPlainAnswerWithCardLang("", () => {
     if (isPaused) return;
 
          if (noScheduleChanges && studyAheadSession) {
-      clearStudyAheadGapTimer();
-      inStudyAheadAnswerGap = true;
       if (currentMode === "voice") {
         listenForCommand(handleVoiceTranscript);
       }

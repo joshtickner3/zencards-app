@@ -4400,14 +4400,17 @@ async function handleGlobalVoiceCommands(text) {
 
   // 🔁 Repeat answer — allowed whenever we've already shown an answer
   if (t.includes("repeat answer") && currentMode === "voice" && currentCard) {
+    if (noScheduleChanges && studyAheadSession) {
+      clearStudyAheadGapTimer();
+      inStudyAheadAnswerGap = true;
+      stopListeningForCommand();
+    }
     const plainAnswer = getPlainTextFromCard(currentCard.answer);
     speakSafe("Answer: " + plainAnswer, () => {
       if (isPaused) return;
 
       // If we're in study-ahead, stay on this card after repeating
       if (noScheduleChanges && studyAheadSession) {
-        clearStudyAheadGapTimer();
-        inStudyAheadAnswerGap = true;
         if (currentMode === "voice") {
           listenForCommand(handleVoiceTranscript);
         }
