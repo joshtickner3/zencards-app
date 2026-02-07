@@ -3255,17 +3255,28 @@ segments.push({
     const vPrefix = v.lang.split("-")[0];
     return v.lang === lang || vPrefix === langPrefix;
   });
+// 2) If user asked for English, prefer most natural MALE voices first
+if (langPrefix === "en") {
+  const preferredNames = [
+    "Eddy (English (United States))",
+    "Eddy (United Kingdom)",
+    "Fred",
+    "Daniel (Enhanced)",
+    "Daniel",
+  ];
 
-  // 2) If user asked for English, keep your "Daniel, not Samantha" preference
-  if (langPrefix === "en") {
-    let preferredVoice = matching.find(v => v.name === "Daniel")
-      || matching.find(v => v.name === "Daniel (Enhanced)");
-
-    // fall back to any matching English voice that isn't Samantha
-    if (!preferredVoice) preferredVoice = matching.find(v => !v.name.toLowerCase().includes("samantha"));
-    if (!preferredVoice) preferredVoice = matching[0] || null;
-    return preferredVoice;
+  // try exact name matches first
+  for (const name of preferredNames) {
+    const v = matching.find(v => v.name === name);
+    if (v) return v;
   }
+
+  // otherwise: pick any matching English voice that isn't Samantha
+  let v = matching.find(v => !v.name.toLowerCase().includes("samantha"));
+  if (!v) v = matching[0] || null;
+  return v;
+}
+
 
   // 3) For non-English, just take the first matching voice (usually best pronunciation)
   if (matching.length > 0) return matching[0];
