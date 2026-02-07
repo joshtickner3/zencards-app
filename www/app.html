@@ -3242,12 +3242,6 @@ function speakWithWebTts(text, onEnd, opts = {}) {
       setStatus("Listening...");
       keepListening = true;
 
-      recognition.onaudiostart = () => {
-        if (inAnswerAfterSpeechDelay) {
-          pauseAnswerAfterSpeechDelayTimer();
-        }
-      };
-
       recognition.onresult = (event) => {
   keepListening = false;
 
@@ -3715,13 +3709,6 @@ function clearAnswerAfterSpeechDelay() {
     answerAfterSpeechTimerId = null;
   }
   inAnswerAfterSpeechDelay = false;
-  answerAfterSpeechDueMs = 0;
-}
-function pauseAnswerAfterSpeechDelayTimer() {
-  if (answerAfterSpeechTimerId !== null) {
-    clearTimeout(answerAfterSpeechTimerId);
-    answerAfterSpeechTimerId = null;
-  }
   answerAfterSpeechDueMs = 0;
 }
 function startOrResetAnswerAfterSpeechDelay() {
