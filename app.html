@@ -3300,13 +3300,10 @@ segments.push({
 }
 
     function listenForCommand(callback) {
-  if (isMicMuted) return;
-
-  // ✅ NEW: never start recognition while TTS is speaking
-  if (isSpeaking) {
-    setTimeout(() => listenForCommand(callback), 250);
-    return;
-  }
+      if (isMicMuted) {
+  // Don’t listen while muted
+  return;
+}
 
       // 2) Fallback: Browser Web SpeechRecognition
       if (!speechSupported || !recognition) {
@@ -4414,10 +4411,9 @@ function parseRatingFromText(text) {
   if (t.includes("main menu") || t.includes("go to the main menu")) return null; // handled elsewhere
 
   // Easy wins
-if (first === "again") return "again";
-if (first === "hard") return "hard";
-if (first === "easy") return "easy";
-
+  if (t.includes("again")) return "again";
+  if (t.includes("hard")) return "hard";
+  if (t.includes("easy")) return "easy";
 
   // “Good” synonyms / common mishears
   // (Web Speech often returns could/hood/gud/go when you say "good")
@@ -4739,12 +4735,6 @@ if (awaitingAnswerSignal && currentMode === "voice") {
     }
 
     const ratingKey = parseRatingFromText(text);
-    // ✅ NEW: if recognition fired too soon, ignore it entirely unless it's a clear rating
-if (tooSoon && !ratingKey) {
-  startDifficultyListening();
-  return;
-}
-
     const trimmed = (text || "").trim().toLowerCase();
     const tooSoon = Date.now() - lastDifficultyPromptAt < difficultyPromptGraceMs;
     const ratingWords = ["again", "hard", "good", "easy"].filter(w => trimmed.includes(w)).length;
@@ -4916,41 +4906,28 @@ function speakAnswerThenAskDifficulty() {
       }
 
       // ===== Normal hands-free flow: show rating buttons, prompt again/hard/good/easy, then listen =====
-      // ===== Normal hands-free flow: show rating buttons, prompt, then listen =====
+      awaitingDifficulty = true;
+      if (voiceRatingButtons) {
+        voiceRatingButtons.classList.remove("hidden");
+      }
 
-// ✅ IMPORTANT: do NOT accept difficulty while the prompt is still speaking
-awaitingDifficulty = false;
+      const detailed = !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
+      hasSpokenInstructionsOnce = true;
 
-if (voiceRatingButtons) {
-  voiceRatingButtons.classList.remove("hidden");
-}
+      const promptText = detailed
+        ? "How was that. Say again, hard, good, or easy."
+        : "How was that.";
 
-const detailed = !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
-hasSpokenInstructionsOnce = true;
+      setStatus(promptText);
 
-const promptText = detailed
-  ? "How was that. Say again, hard, good, or easy."
-  : "How was that.";
-
-setStatus(promptText);
-
-// ✅ Speak the prompt in English, THEN start listening
-speakWithWebTts(
-  promptText,
-  () => {
-    if (isPaused) return;
-
-    // ✅ NOW we accept ratings
-    awaitingDifficulty = true;
-
-    // ✅ small delay avoids capturing the tail end of the prompt
-    setTimeout(() => {
-      if (!isPaused) startDifficultyListening();
-    }, 350);
-  },
-  { lang: "en-US" }
-);
-
+      // ✅ Speak the prompt in English (or change if you want)
+      speakWithWebTts(
+        promptText,
+        () => {
+          if (!isPaused) startDifficultyListening();
+        },
+        { lang: "en-US" }
+      );
     },
     { lang: aLang }
   );
