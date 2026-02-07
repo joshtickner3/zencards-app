@@ -3796,6 +3796,8 @@ let loopStudyAhead = false;       // from Study Options
       listenForCommand(handleVoiceTranscript);
     }
     let inStudyAheadAnswerGap = false;
+    let studyAheadRepeatAnswerActive = false;
+    let pendingStudyAheadAdvance = false;
     let answerAfterSpeechTimerId = null;
 let answerAfterSpeechDueMs = 0;
 let inAnswerAfterSpeechDelay = false;
@@ -4531,12 +4533,21 @@ async function handleGlobalVoiceCommands(text) {
     if (noScheduleChanges && studyAheadSession) {
       clearStudyAheadGapTimer();
       inStudyAheadAnswerGap = true;
+      studyAheadRepeatAnswerActive = true;
       stopListeningForCommand();
     }
      speakPlainAnswerWithCardLang("", () => {
     if (isPaused) return;
 
          if (noScheduleChanges && studyAheadSession) {
+      studyAheadRepeatAnswerActive = false;
+      if (pendingStudyAheadAdvance) {
+        pendingStudyAheadAdvance = false;
+        if (!isPaused && currentMode === "voice" && !awaitingPostCompletionChoice) {
+          runVoiceLoop();
+        }
+        return;
+      }
       if (currentMode === "voice") {
         listenForCommand(handleVoiceTranscript);
       }
@@ -5024,6 +5035,10 @@ function speakAnswerThenAskDifficulty() {
         studyAheadGapTimerId = setTimeout(() => {
           inStudyAheadAnswerGap = false;
           studyAheadGapTimerId = null;
+          if (studyAheadRepeatAnswerActive) {
+            pendingStudyAheadAdvance = true;
+            return;
+          }
           if (!isPaused && currentMode === "voice" && !awaitingPostCompletionChoice) {
             runVoiceLoop();
           }
