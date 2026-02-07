@@ -4720,6 +4720,12 @@ if (
 if (awaitingAnswerSignal && currentMode === "voice") {
   const t = normalizeCmdText(text);
 
+  if (isMainMenuCommand(t)) {
+    awaitingAnswerSignal = false;
+    speakAndGoToMainMenu(true);
+    return;
+  }
+
   if (!awaitingMuteSeconds && (t === "mute microphone" || t.includes("mute microphone"))) {
     awaitingMuteSeconds = true;
 
