@@ -791,26 +791,26 @@ input[type="number"]:focus{
             <label class="inline" for="handsFreeNextDelaySeconds">
               Delay after rating before next question
             </label>
-            <input type="number" id="handsFreeNextDelaySeconds" min="0" max="30" value="2" style="width:60px;" />
+            <input type="number" id="handsFreeNextDelaySeconds" min="0" max="30" value="4" style="width:60px;" />
             <span>seconds</span>
           </div>
           <div style="margin-top:0.5rem;">
             <label class="inline" for="answerToRatingDelaySeconds">
               Delay after answer before rating prompt
             </label>
-            <input type="number" id="answerToRatingDelaySeconds" min="0" max="30" value="0" style="width:60px;" />
+            <input type="number" id="answerToRatingDelaySeconds" min="0" max="30" value="4" style="width:60px;" />
             <span>seconds</span>
           </div>
           <!-- NEW: auto study-ahead options -->
           <div style="margin-top:0.5rem;">
             <label class="inline">
-              <input type="checkbox" id="autoEnterStudyAhead" />
+              <input type="checkbox" id="autoEnterStudyAhead" checked />
               After I finish all due cards, automatically enter study-ahead mode
             </label>
           </div>
           <div>
             <label class="inline">
-              <input type="checkbox" id="loopStudyAhead" />
+              <input type="checkbox" id="loopStudyAhead" checked />
               In study-ahead mode, keep looping the deck automatically
             </label>
           </div>
@@ -818,13 +818,13 @@ input[type="number"]:focus{
             <strong>Hands-free answer behavior:</strong>
             <div class="row" style="margin-top:0.25rem;">
               <div class="inline">
-                <input type="radio" name="answerMode" id="answerModeDelay" value="delay" checked />
+                <input type="radio" name="answerMode" id="answerModeDelay" value="delay" />
                 <label for="answerModeDelay">Wait</label>
                 <input type="number" id="answerDelaySeconds" min="1" max="60" value="4" style="width:60px;" />
                 <span>seconds before answer</span>
               </div>
               <div class="inline">
-                <input type="radio" name="answerMode" id="answerModeVoice" value="voice" />
+                <input type="radio" name="answerMode" id="answerModeVoice" value="voice" checked />
                 <label for="answerModeVoice">Play answer after I speak</label>
               </div>
             </div>
@@ -859,7 +859,7 @@ input[type="number"]:focus{
               min="0.5"
               max="2"
               step="0.1"
-              value="1.0"
+              value="0.75"
             />
           </div>
 
@@ -877,7 +877,7 @@ input[type="number"]:focus{
     min="0"
     max="30"
     step="1"
-    value="0"
+    value="5"
   />
 </div>
 
@@ -2916,9 +2916,9 @@ function getTtsSettingsObj() {
   let s = {};
   try { s = raw ? JSON.parse(raw) : {}; } catch { s = {}; }
 
-  if (typeof s.rate !== "number") s.rate = 0.8;
+  if (typeof s.rate !== "number") s.rate = 0.75;
   if (typeof s.volume !== "number") s.volume = 1.0;
-  if (typeof s.answerDelayAfterSpeechSec !== "number") s.answerDelayAfterSpeechSec = 0;
+  if (typeof s.answerDelayAfterSpeechSec !== "number") s.answerDelayAfterSpeechSec = 5;
 
   s.rate = clamp(s.rate, 0.5, 2.0);
   s.volume = clamp(s.volume, 0.0, 1.0);
@@ -3356,15 +3356,15 @@ function getStudyPrefs() {
 
   // Defaults (match your current defaults)
   if (typeof p.skipInstructionsAfterFirst !== "boolean") p.skipInstructionsAfterFirst = true;
-  if (typeof p.answerMode !== "string") p.answerMode = "delay"; // "delay" | "voice"
+  if (typeof p.answerMode !== "string") p.answerMode = "voice"; // "delay" | "voice"
   if (typeof p.answerDelaySec !== "number") p.answerDelaySec = 4;
-  if (typeof p.answerToRatingDelaySec !== "number") p.answerToRatingDelaySec = 0;
+  if (typeof p.answerToRatingDelaySec !== "number") p.answerToRatingDelaySec = 4;
   if (typeof p.autoGoodMode !== "boolean") p.autoGoodMode = false;
   if (typeof p.autoModeBehavior !== "string") p.autoModeBehavior = "good"; // again|hard|good|easy|tomorrow
-  if (typeof p.handsFreeNextDelaySec !== "number") p.handsFreeNextDelaySec = 2;
+  if (typeof p.handsFreeNextDelaySec !== "number") p.handsFreeNextDelaySec = 4;
   if (typeof p.studyAheadGapSec !== "number") p.studyAheadGapSec = 4;
-  if (typeof p.autoEnterStudyAhead !== "boolean") p.autoEnterStudyAhead = false;
-  if (typeof p.loopStudyAhead !== "boolean") p.loopStudyAhead = false;
+  if (typeof p.autoEnterStudyAhead !== "boolean") p.autoEnterStudyAhead = true;
+  if (typeof p.loopStudyAhead !== "boolean") p.loopStudyAhead = true;
 
   // Clamp numeric values
   p.answerDelaySec = Math.max(1, Math.min(60, Math.floor(p.answerDelaySec)));
