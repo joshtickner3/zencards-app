@@ -2488,13 +2488,13 @@ function rebuildDeckUI() {
 }
 
 // --- Web Speech API TTS for cards ---
-// --- Eddy voice cache ---
-window._eddyVoice = null;
-function cacheEddyVoice() {
+// --- Daniel voice cache ---
+window._danielVoice = null;
+function cacheDanielVoice() {
   const voices = window.speechSynthesis.getVoices();
   for (let v of voices) {
-    if (v.name && v.name.toLowerCase().includes('eddy')) {
-      window._eddyVoice = v;
+    if (v.name && v.name.toLowerCase().includes('daniel')) {
+      window._danielVoice = v;
       break;
     }
   }
@@ -2551,8 +2551,8 @@ function speakPlainAnswerWithCardLang(prefixText = "", onEnd) {
 }
 
 if (typeof window.speechSynthesis !== 'undefined') {
-  window.speechSynthesis.onvoiceschanged = cacheEddyVoice;
-  cacheEddyVoice();
+  window.speechSynthesis.onvoiceschanged = cacheDanielVoice;
+  cacheDanielVoice();
 }
 
 window.speakCardText = function(questionRaw, answerRaw, deckId, cardObj) {
@@ -3256,10 +3256,10 @@ segments.push({
     return v.lang === lang || vPrefix === langPrefix;
   });
 
-  // 2) If user asked for English, keep your "Eddy, not Samantha" preference
+  // 2) If user asked for English, keep your "Daniel, not Samantha" preference
   if (langPrefix === "en") {
-    let preferredVoice = matching.find(v => v.name === "Eddy")
-      || matching.find(v => v.name === "Eddy (Enhanced)");
+    let preferredVoice = matching.find(v => v.name === "Daniel")
+      || matching.find(v => v.name === "Daniel (Enhanced)");
 
     // fall back to any matching English voice that isn't Samantha
     if (!preferredVoice) preferredVoice = matching.find(v => !v.name.toLowerCase().includes("samantha"));
