@@ -3299,6 +3299,18 @@ segments.push({
   }
 }
 
+    function stopListeningForCommand() {
+      keepListening = false;
+      if (recognition) {
+        try {
+          recognition.onresult = null;
+          recognition.onerror = null;
+          recognition.onend = null;
+          recognition.stop();
+        } catch (e) {}
+      }
+    }
+
     function listenForCommand(callback) {
       if (isMicMuted) {
   // Don’t listen while muted
@@ -4488,6 +4500,7 @@ async function handleGlobalVoiceCommands(text) {
       const promptText = detailed
         ? "How was that. Say again, hard, good, or easy."
         : "How was that.";
+      stopListeningForCommand();
       speak(promptText, () => startDifficultyListening());
       return;
     }
@@ -4863,6 +4876,7 @@ function speakAnswerThenAskDifficulty() {
   const { aLang } = getCardLangs(deck, currentCard);
 
   // 🔊 Speak the answer in its language
+  stopListeningForCommand();
   speakWithWebTts(
     getPlainTextFromCard(currentCard.answer),
     async () => {
@@ -4921,6 +4935,7 @@ function speakAnswerThenAskDifficulty() {
       setStatus(promptText);
 
       // ✅ Speak the prompt in English (or change if you want)
+      stopListeningForCommand();
       speakWithWebTts(
         promptText,
         () => {
