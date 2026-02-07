@@ -801,6 +801,13 @@ input[type="number"]:focus{
             <input type="number" id="handsFreeNextDelaySeconds" min="0" max="30" value="2" style="width:60px;" />
             <span>seconds</span>
           </div>
+          <div style="margin-top:0.5rem;">
+            <label class="inline" for="answerToRatingDelaySeconds">
+              Delay after answer before rating prompt
+            </label>
+            <input type="number" id="answerToRatingDelaySeconds" min="0" max="30" value="0" style="width:60px;" />
+            <span>seconds</span>
+          </div>
           <!-- NEW: auto study-ahead options -->
           <div style="margin-top:0.5rem;">
             <label class="inline">
@@ -3136,6 +3143,7 @@ if (answerDelayAfterSpeechSecInput) {
   speakGeneration++;
   clearAnswerAfterSpeechDelay();
       clearAutoGoodNextCardTimer();
+      clearAnswerToRatingDelayTimer();
 
   // Stop browser TTS
   if (window.speechSynthesis) {
@@ -3463,6 +3471,7 @@ function getStudyPrefs() {
   if (typeof p.skipInstructionsAfterFirst !== "boolean") p.skipInstructionsAfterFirst = true;
   if (typeof p.answerMode !== "string") p.answerMode = "delay"; // "delay" | "voice"
   if (typeof p.answerDelaySec !== "number") p.answerDelaySec = 4;
+  if (typeof p.answerToRatingDelaySec !== "number") p.answerToRatingDelaySec = 0;
   if (typeof p.autoGoodMode !== "boolean") p.autoGoodMode = false;
   if (typeof p.autoModeBehavior !== "string") p.autoModeBehavior = "good"; // again|hard|good|easy|tomorrow
   if (typeof p.handsFreeNextDelaySec !== "number") p.handsFreeNextDelaySec = 2;
@@ -3472,6 +3481,7 @@ function getStudyPrefs() {
 
   // Clamp numeric values
   p.answerDelaySec = Math.max(1, Math.min(60, Math.floor(p.answerDelaySec)));
+  p.answerToRatingDelaySec = Math.max(0, Math.min(30, Math.floor(p.answerToRatingDelaySec)));
   p.handsFreeNextDelaySec = Math.max(0, Math.min(30, Math.floor(p.handsFreeNextDelaySec)));
   p.studyAheadGapSec = Math.max(1, Math.min(60, Math.floor(p.studyAheadGapSec)));
 
@@ -3501,6 +3511,7 @@ function saveStudyPrefs(patch = {}) {
     const answerModeDelayRadio = document.getElementById("answerModeDelay");
     const answerModeVoiceRadio = document.getElementById("answerModeVoice");
     const answerDelaySecondsInput = document.getElementById("answerDelaySeconds");
+    const answerToRatingDelaySecondsInput = document.getElementById("answerToRatingDelaySeconds");
       const handsFreeNextDelaySecondsInput = document.getElementById("handsFreeNextDelaySeconds");
     const studyAheadGapSecondsInput = document.getElementById("studyAheadGapSeconds");
 const autoEnterStudyAheadCheckbox = document.getElementById("autoEnterStudyAhead");
@@ -3572,6 +3583,7 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
   }
 
   if (answerDelaySecondsInput) answerDelaySecondsInput.value = String(p.answerDelaySec);
+  if (answerToRatingDelaySecondsInput) answerToRatingDelaySecondsInput.value = String(p.answerToRatingDelaySec);
 
   if (autoGoodToggle) autoGoodToggle.checked = !!p.autoGoodMode;
 
@@ -3598,6 +3610,7 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
   skipInstructionsAfterFirst = !!p.skipInstructionsAfterFirst;
   answerMode = p.answerMode === "voice" ? "voice" : "delay";
   answerDelayMs = p.answerDelaySec * 1000;
+  answerToRatingDelayMs = p.answerToRatingDelaySec * 1000;
 
   autoGoodMode = !!p.autoGoodMode;
   autoModeBehavior = p.autoModeBehavior || "good";
@@ -3639,6 +3652,15 @@ function wireStudyPrefsListeners() {
       const sec = Math.max(1, Math.min(60, parseInt(answerDelaySecondsInput.value, 10) || 4));
       answerDelaySecondsInput.value = String(sec);
       saveStudyPrefs({ answerDelaySec: sec });
+      applyStudyPrefsToUIAndState();
+    });
+  }
+
+  if (answerToRatingDelaySecondsInput) {
+    answerToRatingDelaySecondsInput.addEventListener("change", () => {
+      const sec = Math.max(0, Math.min(30, parseInt(answerToRatingDelaySecondsInput.value, 10) || 0));
+      answerToRatingDelaySecondsInput.value = String(sec);
+      saveStudyPrefs({ answerToRatingDelaySec: sec });
       applyStudyPrefsToUIAndState();
     });
   }
@@ -3719,6 +3741,7 @@ let loopStudyAhead = false;       // from Study Options
     let hasSpokenInstructionsOnce = false;
     let answerMode = "delay";
     let answerDelayMs = 4000;
+    let answerToRatingDelayMs = 0;
     let autoGoodMode = false;
     let handsFreeNextDelayMs = 2000;
     // Disable handsFreeNextDelaySecondsInput when autoGood is enabled
@@ -3825,6 +3848,14 @@ const micMuteSecondsEl = document.getElementById("micMuteSeconds");
     // NEW: track delay window between question and answer in delay mode
     let questionDelayTimerId = null;
      let autoGoodNextCardTimerId = null;
+    let answerToRatingDelayTimerId = null;
+
+function clearAnswerToRatingDelayTimer() {
+  if (answerToRatingDelayTimerId !== null) {
+    clearTimeout(answerToRatingDelayTimerId);
+    answerToRatingDelayTimerId = null;
+  }
+}
 
 function clearAutoGoodNextCardTimer() {
   if (autoGoodNextCardTimerId !== null) {
@@ -3914,6 +3945,7 @@ function startMicMute(seconds) {
     await stopAllAudio();
       clearStudyAheadGapTimer();
       clearQuestionDelayTimer();
+      clearAnswerToRatingDelayTimer();
 
       // Do NOT clear currentCard here, so it is preserved for resuming study
       currentMode = null;
@@ -3983,6 +4015,7 @@ async function openInstructionsModal() {
   clearStudyAheadGapTimer();
   clearQuestionDelayTimer();
   clearAnswerAfterSpeechDelay();
+  clearAnswerToRatingDelayTimer();
 
   if (!instructionsModal) return;
   instructionsModal.classList.remove("hidden");
@@ -4916,29 +4949,43 @@ function speakAnswerThenAskDifficulty() {
       }
 
       // ===== Normal hands-free flow: show rating buttons, prompt again/hard/good/easy, then listen =====
-      awaitingDifficulty = true;
-      if (voiceRatingButtons) {
-        voiceRatingButtons.classList.remove("hidden");
+      const startDifficultyPrompt = () => {
+        awaitingDifficulty = true;
+        if (voiceRatingButtons) {
+          voiceRatingButtons.classList.remove("hidden");
+        }
+
+        const detailed = !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
+        hasSpokenInstructionsOnce = true;
+
+        const promptText = detailed
+          ? "How was that. Say again, hard, good, or easy."
+          : "How was that.";
+
+        setStatus(promptText);
+
+        // ✅ Speak the prompt in English (or change if you want)
+        stopListeningForCommand();
+        speakWithWebTts(
+          promptText,
+          () => {
+            if (!isPaused) startDifficultyListening();
+          },
+          { lang: "en-US" }
+        );
+      };
+
+      clearAnswerToRatingDelayTimer();
+      const delayMs = Math.max(0, Number(answerToRatingDelayMs || 0));
+      if (delayMs > 0) {
+        setStudyState(StudyState.WAITING_FOR_RATING);
+        answerToRatingDelayTimerId = setTimeout(() => {
+          answerToRatingDelayTimerId = null;
+          if (!isPaused) startDifficultyPrompt();
+        }, delayMs);
+      } else {
+        startDifficultyPrompt();
       }
-
-      const detailed = !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
-      hasSpokenInstructionsOnce = true;
-
-      const promptText = detailed
-        ? "How was that. Say again, hard, good, or easy."
-        : "How was that.";
-
-      setStatus(promptText);
-
-      // ✅ Speak the prompt in English (or change if you want)
-      stopListeningForCommand();
-      speakWithWebTts(
-        promptText,
-        () => {
-          if (!isPaused) startDifficultyListening();
-        },
-        { lang: "en-US" }
-      );
     },
     { lang: aLang }
   );
