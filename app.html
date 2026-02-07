@@ -909,7 +909,7 @@ input[type="number"]:focus{
         <p style="font-size:0.85rem;color:#9ca3af;margin-top:0.5rem;">
           Voice commands (hands-free): "again", "hard", "good", "easy", "go to the next card",
           "repeat question", "repeat answer", "pause study session",
-          "resume study session", "go to the main menu", "mute microphone".
+          "resume study session", "main menu", "mute microphone".
         </p>
       </div>
     </div>
@@ -1170,7 +1170,7 @@ input[type="number"]:focus{
       <ul>
    <li><strong>After the question</strong>: you can say <em>repeat question or mute microphone </em> or <em></em>.</li>
         <li><strong>After the answer</strong>: say your rating when prompted (<em>again / hard / good / easy</em>).</li>
-        <li><strong>Any time</strong>: <em>"pause study session"</em>, <em>"resume study session"</em>, <em>"go to the main menu"</em>.</li>
+        <li><strong>Any time</strong>: <em>"pause study session"</em>, <em>"resume study session"</em>, <em>"main menu"</em>.</li>
       </ul>
 
       <hr style="border:0;border-top:1px solid #111827;margin:1rem 0;" />
@@ -1201,7 +1201,7 @@ input[type="number"]:focus{
         <li><strong>repeat answer</strong></li>
         <li><strong>pause study session</strong></li>
         <li><strong>resume study session</strong></li>
-        <li><strong>go to the main menu</strong></li>
+        <li><strong>main menu</strong></li>
         <li><strong>mute microphone</strong> (then say: 10/20/30/40/50/60)</li>
       </ul>
 
@@ -4420,7 +4420,7 @@ function parseRatingFromText(text) {
 
   // Direct phrase matches
   if (t.includes("repeat question") || t.includes("repeat answer")) return null; // handled elsewhere
-  if (t.includes("main menu") || t.includes("go to the main menu")) return null; // handled elsewhere
+  if (t === "main menu") return null; // handled elsewhere
 
   // Easy wins
   if (t.includes("again")) return "again";
@@ -4459,12 +4459,8 @@ function parseRatingFromText(text) {
 
     // Helper: detect "main menu" style commands
 function isMainMenuCommand(text) {
-  const t = text.toLowerCase();
-  return (
-    t.includes("main menu") ||
-    t.includes("go to the menu") ||
-    t.includes("go to main menu")
-  );
+  const t = normalizeCmdText(text);
+  return t === "main menu";
 }
 
 // NEW: stop any current audio, then confirm + go to main menu
