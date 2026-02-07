@@ -4171,16 +4171,15 @@ document.addEventListener("keydown", (e) => {
   }
 });
     
-   async function endStudySession() {
-  await stopAllAudio(); // ✅ guarantees no leftover speech or recognition
-
+   
+    function endStudySession() {
   clearStudyAheadGapTimer();
   clearQuestionDelayTimer();
   clearAnswerAfterSpeechDelay();
-
-  if (voiceRatingButtons) voiceRatingButtons.classList.add("hidden");
-
-  await showMainMenu();
+  if (voiceRatingButtons) {
+    voiceRatingButtons.classList.add("hidden");
+  }
+  showMainMenu();
   setStatus("Study session ended.");
 }
 
