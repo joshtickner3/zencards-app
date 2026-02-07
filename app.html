@@ -4421,14 +4421,11 @@ if (first === "easy") return "easy";
 
   // “Good” synonyms / common mishears
   // (Web Speech often returns could/hood/gud/go when you say "good")
-const goodLike = new Set([
-  "good", "fine", "okay", "ok", "k",
-  "could", "hood", "gud", "go", "goo", "gould"
-]);
-
-// ✅ Only accept "good" (and mishears) if it's the FIRST word
-if (goodLike.has(first)) return "good";
-
+  const goodLike = new Set([
+    "good", "fine", "okay", "ok", "k",
+    "could", "hood", "gud", "go", "goo", "gould"
+  ]);
+  if (goodLike.has(first) || t.includes(" good ") || t.endsWith(" good")) return "good";
 
   // Fuzzy match the FIRST word to the 4 commands
   const targets = ["again", "hard", "good", "easy"];
