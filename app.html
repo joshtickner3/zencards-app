@@ -3198,7 +3198,17 @@ function speakWithWebTts(text, onEnd, opts = {}) {
     return str.replace(/\b([A-Z]{2,})\b/g, (m) => m.split('').join(' '));
   }
 
-   const processedText = addCognitivePauses(expandAcronyms(text));
+  // Normalize punctuation so TTS doesn't read symbols aloud
+  function normalizePunctuation(str) {
+    return str
+      .replace(/[?!]+/g, ".")
+      .replace(/[:;]+/g, ",")
+      .replace(/[“”"'`]/g, "")
+      .replace(/[()\[\]{}]/g, "")
+      .replace(/\s{2,}/g, " ");
+  }
+
+   const processedText = addCognitivePauses(normalizePunctuation(expandAcronyms(text)));
 
   // Split text into segments, keeping delimiters
   const segments = [];
