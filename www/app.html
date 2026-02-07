@@ -4169,10 +4169,10 @@ setCardContent(silentAnswerText, currentCard.answer);
 
     // ===================== VOICE MODE =====================
 
-   // NEW: stop any current audio, then confirm + go to main menu
+  // Stop any current audio, then go to main menu immediately
 async function speakAndGoToMainMenu() {
   await stopAllAudio();
- speakSafe("Going to the main menu.", () => { endStudySession(); });
+  endStudySession();
 }
 
 
@@ -4383,12 +4383,10 @@ function isMainMenuCommand(text) {
   return t === "main menu";
 }
 
-// NEW: stop any current audio, then confirm + go to main menu
+// Stop any current audio, then go to main menu immediately
 async function speakAndGoToMainMenu() {
   await stopAllAudio();
-  speakSafe("Going to the main menu.", () => {
-    endStudySession();
-  });
+  endStudySession();
 }
 
 async function handleGlobalVoiceCommands(text) {
