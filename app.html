@@ -1122,27 +1122,26 @@ input[type="number"]:focus{
       <ul style="margin-top:0.5rem;">
         <li>
           <strong>Hands-Free Study</strong> — best when you want audio + speaking (driving/walking/eyes-free).
-          Use voice commands like <em>"repeat question"</em> and rate with <em>again / hard / good / easy</em>.
+          Use voice commands like <em>"repeat question"</em> and when prompted, rate with <em>again / hard / good / easy</em>.
         </li>
         <li>
-          <strong>Silent Study</strong> — best when you want to read and tap.
+        <strong>Silent Study</strong> — Traditional flashcards.
           Tap <em>Show Answer</em>, then rate with the buttons.
         </li>
       </ul>
 
       <p style="color:#9ca3af;margin-top:0.75rem;margin-bottom:0.25rem;">
-        <strong>Recommended presets:</strong>
+           <strong>Recommended presets (these are all hands free study options):</strong>
       </p>
       <ul>
         <li>
-          <strong>Normal studying:</strong> leave defaults on, rate honestly (use <strong>Good</strong> most of the time).
+          <strong>In a place you can speak? Navigate to study options and set to play answer after you speak, do not check off automatic rating mode.</strong>
         </li>
         <li>
-          <strong>Quick review / passive listening:</strong> enable <strong>Automatic mode</strong> and choose a rating (usually <strong>Good</strong>).
+         <strong>Unable to speak? Play answer after X amount of seconds and set to automatic rating mode in study options.
         </li>
         <li>
-          <strong>Keep going after you finish due cards:</strong> enable <strong>Study-ahead auto-enter</strong>.
-          (Optional) enable <strong>Loop study-ahead</strong> to keep cycling.
+             <strong>Want some extra review? Enter study-ahead mode when prompted once completed your due cards for that deck. </strong>
         </li>
       </ul>
 
@@ -1151,13 +1150,13 @@ input[type="number"]:focus{
       </p>
       <ul>
         <li>
-          <strong>Delay after rating before next question</strong> — adds breathing room between cards in hands-free mode.
+          <strong>Delay after rating before next question</strong> — adds breathing room between cards in hands-free mode. We recommend 5+ seconds for maximal retention.
         </li>
         <li>
-          <strong>Hands-free answer behavior</strong> — either <em>wait X seconds</em> or <em>play answer after I speak</em>.
+     <strong>Hands-free answer behavior</strong> — either <em>wait X seconds</em> or <em>play answer after I speak</em>. If choosing to wait X amount of seconds after answers, give yourself enough time to process the question for maximal retention.
         </li>
         <li>
-          <strong>Answer delay after I stop speaking</strong> — set to <strong>0</strong> for instant (default), or increase it if you want a pause.
+ <strong>Answer delay after I stop speaking</strong> — set to <strong>0</strong> for instant (default), or increase it if you want a pause. We recommend 5+ seconds to give yourself time to recall and process your cards for maximal retention. 
         </li>
       </ul>
 
@@ -2530,6 +2529,18 @@ function getCardLangs(deck, card) {
   const qLang = (card && card.qLang) || (deck && deck.qLang) || "en-US";
   const aLang = (card && card.aLang) || (deck && deck.aLang) || "en-US";
   return { qLang, aLang };
+}
+
+function speakPlainAnswerWithCardLang(prefixText = "", onEnd) {
+  const { deck, card } = getActiveDeckAndCardForTts();
+  if (!card) { if (onEnd) onEnd(); return; }
+
+  const { aLang } = getCardLangs(deck, card);
+  const answer = getPlainTextFromCard(card.answer || "");
+  if (!answer.trim()) { if (onEnd) onEnd(); return; }
+
+  const textToSpeak = prefixText ? (prefixText + answer) : answer;
+  speakWithWebTts(textToSpeak, onEnd, { lang: aLang });
 }
 
 if (typeof window.speechSynthesis !== 'undefined') {
@@ -4463,45 +4474,37 @@ async function handleGlobalVoiceCommands(text) {
 
   // 🔁 Repeat answer — allowed whenever we've already shown an answer
   if (t.includes("repeat answer") && currentMode === "voice" && currentCard) {
-    const plainAnswer = getPlainTextFromCard(currentCard.answer);
-    speakSafe("Answer: " + plainAnswer, () => {
-      if (isPaused) return;
+     speakPlainAnswerWithCardLang("", () => {
+    if (isPaused) return;
 
-      // If we're in study-ahead + gap, restart the gap window
-      if (noScheduleChanges && studyAheadSession && inStudyAheadAnswerGap) {
-        startStudyAheadAnswerWindow(true);
-        return;
-      }
+         if (noScheduleChanges && studyAheadSession && inStudyAheadAnswerGap) {
+      startStudyAheadAnswerWindow(true);
+      return;
+    }
 
-      // If we are waiting for difficulty in normal mode, just re-prompt
-      if (awaitingDifficulty && !noScheduleChanges) {
-        const detailed =
-          !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
-        hasSpokenInstructionsOnce = true;
-        const promptText = detailed
-          ? "How was that? Say again, hard, good, or easy."
-          : "How was that?";
-        speak(promptText, () => {
-          startDifficultyListening();
-        });
-        return;
-      }
+         if (awaitingDifficulty && !noScheduleChanges) {
+      const detailed = !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
+      hasSpokenInstructionsOnce = true;
+      const promptText = detailed
+        ? "How was that? Say again, hard, good, or easy."
+        : "How was that?";
+      speak(promptText, () => startDifficultyListening());
+      return;
+    }
 
-      // If we're at post-completion choice, re-prompt main menu
       if (awaitingPostCompletionChoice) {
-        speakSafe("Say main menu to go back.", () => {
-          listenForCommand(handleVoiceTranscript);
-        });
-        return;
-      }
-
-      // Otherwise, just keep listening for the next command
-      if (currentMode === "voice") {
+      speakSafe("Say main menu to go back.", () => {
         listenForCommand(handleVoiceTranscript);
-      }
-    });
-    return true;
-  }
+      });
+      return;
+    }
+
+    if (currentMode === "voice") {
+      listenForCommand(handleVoiceTranscript);
+    }
+  });
+  return true;
+}
 
   // 🧊 Pause study session – pause IMMEDIATELY (before speaking)
 if (
