@@ -4403,6 +4403,7 @@ async function handleGlobalVoiceCommands(text) {
   // 🔁 Repeat answer — allowed whenever we've already shown an answer
   if (t.includes("repeat answer") && currentMode === "voice" && currentCard) {
     if (noScheduleChanges && studyAheadSession) {
+      await stopAllAudio();
       clearStudyAheadGapTimer();
       inStudyAheadAnswerGap = true;
       studyAheadRepeatAnswerActive = true;
