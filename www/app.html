@@ -4662,7 +4662,8 @@ if (
   // If we are waiting to play the answer after speech ended, ANY transcript resets the countdown
   if (inAnswerAfterSpeechDelay || answerAfterSpeechRestartNeeded) {
     if (isNextCardCommand(text)) { handleNextCardSkip(); return; }
-    if (normalizeCmdText(text).length > 0) {
+    const normalized = normalizeCmdText(text);
+    if (normalized && normalized.replace(/\s+/g, "").length >= 2) {
       answerAfterSpeechRestartNeeded = false;
       startOrResetAnswerAfterSpeechDelay();
       return;
