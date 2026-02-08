@@ -3242,12 +3242,6 @@ function speakWithWebTts(text, onEnd, opts = {}) {
       setStatus("Listening...");
       keepListening = true;
 
-      recognition.onspeechstart = () => {
-        if (inAnswerAfterSpeechDelay) {
-          pauseAnswerAfterSpeechDelayTimer();
-        }
-      };
-
       recognition.onresult = (event) => {
   keepListening = false;
 
@@ -3708,7 +3702,6 @@ let answerAfterSpeechDueMs = 0;
   let answerToRatingDueMs = 0;
   let afterRatingDueMs = 0;
 let inAnswerAfterSpeechDelay = false;
-    let answerAfterSpeechRestartNeeded = false;
 
 function clearAnswerAfterSpeechDelay() {
   if (answerAfterSpeechTimerId !== null) {
@@ -3717,15 +3710,6 @@ function clearAnswerAfterSpeechDelay() {
   }
   inAnswerAfterSpeechDelay = false;
   answerAfterSpeechDueMs = 0;
-  answerAfterSpeechRestartNeeded = false;
-}
-function pauseAnswerAfterSpeechDelayTimer() {
-  if (answerAfterSpeechTimerId !== null) {
-    clearTimeout(answerAfterSpeechTimerId);
-    answerAfterSpeechTimerId = null;
-  }
-  answerAfterSpeechDueMs = 0;
-  answerAfterSpeechRestartNeeded = true;
 }
 function startOrResetAnswerAfterSpeechDelay() {
   const s = getTtsSettingsObj();
@@ -3739,7 +3723,6 @@ function startOrResetAnswerAfterSpeechDelay() {
 
   clearAnswerAfterSpeechDelay();
   inAnswerAfterSpeechDelay = true;
-  answerAfterSpeechRestartNeeded = false;
   answerAfterSpeechDueMs = Date.now() + sec * 1000;
 
   // ✅ keep the mic open during this window so any speech resets the timer
@@ -3750,7 +3733,6 @@ function startOrResetAnswerAfterSpeechDelay() {
   answerAfterSpeechTimerId = setTimeout(() => {
     inAnswerAfterSpeechDelay = false;
     answerAfterSpeechTimerId = null;
-    answerAfterSpeechRestartNeeded = false;
     speakAnswerThenAskDifficulty();
   }, sec * 1000);
 }
@@ -4660,10 +4642,9 @@ if (
   }
 
   // If we are waiting to play the answer after speech ended, ANY transcript resets the countdown
-  if (inAnswerAfterSpeechDelay || answerAfterSpeechRestartNeeded) {
+  if (inAnswerAfterSpeechDelay) {
     if (isNextCardCommand(text)) { handleNextCardSkip(); return; }
     if (normalizeCmdText(text).length > 0) {
-      answerAfterSpeechRestartNeeded = false;
       startOrResetAnswerAfterSpeechDelay();
       return;
     }
