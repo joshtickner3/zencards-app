@@ -3,10 +3,15 @@
 <head>
    <style>
     .instructions-top-right {
-      position: fixed;
-      top: 1rem;
-      right: 1rem;
-      z-index: 1000;
+      position: static;
+      display: flex;
+      justify-content: center;
+      margin: 0.35rem 0 0.9rem;
+      z-index: auto;
+    }
+    .instructions-top-right button{
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
     }
   </style>
     <!-- Capacitor Preferences for robust session persistence on iOS -->
@@ -225,17 +230,23 @@ document.addEventListener('visibilitychange', function() {
   justify-content: center;
 }
 
+    *{ box-sizing: border-box; }
     body{
   margin:0;
   padding:1.25rem;
   padding-top: calc(var(--topBarClearance) + env(safe-area-inset-top, 0px));
   font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  color-scheme: dark;
   background:
     radial-gradient(800px 400px at 20% -10%, rgba(56,189,248,0.12), transparent 55%),
     radial-gradient(700px 380px at 85% -5%, rgba(34,211,238,0.12), transparent 60%),
     linear-gradient(160deg, var(--bg1), var(--bg2));
   color: var(--text);
   line-height:1.55;
+}
+::selection{
+  background: rgba(34,211,238,0.32);
+  color: #001018;
 }
     h1, h2, h3 {
       margin: 0.55rem 0;
@@ -315,7 +326,7 @@ document.addEventListener('visibilitychange', function() {
       margin: 0 auto;
     }
     .card{
-  background: var(--card);
+  background: linear-gradient(180deg, rgba(10,18,36,0.95), rgba(3,7,18,0.9));
   border-radius: 1rem;
   padding: 1.1rem 1.15rem;
   margin-top: 1rem;
@@ -323,6 +334,11 @@ document.addEventListener('visibilitychange', function() {
   box-shadow: var(--shadow);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card:hover{
+  transform: translateY(-1px);
+  box-shadow: 0 20px 42px rgba(2,6,23,0.7), 0 0 0 1px rgba(148,163,184,0.12);
 }
     label {
       display: inline-block;
@@ -334,10 +350,14 @@ document.addEventListener('visibilitychange', function() {
   padding:0.65rem 0.75rem;
   border-radius:0.7rem;
   border:1px solid rgba(148,163,184,0.18);
-  background: rgba(2,6,23,0.6);
+  background: linear-gradient(180deg, rgba(2,6,23,0.7), rgba(2,6,23,0.5));
   color:var(--text);
   box-sizing:border-box;
   font-size:0.92rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+input::placeholder, textarea::placeholder{
+  color: rgba(148,163,184,0.7);
 }
     input[type="text"]:focus,
 textarea:focus,
@@ -370,6 +390,14 @@ input[type="number"]:focus{
         box-shadow 0.2s ease;
       box-shadow: 0 10px 24px rgba(56,189,248,0.28);
     }
+    button:focus-visible,
+input[type="text"]:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+input[type="number"]:focus-visible{
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(56,189,248,0.25);
+}
     button:hover:not(:disabled) {
       transform: translateY(-1px);
       box-shadow: 0 12px 26px rgba(56,189,248,0.35);
@@ -379,10 +407,10 @@ input[type="number"]:focus{
       box-shadow: 0 4px 10px rgba(15,23,42,0.6);
     }
     button.secondary {
-      background: rgba(148,163,184,0.12);
+      background: linear-gradient(180deg, rgba(148,163,184,0.18), rgba(148,163,184,0.1));
       color: #e2e8f0;
       box-shadow: none;
-      border: 1px solid rgba(148,163,184,0.2);
+      border: 1px solid rgba(148,163,184,0.22);
     }
     button.secondary:hover:not(:disabled) {
       background: rgba(148,163,184,0.2);
@@ -432,10 +460,11 @@ input[type="number"]:focus{
       display: inline-block;
       padding: 0.2rem 0.55rem;
       border-radius: 999px;
-      background: rgba(148,163,184,0.16);
+      background: linear-gradient(180deg, rgba(148,163,184,0.22), rgba(148,163,184,0.1));
       font-size: 0.75rem;
       margin-left: 0.25rem;
       color: #e2e8f0;
+      border: 1px solid rgba(148,163,184,0.18);
     }
     #status {
       margin-top: 0.75rem;
@@ -449,9 +478,18 @@ input[type="number"]:focus{
       margin-top: 0.6rem;
       border-top: 1px solid rgba(148,163,184,0.18);
       padding-top: 0.6rem;
+      scrollbar-gutter: stable;
+    }
+    #cardsList::-webkit-scrollbar{
+      width: 10px;
+    }
+    #cardsList::-webkit-scrollbar-thumb{
+      background: rgba(148,163,184,0.25);
+      border-radius: 999px;
+      border: 2px solid rgba(2,6,23,0.8);
     }
     .cardRow {
-      padding: 0.4rem 0.2rem;
+      padding: 0.45rem 0.35rem;
       border-bottom: 1px solid rgba(148,163,184,0.08);
       display: flex;
       justify-content: space-between;
@@ -459,9 +497,11 @@ input[type="number"]:focus{
       gap: 0.5rem;
       font-size: 0.9rem;
       border-radius: 0.6rem;
+      transition: background 0.15s ease, transform 0.12s ease;
     }
     .cardRow:hover {
-      background: rgba(148,163,184,0.06);
+      background: rgba(148,163,184,0.08);
+      transform: translateY(-1px);
     }
     /* Horizontal rating layout */
 .ratingRow {
@@ -558,6 +598,8 @@ input[type="number"]:focus{
   position: absolute;
   inset: 0;
   background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
     .modalCard {
@@ -577,10 +619,10 @@ input[type="number"]:focus{
     #silentQuestion, #silentAnswer, #voiceQuestion, #voiceAnswer {
       margin-top: 0.75rem;
       padding: 0.75rem;
-      background: #020617;
-      border-radius: 0.6rem;
+      background: linear-gradient(180deg, rgba(2,6,23,0.95), rgba(2,6,23,0.75));
+      border-radius: 0.75rem;
       min-height: 3rem;
-      border: 1px solid #1f2937;
+      border: 1px solid rgba(148,163,184,0.18);
     }
     #modeBadge {
       font-size: 0.8rem;
