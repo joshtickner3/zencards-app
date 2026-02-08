@@ -4775,7 +4775,7 @@ if (
   // If we are waiting to play the answer after a delay, reset the timer on any speech
   if (currentMode === "voice" && answerMode === "delay" && questionDelayTimerId !== null) {
     if (normalizeCmdText(text).length > 0) {
-      setStatus("Delay reset — waiting for your answer...");
+      setStatus("Wait until after answer to give voice commands in this answer behavior mode...");
       startOrResetQuestionDelayTimer();
       return;
     }
