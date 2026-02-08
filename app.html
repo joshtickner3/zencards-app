@@ -1124,6 +1124,7 @@ input[type="number"]:focus-visible{
 
         <!-- Inline edit for voice mode -->
         <div style="margin-top:0.5rem;">
+          <button id="voiceRepeatQuestionBtn" class="secondary small">Repeat Question</button>
           <button id="voiceSkipToAnswerBtn" class="secondary small">Skip to Answer</button>
           <button id="voiceEditToggleBtn" class="secondary small">Edit Card</button>
         </div>
@@ -1188,6 +1189,7 @@ input[type="number"]:focus-visible{
         </div>
 
         <div style="margin-top:0.75rem;">
+          <button id="silentRepeatQuestionBtn" class="secondary">Repeat Question</button>
           <button id="showAnswerBtn">Show Answer</button>
           <!-- next card button for silent study-ahead -->
           <button id="silentNextCardBtn" class="secondary hidden">Next Card</button>
@@ -3841,8 +3843,10 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
     const silentEditAnswer = document.getElementById("silentEditAnswer");
     const silentSaveEditBtn = document.getElementById("silentSaveEditBtn");
     const silentCancelEditBtn = document.getElementById("silentCancelEditBtn");
+    const silentRepeatQuestionBtn = document.getElementById("silentRepeatQuestionBtn");
 
     const voiceSkipToAnswerBtn = document.getElementById("voiceSkipToAnswerBtn");
+    const voiceRepeatQuestionBtn = document.getElementById("voiceRepeatQuestionBtn");
     const voiceEditToggleBtn = document.getElementById("voiceEditToggleBtn");
     const voiceEditPanel = document.getElementById("voiceEditPanel");
     const voiceEditQuestion = document.getElementById("voiceEditQuestion");
@@ -4594,6 +4598,29 @@ setCardContent(voiceAnswerText, currentCard.answer);
       silentEditPanel.classList.add("hidden");
       setStatus("Card updated.");
     });
+
+    if (voiceRepeatQuestionBtn) {
+      voiceRepeatQuestionBtn.addEventListener("click", () => {
+        if (currentMode !== "voice" || !currentCard || isPaused) return;
+        restartCurrentCardVoiceFlow();
+      });
+    }
+
+    if (silentRepeatQuestionBtn) {
+      silentRepeatQuestionBtn.addEventListener("click", () => {
+        if (currentMode !== "silent" || !currentCard || isPaused) return;
+        setFlashcardFlipped("silent", false);
+        setStudyState(StudyState.SHOWING_QUESTION);
+        if (showAnswerBtn) showAnswerBtn.classList.remove("hidden");
+        if (silentRatingButtons) silentRatingButtons.classList.add("hidden");
+        if (noScheduleChanges) {
+          silentNextCardBtn.classList.remove("hidden");
+        } else {
+          silentNextCardBtn.classList.add("hidden");
+        }
+        clearSilentHints();
+      });
+    }
 
     // Voice mode inline edit
     if (voiceSkipToAnswerBtn) {
