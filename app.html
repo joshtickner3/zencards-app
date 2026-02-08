@@ -4690,13 +4690,19 @@ async function speakAndGoToMainMenu() {
 
 
     // NEW helper: fully restart current card flow in hands-free mode
-    function restartCurrentCardVoiceFlow() {
+    async function restartCurrentCardVoiceFlow() {
       if (!currentCard) return;
+
+      await stopAllAudio();
 
       // Reset timers and state for this card
       clearStudyAheadGapTimer();
       clearQuestionDelayTimer();
       clearAnswerAfterSpeechDelay();
+      clearAnswerToRatingDelayTimer();
+      clearAfterRatingDelayTimer();
+      clearAutoGoodNextCardTimer();
+      clearMicMuteTimer();
       awaitingDifficulty = false;
       awaitingAnswerSignal = false;
       awaitingPostCompletionChoice = false;
@@ -4704,6 +4710,7 @@ async function speakAndGoToMainMenu() {
 
       // Hide answer again and reset flags
       setFlashcardFlipped("voice", false);
+      if (voiceRatingButtons) voiceRatingButtons.classList.add("hidden");
       hasSpokenCurrentAnswer = false;
       hasSpokenCurrentQuestion = false;
 
