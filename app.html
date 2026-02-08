@@ -4782,7 +4782,8 @@ if (
   if (inAnswerAfterSpeechDelay || answerAfterSpeechRestartNeeded) {
     if (isNextCardCommand(text)) { handleNextCardSkip(); return; }
     const normalized = normalizeCmdText(text);
-    if (normalized && normalized.replace(/\s+/g, "").length >= 2) {
+    const hasFullWord = normalized && /\b[a-z]{2,}\b/i.test(normalized);
+    if (hasFullWord) {
       answerAfterSpeechRestartNeeded = false;
       startOrResetAnswerAfterSpeechDelay();
       return;
