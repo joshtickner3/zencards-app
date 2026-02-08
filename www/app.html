@@ -4363,6 +4363,35 @@ speakWithWebTts(getPlainTextFromCard(currentCard.question), () => {
     .replace(/\s+/g, " ")
     .trim();
 }
+    function hasMeaningfulWord(text) {
+      const normalized = normalizeCmdText(text);
+      if (!normalized) return false;
+
+      const fillers = new Set([
+        "uh",
+        "um",
+        "uhh",
+        "umm",
+        "hmm",
+        "mm",
+        "mmm",
+        "ah",
+        "oh",
+        "er",
+        "uhm",
+        "huh"
+      ]);
+
+      const tokens = normalized.split(" ");
+      for (const token of tokens) {
+        if (!token) continue;
+        if (token === "a" || token === "i") return true;
+        if (token.length < 2) continue;
+        if (fillers.has(token)) continue;
+        return true;
+      }
+      return false;
+    }
 function isNextCardCommand(text) {
   const t = normalizeCmdText(text);
   return (
@@ -4662,9 +4691,7 @@ if (
   // If we are waiting to play the answer after speech ended, ANY transcript resets the countdown
   if (inAnswerAfterSpeechDelay || answerAfterSpeechRestartNeeded) {
     if (isNextCardCommand(text)) { handleNextCardSkip(); return; }
-    const normalized = normalizeCmdText(text);
-    const hasFullWord = normalized && /\b[a-z]{2,}\b/i.test(normalized);
-    if (hasFullWord) {
+    if (hasMeaningfulWord(text)) {
       answerAfterSpeechRestartNeeded = false;
       startOrResetAnswerAfterSpeechDelay();
       return;
