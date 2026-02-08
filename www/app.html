@@ -659,6 +659,21 @@ input[type="number"]:focus-visible{
       text-transform: uppercase;
       color: rgba(148,163,184,0.8);
       margin-bottom: 0.45rem;
+      text-align: center;
+      width: 100%;
+    }
+    #voiceQuestionText,
+    #voiceAnswerText,
+    #silentQuestionText,
+    #silentAnswerText{
+      flex: 1 1 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      font-size: clamp(1.05rem, 1.4vw + 0.7rem, 1.6rem);
+      line-height: 1.45;
+      width: 100%;
     }
 @keyframes fadeIn{
   from{ opacity:0; }
