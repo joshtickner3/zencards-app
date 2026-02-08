@@ -925,9 +925,9 @@ input[type="number"]:focus{
                   min="0"
                   max="1"
                   step="0.01"
-                  value="0.08"
+                  value="0.04"
                 />
-                <span id="bgMusicVolumeValue">0.08</span>
+                <span id="bgMusicVolumeValue">0.04</span>
               </div>
             </div>
           </div>
@@ -3028,7 +3028,7 @@ let speakGeneration = 0;
     // NEW: TTS settings (rate & volume)
     let ttsRate = 1.0;
     let ttsVolume = 1.0;
-    let bgmVolume = 0.08;
+    let bgmVolume = 0.04;
     let bgmMuted = false;
     let bgmDucked = false;
     const TTS_SETTINGS_KEY = "srsTtsSettings";
@@ -3045,7 +3045,7 @@ function getTtsSettingsObj() {
   if (typeof s.rate !== "number") s.rate = 0.75;
   if (typeof s.volume !== "number") s.volume = 1.0;
   if (typeof s.answerDelayAfterSpeechSec !== "number") s.answerDelayAfterSpeechSec = 5;
-  if (typeof s.bgmVolume !== "number") s.bgmVolume = 0.08;
+  if (typeof s.bgmVolume !== "number") s.bgmVolume = 0.04;
   if (typeof s.bgmMuted !== "boolean") s.bgmMuted = false;
 
   s.rate = clamp(s.rate, 0.5, 2.0);
@@ -3062,7 +3062,7 @@ function saveTtsSettingsObj(s) {
     rate: clamp(Number(s.rate ?? 1.0), 0.5, 2.0),
     volume: clamp(Number(s.volume ?? 1.0), 0.0, 1.0),
     answerDelayAfterSpeechSec: clamp(Math.round(Number(s.answerDelayAfterSpeechSec ?? 0)), 0, 30),
-    bgmVolume: clamp(Number(s.bgmVolume ?? 0.08), 0.0, 1.0),
+    bgmVolume: clamp(Number(s.bgmVolume ?? 0.04), 0.0, 1.0),
     bgmMuted: !!s.bgmMuted,
   };
   localStorage.setItem(TTS_SETTINGS_KEY, JSON.stringify(out));
@@ -3213,7 +3213,7 @@ function setBgMusicDucked(ducked) {
     if (bgMusicVolumeInput) {
       const onVolumeChange = () => {
         let v = parseFloat(bgMusicVolumeInput.value);
-        if (isNaN(v)) v = 0.08;
+        if (isNaN(v)) v = 0.04;
         v = Math.max(0, Math.min(1, v));
         bgmVolume = v;
         bgMusicVolumeInput.value = String(v);
