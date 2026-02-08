@@ -620,31 +620,38 @@ input[type="number"]:focus-visible{
     }
     /* Flashcard flip UI */
     .flashcard{
-      margin-top: 0.75rem;
+      margin: 1rem auto 0;
       perspective: 1200px;
+      width: min(92vw, 760px);
+      height: clamp(260px, 38vh, 420px);
     }
     .flashcard-inner{
       position: relative;
+      width: 100%;
+      height: 100%;
       transition: transform 480ms ease;
       transform-style: preserve-3d;
-      min-height: 4.5rem;
     }
     .flashcard.flipped .flashcard-inner{
-      transform: rotateY(180deg);
+      transform: rotateX(180deg);
     }
     .flashcard-face{
-      position: relative;
-      padding: 0.9rem 1rem;
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      padding: 1.2rem 1.35rem;
       background: linear-gradient(180deg, rgba(2,6,23,0.95), rgba(2,6,23,0.75));
-      border-radius: 0.9rem;
-      min-height: 4.5rem;
+      border-radius: 1rem;
       border: 1px solid rgba(148,163,184,0.18);
+      overflow: auto;
       backface-visibility: hidden;
       -webkit-backface-visibility: hidden;
       animation: softIn 180ms ease-out;
     }
     .flashcard-back{
-      transform: rotateY(180deg);
+      transform: rotateX(180deg);
     }
     .flashcard-label{
       font-size: 0.75rem;
@@ -751,7 +758,7 @@ input[type="number"]:focus-visible{
   <img src="zencards-logo.png" alt="ZenCards logo" class="brandLogo" />
 </div>
 
-    <p class="appSubtitle">Hands-free & silent spaced&nbsp;repetition flashcards</p>
+    <p class="appSubtitle">Study anywhere, anytime. </p>
 
         <div class="instructions-top-right">
   <button id="openInstructionsBtn" class="secondary small" type="button">
