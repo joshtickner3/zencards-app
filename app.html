@@ -4912,7 +4912,8 @@ function isMainMenuCommand(text) {
 async function speakAndGoToMainMenu(withConfirmation = false) {
   await stopAllAudio();
   if (withConfirmation) {
-    speakSafe("Going to the main menu.", () => {
+    speakSafe("Going to the main menu.", async () => {
+      await stopAllAudio();
       endStudySession();
     });
     return;
