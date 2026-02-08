@@ -967,6 +967,7 @@ input[type="number"]:focus{
 
         <!-- Inline edit for voice mode -->
         <div style="margin-top:0.5rem;">
+          <button id="voiceSkipToAnswerBtn" class="secondary small">Skip to Answer</button>
           <button id="voiceEditToggleBtn" class="secondary small">Edit Card</button>
         </div>
         <div id="voiceEditPanel" class="hidden" style="margin-top:0.75rem;">
@@ -3451,6 +3452,7 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
     const silentSaveEditBtn = document.getElementById("silentSaveEditBtn");
     const silentCancelEditBtn = document.getElementById("silentCancelEditBtn");
 
+    const voiceSkipToAnswerBtn = document.getElementById("voiceSkipToAnswerBtn");
     const voiceEditToggleBtn = document.getElementById("voiceEditToggleBtn");
     const voiceEditPanel = document.getElementById("voiceEditPanel");
     const voiceEditQuestion = document.getElementById("voiceEditQuestion");
@@ -4208,6 +4210,27 @@ setCardContent(voiceAnswerText, currentCard.answer);
     });
 
     // Voice mode inline edit
+    if (voiceSkipToAnswerBtn) {
+      voiceSkipToAnswerBtn.addEventListener("click", async () => {
+        if (currentMode !== "voice" || !currentCard || isPaused) return;
+        if (hasSpokenCurrentAnswer) return;
+
+        await stopAllAudio();
+        clearStudyAheadGapTimer();
+        clearQuestionDelayTimer();
+        clearAnswerAfterSpeechDelay();
+        clearAnswerToRatingDelayTimer();
+        clearAfterRatingDelayTimer();
+        clearMicMuteTimer();
+
+        awaitingAnswerSignal = false;
+        awaitingDifficulty = false;
+        inAnswerAfterSpeechDelay = false;
+
+        speakAnswerThenAskDifficulty();
+      });
+    }
+
     voiceEditToggleBtn.addEventListener("click", () => {
       if (!currentCard) return;
       voiceEditQuestion.value = currentCard.question;
