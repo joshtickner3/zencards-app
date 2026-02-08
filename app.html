@@ -4837,6 +4837,12 @@ if (awaitingAnswerSignal && currentMode === "voice") {
   // ✅ If we get here while awaitingAnswerSignal is true, the user said something OTHER than "mute microphone"
   // So proceed with playing the answer
   console.log("[VOICE] User spoke in voice-answer mode (not mute), calling startOrResetAnswerAfterSpeechDelay");
+  const wantsAnswer = t === "answer" || t === "play answer" || t === "show answer" || t.endsWith(" answer");
+  if (!wantsAnswer) {
+    setStatus("Say 'answer', 'play answer', or 'show answer' when you're ready.");
+    listenForCommand(handleVoiceTranscript);
+    return;
+  }
   awaitingAnswerSignal = false;
   startOrResetAnswerAfterSpeechDelay();
   return;
