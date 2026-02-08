@@ -1946,6 +1946,9 @@ currentUser = session.user;
   refreshCardsList();
   refreshCardLanguageDropdownsForCurrentDeck(null);
 
+  // Start background music on app load (may be blocked until user gesture)
+  ensureBgMusicPlayback();
+
 
   // 5) Load remote once (this will set hasLoadedRemote=true in finally)
   await loadStateFromSupabase();
@@ -1959,6 +1962,11 @@ currentUser = session.user;
 
   console.log("[BOOT] done", { hasLoadedRemote, userId: currentUser?.id });
 }
+
+// If autoplay is blocked, start music on first user gesture
+document.addEventListener("click", () => {
+  ensureBgMusicPlayback();
+}, { once: true });
 
     function scheduleKey(deckId, cardId) {
       return `${deckId}_${cardId}`;
