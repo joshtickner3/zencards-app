@@ -39,6 +39,8 @@
         deck: document.getElementById('deckSelect')?.value || '',
         ttsRate: document.getElementById('ttsRateInput')?.value || '',
         ttsVolume: document.getElementById('ttsVolumeInput')?.value || '',
+        bgMusicMuted: document.getElementById('bgMusicMute')?.checked || false,
+        bgMusicVolume: document.getElementById('bgMusicVolume')?.value || '',
         // Add more as needed (e.g., mode, delay)
       };
       localStorage.setItem('zencards_study_settings', JSON.stringify(settings));
@@ -55,13 +57,19 @@
       if (settings.ttsVolume && document.getElementById('ttsVolumeInput')) {
         document.getElementById('ttsVolumeInput').value = settings.ttsVolume;
       }
+      if (typeof settings.bgMusicMuted === 'boolean' && document.getElementById('bgMusicMute')) {
+        document.getElementById('bgMusicMute').checked = settings.bgMusicMuted;
+      }
+      if (settings.bgMusicVolume && document.getElementById('bgMusicVolume')) {
+        document.getElementById('bgMusicVolume').value = settings.bgMusicVolume;
+      }
       // Add more as needed
     }
 
     document.addEventListener('DOMContentLoaded', () => {
       restoreStudySettings();
       // Save on change
-      ['deckSelect','ttsRateInput','ttsVolumeInput'].forEach(id => {
+      ['deckSelect','ttsRateInput','ttsVolumeInput','bgMusicMute','bgMusicVolume'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.addEventListener('change', saveStudySettings);
       });
@@ -901,8 +909,32 @@ input[type="number"]:focus{
               value="1.0"
             />
           </div>
+
+          <div style="margin-top:0.5rem;">
+            <label>Background music</label>
+            <div class="row" style="align-items:center;gap:0.75rem;flex-wrap:wrap;">
+              <label class="inline" for="bgMusicMute">
+                <input type="checkbox" id="bgMusicMute" />
+                Mute background music
+              </label>
+              <div class="inline" style="gap:0.35rem;">
+                <label for="bgMusicVolume">Volume</label>
+                <input
+                  type="range"
+                  id="bgMusicVolume"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value="0.08"
+                />
+                <span id="bgMusicVolumeValue">0.08</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
+
+      <audio id="bgMusic" src="Zen-Meditation.mp3" loop preload="auto"></audio>
 
       <!-- Study mode buttons -->
       <div class="card">
@@ -2996,6 +3028,9 @@ let speakGeneration = 0;
     // NEW: TTS settings (rate & volume)
     let ttsRate = 1.0;
     let ttsVolume = 1.0;
+    let bgmVolume = 0.08;
+    let bgmMuted = false;
+    let bgmDucked = false;
     const TTS_SETTINGS_KEY = "srsTtsSettings";
     function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
@@ -3010,10 +3045,14 @@ function getTtsSettingsObj() {
   if (typeof s.rate !== "number") s.rate = 0.75;
   if (typeof s.volume !== "number") s.volume = 1.0;
   if (typeof s.answerDelayAfterSpeechSec !== "number") s.answerDelayAfterSpeechSec = 5;
+  if (typeof s.bgmVolume !== "number") s.bgmVolume = 0.08;
+  if (typeof s.bgmMuted !== "boolean") s.bgmMuted = false;
 
   s.rate = clamp(s.rate, 0.5, 2.0);
   s.volume = clamp(s.volume, 0.0, 1.0);
   s.answerDelayAfterSpeechSec = clamp(Math.round(s.answerDelayAfterSpeechSec), 0, 30);
+  s.bgmVolume = clamp(Number(s.bgmVolume), 0.0, 1.0);
+  s.bgmMuted = !!s.bgmMuted;
 
   return s;
 }
@@ -3023,6 +3062,8 @@ function saveTtsSettingsObj(s) {
     rate: clamp(Number(s.rate ?? 1.0), 0.5, 2.0),
     volume: clamp(Number(s.volume ?? 1.0), 0.0, 1.0),
     answerDelayAfterSpeechSec: clamp(Math.round(Number(s.answerDelayAfterSpeechSec ?? 0)), 0, 30),
+    bgmVolume: clamp(Number(s.bgmVolume ?? 0.08), 0.0, 1.0),
+    bgmMuted: !!s.bgmMuted,
   };
   localStorage.setItem(TTS_SETTINGS_KEY, JSON.stringify(out));
 }
@@ -3034,6 +3075,10 @@ function saveTtsSettingsObj(s) {
     const ttsRateInput = document.getElementById("ttsRateInput");
     const ttsVolumeInput = document.getElementById("ttsVolumeInput");
     const answerDelayAfterSpeechSecInput = document.getElementById("answerDelayAfterSpeechSecInput");
+    const bgMusicEl = document.getElementById("bgMusic");
+    const bgMusicMuteInput = document.getElementById("bgMusicMute");
+    const bgMusicVolumeInput = document.getElementById("bgMusicVolume");
+    const bgMusicVolumeValue = document.getElementById("bgMusicVolumeValue");
     
 if (answerDelayAfterSpeechSecInput) {
   answerDelayAfterSpeechSecInput.addEventListener("change", () => {
@@ -3054,19 +3099,56 @@ if (answerDelayAfterSpeechSecInput) {
   const s = getTtsSettingsObj();
   ttsRate = s.rate;
   ttsVolume = s.volume;
+  bgmVolume = s.bgmVolume;
+  bgmMuted = !!s.bgmMuted;
 
   if (ttsRateInput) ttsRateInput.value = String(ttsRate);
   if (ttsVolumeInput) ttsVolumeInput.value = String(ttsVolume);
+  if (bgMusicMuteInput) bgMusicMuteInput.checked = !!bgmMuted;
+  if (bgMusicVolumeInput) bgMusicVolumeInput.value = String(bgmVolume);
+  if (bgMusicVolumeValue) bgMusicVolumeValue.textContent = String(bgmVolume);
 
   const delayInput = document.getElementById("answerDelayAfterSpeechSecInput");
   if (delayInput) delayInput.value = String(s.answerDelayAfterSpeechSec ?? 0);
 })();
+
+function getEffectiveBgmVolume() {
+  if (bgmMuted) return 0;
+  const base = clamp(Number(bgmVolume || 0), 0, 1);
+  if (bgmDucked) return Math.min(base, 0.02);
+  return base;
+}
+
+function applyBgMusicVolume() {
+  if (!bgMusicEl) return;
+  bgMusicEl.volume = getEffectiveBgmVolume();
+}
+
+function ensureBgMusicPlayback() {
+  if (!bgMusicEl) return;
+  if (bgmMuted) {
+    try { bgMusicEl.pause(); } catch (_) {}
+    return;
+  }
+  applyBgMusicVolume();
+  const p = bgMusicEl.play();
+  if (p && typeof p.catch === "function") {
+    p.catch(() => {});
+  }
+}
+
+function setBgMusicDucked(ducked) {
+  bgmDucked = !!ducked;
+  applyBgMusicVolume();
+}
 
 
     function saveTtsSettings() {
   const current = getTtsSettingsObj();
   current.rate = ttsRate;
   current.volume = ttsVolume;
+  current.bgmVolume = bgmVolume;
+  current.bgmMuted = bgmMuted;
 
   // keep existing value unless you set it elsewhere
   saveTtsSettingsObj(current);
@@ -3119,6 +3201,29 @@ if (answerDelayAfterSpeechSecInput) {
         saveTtsSettings();
       });
     }
+
+    if (bgMusicMuteInput) {
+      bgMusicMuteInput.addEventListener("change", () => {
+        bgmMuted = !!bgMusicMuteInput.checked;
+        saveTtsSettings();
+        ensureBgMusicPlayback();
+      });
+    }
+
+    if (bgMusicVolumeInput) {
+      const onVolumeChange = () => {
+        let v = parseFloat(bgMusicVolumeInput.value);
+        if (isNaN(v)) v = 0.08;
+        v = Math.max(0, Math.min(1, v));
+        bgmVolume = v;
+        bgMusicVolumeInput.value = String(v);
+        if (bgMusicVolumeValue) bgMusicVolumeValue.textContent = String(v);
+        saveTtsSettings();
+        ensureBgMusicPlayback();
+      };
+      bgMusicVolumeInput.addEventListener("input", onVolumeChange);
+      bgMusicVolumeInput.addEventListener("change", onVolumeChange);
+    }
     if (answerDelayAfterSpeechSecInput) {
   answerDelayAfterSpeechSecInput.addEventListener("change", () => {
     const v = Math.max(
@@ -3142,6 +3247,7 @@ if (answerDelayAfterSpeechSecInput) {
       clearAutoGoodNextCardTimer();
       clearAnswerToRatingDelayTimer();
       clearAfterRatingDelayTimer();
+  setBgMusicDucked(false);
 
   // Stop browser TTS
   if (window.speechSynthesis) {
@@ -3287,12 +3393,14 @@ function addCognitivePauses(str) {
 }
 
   function startSpeaking() {
+    setBgMusicDucked(true);
     const preferredVoice = getPreferredVoice();
     let idx = 0;
     function speakSegment() {
       if (idx >= segments.length) {
         isSpeaking = false;
         setStatus("");
+        setBgMusicDucked(false);
         if (onEnd) onEnd();
         return;
       }
@@ -5694,6 +5802,7 @@ setCardContent(voiceAnswerText, currentCard.answer);
     });
 
     startSilentBtn.addEventListener("click", () => {
+      ensureBgMusicPlayback();
       saveLastMode("silent");
 if (selectedDeckId) saveLastDeckId(selectedDeckId);
       currentDeckId = selectedDeckId;
@@ -5736,6 +5845,7 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
     // >>> MODIFIED: add async + inline mic permission request here <<<
     // >>> REPLACE your existing startVoiceBtn handler with this whole block <<<
 startVoiceBtn.addEventListener("click", async () => {
+  ensureBgMusicPlayback();
   saveLastMode("voice");
   if (selectedDeckId) saveLastDeckId(selectedDeckId);
 
