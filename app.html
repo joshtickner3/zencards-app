@@ -3858,15 +3858,18 @@ function startOrResetAnswerAfterSpeechDelay() {
 
   // ✅ keep the mic open during this window so any speech resets the timer
   if (currentMode === "voice" && !isPaused) {
+    // Re-listen for speech continuously so any speech resets the timer
     listenForCommand(handleVoiceTranscript);
   }
 
+  // Start or reset the timer for when the answer should be spoken
   answerAfterSpeechTimerId = setTimeout(() => {
     inAnswerAfterSpeechDelay = false;
     answerAfterSpeechTimerId = null;
     speakAnswerThenAskDifficulty();
   }, sec * 1000);
 }
+
 
     let studyAheadGapTimerId = null;
 
@@ -4728,7 +4731,6 @@ if (
 
  async function handleVoiceTranscript(text) {
   console.log("[VOICE] handleVoiceTranscript called with text:", text, { awaitingAnswerSignal, awaitingDifficulty, inAnswerAfterSpeechDelay });
-  
 
   // If paused, only allow resume command, ignore all other input (mic stays on)
   if (isPaused) {
@@ -4760,10 +4762,16 @@ if (
     return;
   }
 
+  // Reset the timer if actual words are spoken
+  if (text.trim().length > 0) {
+    startOrResetAnswerAfterSpeechDelay();
+  }
+
   // If we are waiting to play the answer after speech ended, ANY transcript resets the countdown
-  if (inAnswerAfterSpeechDelay) {
+  if (inAnswerAfterSpeechDelay || answerAfterSpeechRestartNeeded) {
     if (isNextCardCommand(text)) { handleNextCardSkip(); return; }
-    if (normalizeCmdText(text).length > 0) {
+    if (hasMeaningfulWord(text)) {
+      answerAfterSpeechRestartNeeded = false;
       startOrResetAnswerAfterSpeechDelay();
       return;
     }
