@@ -3834,6 +3834,10 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
     .querySelectorAll('button[data-voice-rating]')
     .forEach(b => (b.disabled = !enabled));
 }
+        function setVoiceSkipToAnswerEnabled(enabled) {
+  if (!voiceSkipToAnswerBtn) return;
+  voiceSkipToAnswerBtn.disabled = !enabled;
+}
 
     const silentNextCardBtn = document.getElementById("silentNextCardBtn");
 
@@ -4444,6 +4448,9 @@ await stopAllAudio();
 
   pauseBtn.disabled = true;
   resumeBtn.disabled = false;
+  if (currentMode === "voice") {
+    setVoiceSkipToAnswerEnabled(false);
+  }
   setStatus("Paused. Say 'resume study session' or tap Resume.");
 
   // keep listening while paused when paused via button
@@ -4711,6 +4718,7 @@ async function speakAndGoToMainMenu() {
       // Hide answer again and reset flags
       setFlashcardFlipped("voice", false);
       if (voiceRatingButtons) voiceRatingButtons.classList.add("hidden");
+      setVoiceSkipToAnswerEnabled(false);
       hasSpokenCurrentAnswer = false;
       hasSpokenCurrentQuestion = false;
 
@@ -4718,7 +4726,8 @@ async function speakAndGoToMainMenu() {
       setStudyState(StudyState.SHOWING_QUESTION);
 
       hasSpokenCurrentQuestion = true;
-speakWithWebTts(getPlainTextFromCard(currentCard.question), () => {
+      setVoiceSkipToAnswerEnabled(true);
+    speakWithWebTts(getPlainTextFromCard(currentCard.question), () => {
   if (isPaused) return;
 
   if (answerMode === "delay") {
@@ -5659,6 +5668,7 @@ function speakAnswerThenAskDifficulty() {
       setStatus("Studying card...");
       hasSpokenCurrentQuestion = false;
       hasSpokenCurrentAnswer = false;
+      setVoiceSkipToAnswerEnabled(false);
 
       setCardContent(voiceQuestionText, currentCard.question);
 setCardContent(voiceAnswerText, currentCard.answer);
@@ -5674,6 +5684,7 @@ if (!noScheduleChanges && !autoGoodMode && voiceRatingButtons) {
 }
 
       hasSpokenCurrentQuestion = true;
+      setVoiceSkipToAnswerEnabled(true);
 setStudyState(StudyState.SHOWING_QUESTION);
 
 // 🔊 Use the same MP3-capable helper for the question
