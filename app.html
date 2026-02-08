@@ -3373,6 +3373,12 @@ function addCognitivePauses(str) {
       setStatus("Listening...");
       keepListening = true;
 
+      recognition.onspeechstart = () => {
+        if (inAnswerAfterSpeechDelay) {
+          clearAnswerAfterSpeechDelay();
+        }
+      };
+
       recognition.onresult = (event) => {
   keepListening = false;
 

@@ -3242,6 +3242,12 @@ function speakWithWebTts(text, onEnd, opts = {}) {
       setStatus("Listening...");
       keepListening = true;
 
+      recognition.onspeechstart = () => {
+        if (inAnswerAfterSpeechDelay) {
+          clearAnswerAfterSpeechDelay();
+        }
+      };
+
       recognition.onresult = (event) => {
   keepListening = false;
 
