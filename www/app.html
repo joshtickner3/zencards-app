@@ -4683,6 +4683,15 @@ if (
 if (awaitingAnswerSignal && currentMode === "voice") {
   const t = normalizeCmdText(text);
 
+  if (t === "skip to answer" && answerMode === "voice") {
+    awaitingAnswerSignal = false;
+    clearAnswerAfterSpeechDelay();
+    clearQuestionDelayTimer();
+    stopListeningForCommand();
+    speakAnswerThenAskDifficulty();
+    return;
+  }
+
   if (isMainMenuCommand(t)) {
     awaitingAnswerSignal = false;
     speakAndGoToMainMenu(true);
