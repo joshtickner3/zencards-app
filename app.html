@@ -1120,9 +1120,9 @@ input[type="number"]:focus{
 
     <div style="margin-top:0.75rem;max-height:70vh;overflow:auto;">
 
-       <span style="color:#90c000;font-weight:700;"><h3>➡️ Important</h3> </span>
+       <h3>➡️ Important</h3>
       <p style="color:#abb515;margin-top:0.25rem;">
-    Say <strong></strong> ZenCards requires exact wording for voice commands. Voice commands may only be used when the microphone is turned on. ZenCards turns the microphone off while questions and answers are being read, so voice commands may be given after prompted for your card rating or after 
+    Say <strong></strong> ZenCards requires exact wording for voice commands and you must follow along with the hands-free audio prompts that play during studying in order to maximize your user experience. Study options and settings are set for you already for efficiency, however you may customize them as you wish.  
       </p>
 
       <h3>📊 Ratings (Again / Hard / Good / Easy)</h3>
@@ -4490,29 +4490,6 @@ speakWithWebTts(getPlainTextFromCard(currentCard.question), () => {
     .replace(/\s+/g, " ")
     .trim();
 }
-    function hasMeaningfulWord(text) {
-  const normalized = normalizeCmdText(text);
-  if (!normalized) return false;
-
-  const fillers = new Set([
-    "uh", "um", "uhh", "umm", "hmm", "mm", "mmm", "ah", "oh", "er", "uhm", "huh"
-  ]);
-
-  const tokens = normalized.split(" ");
-  let meaningfulWordDetected = false;
-
-  for (const token of tokens) {
-    if (!token) continue;
-    if (token === "a" || token === "i") return true; // short but meaningful words
-    if (token.length < 2) continue; // Skip single-letter words
-    if (!fillers.has(token)) {
-      meaningfulWordDetected = true; // Found a non-filler word
-    }
-  }
-
-  return meaningfulWordDetected;
-}
-
 function isNextCardCommand(text) {
   const t = normalizeCmdText(text);
   return (
@@ -4769,6 +4746,7 @@ if (
 
  async function handleVoiceTranscript(text) {
   console.log("[VOICE] handleVoiceTranscript called with text:", text, { awaitingAnswerSignal, awaitingDifficulty, inAnswerAfterSpeechDelay });
+  
 
   // If paused, only allow resume command, ignore all other input (mic stays on)
   if (isPaused) {
@@ -4803,7 +4781,7 @@ if (
   // If we are waiting to play the answer after speech ended, ANY transcript resets the countdown
   if (inAnswerAfterSpeechDelay || answerAfterSpeechRestartNeeded) {
     if (isNextCardCommand(text)) { handleNextCardSkip(); return; }
-    if (hasMeaningfulWord(text)) {
+    if (normalizeCmdText(text).length > 0) {
       answerAfterSpeechRestartNeeded = false;
       startOrResetAnswerAfterSpeechDelay();
       return;
@@ -4827,62 +4805,61 @@ if (
     handleNextCardSkip().catch(console.error);
     return;
   }
-
   // ===== Mic mute command: ONLY during voice-answer gap (after question, before answer) =====
-  if (awaitingAnswerSignal && currentMode === "voice") {
-    const t = normalizeCmdText(text);
+if (awaitingAnswerSignal && currentMode === "voice") {
+  const t = normalizeCmdText(text);
 
-    if (isMainMenuCommand(t)) {
-      awaitingAnswerSignal = false;
-      speakAndGoToMainMenu(true);
-      return;
-    }
-
-    if (!awaitingMuteSeconds && (t === "mute microphone" || t.includes("mute microphone"))) {
-      awaitingMuteSeconds = true;
-
-      // Speak the allowed options and then listen for a number
-      speakSafe("10, 20, 30, 40, 50, or 60 seconds?", () => {
-        listenForCommand((numText) => {
-          const n = parseMuteSeconds(numText);
-          if (!n) {
-            // reprompt once (safe, minimal)
-            speakSafe("Please say 10, 20, 30, 40, 50, or 60.", () => {
-              awaitingMuteSeconds = true;
-              listenForCommand((numText2) => {
-                const n2 = parseMuteSeconds(numText2);
-                awaitingMuteSeconds = false;
-                if (!n2) {
-                  speakSafe("Okay, not muting.", () => {
-                    // resume listening for the answer
-                    if (!isPaused && awaitingAnswerSignal) {
-                      setStatus("Listening for your answer...");
-                      listenForCommand(handleVoiceTranscript);
-                    }
-                  });
-                  return;
-                }
-                startMicMute(n2);
-              });
-            });
-            return;
-          }
-
-          awaitingMuteSeconds = false;
-          startMicMute(n);
-        });
-      });
-
-      return; // important: don’t fall through
-    }
-
-    // ✅ If we get here while awaitingAnswerSignal is true, the user said something OTHER than "mute microphone"
-    // So proceed with playing the answer
-    console.log("[VOICE] User spoke in voice-answer mode (not mute), calling startOrResetAnswerAfterSpeechDelay");
+  if (isMainMenuCommand(t)) {
     awaitingAnswerSignal = false;
-    startOrResetAnswerAfterSpeechDelay();
+    speakAndGoToMainMenu(true);
     return;
   }
+
+  if (!awaitingMuteSeconds && (t === "mute microphone" || t.includes("mute microphone"))) {
+    awaitingMuteSeconds = true;
+
+    // Speak the allowed options and then listen for a number
+    speakSafe("10, 20, 30, 40, 50, or 60 seconds?", () => {
+      listenForCommand((numText) => {
+        const n = parseMuteSeconds(numText);
+        if (!n) {
+          // reprompt once (safe, minimal)
+          speakSafe("Please say 10, 20, 30, 40, 50, or 60.", () => {
+            awaitingMuteSeconds = true;
+            listenForCommand((numText2) => {
+              const n2 = parseMuteSeconds(numText2);
+              awaitingMuteSeconds = false;
+              if (!n2) {
+                speakSafe("Okay, not muting.", () => {
+                  // resume listening for the answer
+                  if (!isPaused && awaitingAnswerSignal) {
+                    setStatus("Listening for your answer...");
+                    listenForCommand(handleVoiceTranscript);
+                  }
+                });
+                return;
+              }
+              startMicMute(n2);
+            });
+          });
+          return;
+        }
+
+        awaitingMuteSeconds = false;
+        startMicMute(n);
+      });
+    });
+
+    return; // important: don’t fall through
+  }
+  
+  // ✅ If we get here while awaitingAnswerSignal is true, the user said something OTHER than "mute microphone"
+  // So proceed with playing the answer
+  console.log("[VOICE] User spoke in voice-answer mode (not mute), calling startOrResetAnswerAfterSpeechDelay");
+  awaitingAnswerSignal = false;
+  startOrResetAnswerAfterSpeechDelay();
+  return;
+}
 
   // If we were in the study-ahead answer gap, we no longer need a special case here;
   // main menu / repeat answer are already handled globally.
@@ -4920,7 +4897,7 @@ if (
   // Difficulty / rating flow (normal, schedule-changing mode only)
   if (awaitingDifficulty) {
     const t = text.toLowerCase();
-    if (isNextCardCommand(text)) { handleNextCardSkip(); return; }
+      if (isNextCardCommand(text)) { handleNextCardSkip(); return; }
 
     // Main menu commands are already handled globally, but just in case:
     if (isMainMenuCommand(t)) {
@@ -4968,23 +4945,23 @@ if (
 
     // Apply scheduling normally
     // Apply scheduling normally (this records the rating)
-    const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
-    if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
-      queueCardForAgain(currentDeckId, currentCard);
-    }
+const nextState = applyAnkiScheduling(currentDeckId, currentCard.id, ratingKey);
+if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
+  queueCardForAgain(currentDeckId, currentCard);
+}
 
-    awaitingDifficulty = false;
-    if (voiceRatingButtons) {
-      voiceRatingButtons.classList.add("hidden");
-    }
+awaitingDifficulty = false;
+if (voiceRatingButtons) {
+  voiceRatingButtons.classList.add("hidden");
+}
 
-    // ✅ NEW: echo the rating word with mic OFF, then continue
-    echoRatingThenContinue(ratingKey, () => {
-      if (isPaused) return; // safety
-      runVoiceLoopAfterRating();
-    });
+// ✅ NEW: echo the rating word with mic OFF, then continue
+echoRatingThenContinue(ratingKey, () => {
+  if (isPaused) return; // safety
+  runVoiceLoopAfterRating();
+});
 
-    return;
+return;
   }
 
   // Fallback: keep listening for the next command in voice mode
