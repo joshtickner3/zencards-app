@@ -3965,6 +3965,7 @@ function clearAutoGoodNextCardTimer() {
         clearTimeout(questionDelayTimerId);
         questionDelayTimerId = null;
       }
+      questionDelayDueMs = 0;
     }
 
     function startOrResetQuestionDelayTimer() {
@@ -3975,6 +3976,8 @@ function clearAutoGoodNextCardTimer() {
       );
       setStudyState(StudyState.WAITING_FOR_ANSWER);
       questionDelayTimerId = setTimeout(() => {
+        questionDelayTimerId = null;
+        questionDelayDueMs = 0;
         if (!isPaused) {
           speakAnswerThenAskDifficulty();
         }
@@ -5017,6 +5020,8 @@ function echoRatingThenContinue(ratingKey, next) {
 
 function speakAnswerThenAskDifficulty() {
   if (!currentCard) return;
+
+  clearQuestionDelayTimer();
 
   hasSpokenCurrentAnswer = true;
   setStudyState(StudyState.SHOWING_ANSWER);
