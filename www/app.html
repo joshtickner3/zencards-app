@@ -2498,12 +2498,12 @@ window.speakCardText = function(questionRaw, answerRaw, deckId, cardObj) {
   const question = getPlainTextFromCard(questionRaw);
   const answer = getPlainTextFromCard(answerRaw);
 
-  // Speak question, then answer after 3s pause, using your unified TTS with correct languages
+  // Speak question, then answer after 5s pause, using your unified TTS with correct languages
   speakWithWebTts(question, () => {
     if (answer && answer.trim()) {
       setTimeout(() => {
         speakWithWebTts(answer, null, { lang: aLang });
-      }, 3000); // 3 second pause
+      }, 5000); // 5 second pause
     }
   }, { lang: qLang });
 };

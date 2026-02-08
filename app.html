@@ -947,7 +947,7 @@ input[type="number"]:focus{
 
         <p style="font-size:0.85rem;color:#9ca3af;margin-top:0.5rem;">
           Voice commands (hands-free): "again", "hard", "good", "easy", "go to the next card",
-          "repeat question", "repeat answer", "pause study session",
+          "repeat question", "repeat answer", "pause study session", "show answer", "skip to answer",
           "resume study session", "main menu", "mute microphone".
         </p>
       </div>
@@ -2591,12 +2591,12 @@ window.speakCardText = function(questionRaw, answerRaw, deckId, cardObj) {
   const question = getPlainTextFromCard(questionRaw);
   const answer = getPlainTextFromCard(answerRaw);
 
-  // Speak question, then answer after 3s pause, using your unified TTS with correct languages
+  // Speak question, then answer after 5s pause, using your unified TTS with correct languages
   speakWithWebTts(question, () => {
     if (answer && answer.trim()) {
-    speakWithWebTts("Answer.", () => {
-  setTimeout(() => speakWithWebTts(answer), 400);
-});
+      setTimeout(() => {
+        speakWithWebTts(answer, null, { lang: aLang });
+      }, 5000);
     }
   }, { lang: qLang });
 };
