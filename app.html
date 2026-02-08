@@ -618,15 +618,40 @@ input[type="number"]:focus-visible{
     #studySection {
       margin-top: 1rem;
     }
-    /* Shared visual style for both silent + voice question/answer blocks */
-    #silentQuestion, #silentAnswer, #voiceQuestion, #voiceAnswer {
+    /* Flashcard flip UI */
+    .flashcard{
       margin-top: 0.75rem;
-      padding: 0.75rem;
+      perspective: 1200px;
+    }
+    .flashcard-inner{
+      position: relative;
+      transition: transform 480ms ease;
+      transform-style: preserve-3d;
+      min-height: 4.5rem;
+    }
+    .flashcard.flipped .flashcard-inner{
+      transform: rotateY(180deg);
+    }
+    .flashcard-face{
+      position: relative;
+      padding: 0.9rem 1rem;
       background: linear-gradient(180deg, rgba(2,6,23,0.95), rgba(2,6,23,0.75));
-      border-radius: 0.75rem;
-      min-height: 3rem;
+      border-radius: 0.9rem;
+      min-height: 4.5rem;
       border: 1px solid rgba(148,163,184,0.18);
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
       animation: softIn 180ms ease-out;
+    }
+    .flashcard-back{
+      transform: rotateY(180deg);
+    }
+    .flashcard-label{
+      font-size: 0.75rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: rgba(148,163,184,0.8);
+      margin-bottom: 0.45rem;
     }
 @keyframes fadeIn{
   from{ opacity:0; }
@@ -1046,11 +1071,17 @@ input[type="number"]:focus-visible{
 
       <!-- Voice mode UI (visual front/back during hands-free) -->
       <div id="voiceUI" class="hidden">
-        <div id="voiceQuestion">
-          <strong>Question:</strong> <span id="voiceQuestionText"></span>
-        </div>
-        <div id="voiceAnswer" class="hidden">
-          <strong>Answer:</strong> <span id="voiceAnswerText"></span>
+        <div id="voiceFlashcard" class="flashcard">
+          <div class="flashcard-inner">
+            <div id="voiceQuestion" class="flashcard-face flashcard-front">
+              <div class="flashcard-label">Question</div>
+              <div id="voiceQuestionText"></div>
+            </div>
+            <div id="voiceAnswer" class="flashcard-face flashcard-back">
+              <div class="flashcard-label">Answer</div>
+              <div id="voiceAnswerText"></div>
+            </div>
+          </div>
         </div>
         <div id="micMuteTimer" class="hidden" style="margin-top:0.5rem;">
   <span class="badge">
@@ -1102,11 +1133,17 @@ input[type="number"]:focus-visible{
 
       <!-- Silent mode UI -->
       <div id="silentUI" class="hidden">
-        <div id="silentQuestion">
-          <strong>Question:</strong> <span id="silentQuestionText"></span>
-        </div>
-        <div id="silentAnswer" class="hidden">
-          <strong>Answer:</strong> <span id="silentAnswerText"></span>
+        <div id="silentFlashcard" class="flashcard">
+          <div class="flashcard-inner">
+            <div id="silentQuestion" class="flashcard-face flashcard-front">
+              <div class="flashcard-label">Question</div>
+              <div id="silentQuestionText"></div>
+            </div>
+            <div id="silentAnswer" class="flashcard-face flashcard-back">
+              <div class="flashcard-label">Answer</div>
+              <div id="silentAnswerText"></div>
+            </div>
+          </div>
         </div>
 
         <!-- Inline edit for silent mode -->
@@ -3756,6 +3793,17 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
     const voiceAnswer = document.getElementById("voiceAnswer");
     const voiceAnswerText = document.getElementById("voiceAnswerText");
         const voiceRatingButtons = document.getElementById("voiceRatingButtons");
+        const voiceFlashcard = document.getElementById("voiceFlashcard");
+        const silentFlashcard = document.getElementById("silentFlashcard");
+        function setFlashcardFlipped(mode, flipped) {
+        const el = mode === "voice" ? voiceFlashcard : silentFlashcard;
+        if (!el) return;
+        el.classList.toggle("flipped", !!flipped);
+      }
+        function isFlashcardFlipped(mode) {
+        const el = mode === "voice" ? voiceFlashcard : silentFlashcard;
+        return !!el?.classList?.contains("flipped");
+      }
         function setVoiceRatingButtonsEnabled(enabled) {
   if (!voiceRatingButtons) return;
   voiceRatingButtons
@@ -4253,7 +4301,7 @@ function startMicMute(seconds) {
       silentCompletionControls.classList.add("hidden");
       if (voiceQuestionText) voiceQuestionText.textContent = "";
       if (voiceAnswerText) voiceAnswerText.textContent = "";
-      if (voiceAnswer) voiceAnswer.classList.add("hidden");
+      setFlashcardFlipped("voice", false);
       silentEditPanel.classList.add("hidden");
       voiceEditPanel.classList.add("hidden");
             if (voiceRatingButtons) voiceRatingButtons.classList.add("hidden");
@@ -4606,9 +4654,7 @@ async function speakAndGoToMainMenu() {
       inStudyAheadAnswerGap = false;
 
       // Hide answer again and reset flags
-      if (voiceAnswer) {
-        voiceAnswer.classList.add("hidden");
-      }
+      setFlashcardFlipped("voice", false);
       hasSpokenCurrentAnswer = false;
       hasSpokenCurrentQuestion = false;
 
@@ -4649,7 +4695,7 @@ speakWithWebTts(getPlainTextFromCard(currentCard.question), () => {
   inAnswerAfterSpeechDelay = false;
 
   // 3) Hide answer UI (we’re skipping it)
-  if (voiceAnswer) voiceAnswer.classList.add("hidden");
+  setFlashcardFlipped("voice", false);
   if (voiceRatingButtons) voiceRatingButtons.classList.add("hidden");
 
   // 4) Apply EASY only when schedule changes are enabled
@@ -5234,9 +5280,7 @@ function speakAnswerThenAskDifficulty() {
   hasSpokenCurrentAnswer = true;
   setStudyState(StudyState.SHOWING_ANSWER);
 
-  if (voiceAnswer) {
-    voiceAnswer.classList.remove("hidden");
-  }
+  setFlashcardFlipped("voice", true);
   setCardContent(voiceAnswerText, currentCard.answer);
 
   // ✅ get language for the ANSWER
@@ -5448,7 +5492,7 @@ function speakAnswerThenAskDifficulty() {
       if (!deck || deck.cards.length === 0) {
         if (voiceQuestionText) voiceQuestionText.textContent = "";
         if (voiceAnswerText) voiceAnswerText.textContent = "";
-        if (voiceAnswer) voiceAnswer.classList.add("hidden");
+        setFlashcardFlipped("voice", false);
 
         setStudyState(StudyState.IDLE);
         speakSafe("This deck has no cards.", () => {
@@ -5563,9 +5607,7 @@ function speakAnswerThenAskDifficulty() {
       setCardContent(voiceQuestionText, currentCard.question);
 setCardContent(voiceAnswerText, currentCard.answer);
 
-      if (voiceAnswer) {
-        voiceAnswer.classList.add("hidden");
-      }
+      setFlashcardFlipped("voice", false);
       voiceEditPanel.classList.add("hidden");
    // Show rating buttons immediately AND make them clickable right away
 if (!noScheduleChanges && !autoGoodMode && voiceRatingButtons) {
@@ -5660,7 +5702,7 @@ speakWithWebTts(
         setStatus("This deck has no cards.");
         silentQuestionText.textContent = "";
         silentQuestion.classList.remove("hidden");
-        silentAnswer.classList.add("hidden");
+        setFlashcardFlipped("silent", false);
         showAnswerBtn.classList.remove("hidden");
         silentRatingButtons.classList.add("hidden");
         silentNextCardBtn.classList.add("hidden");
@@ -5722,7 +5764,7 @@ if (overdue.length > 0) {
   );
   silentQuestionText.textContent = "";
   silentQuestion.classList.add("hidden");
-  silentAnswer.classList.add("hidden");
+  setFlashcardFlipped("silent", false);
   showAnswerBtn.classList.add("hidden");
   silentRatingButtons.classList.add("hidden");
   silentNextCardBtn.classList.add("hidden");
@@ -5750,7 +5792,7 @@ if (overdue.length > 0) {
   setStatus("There are no more cards available to study in this deck right now.");
   silentQuestionText.textContent = "";
   silentQuestion.classList.add("hidden");
-  silentAnswer.classList.add("hidden");
+  setFlashcardFlipped("silent", false);
   showAnswerBtn.classList.add("hidden");
   silentRatingButtons.classList.add("hidden");
   silentNextCardBtn.classList.add("hidden");
@@ -5770,8 +5812,8 @@ if (overdue.length > 0) {
       currentCard = nextCard;
       setStatus("Studying card...");
       setCardContent(silentQuestionText, currentCard.question);
-setCardContent(silentAnswerText, currentCard.answer);
-      silentAnswer.classList.add("hidden");
+    setCardContent(silentAnswerText, currentCard.answer);
+      setFlashcardFlipped("silent", false);
       silentRatingButtons.classList.add("hidden");
       clearSilentHints();
       silentEditPanel.classList.add("hidden");
@@ -5792,15 +5834,15 @@ setCardContent(voiceAnswerText, currentCard.answer);
       if (!currentCard) return;
 
       // study-ahead silent: tap once to show answer, second tap goes next
-      if (noScheduleChanges && !silentAnswer.classList.contains("hidden")) {
-        silentAnswer.classList.add("hidden");
+      if (noScheduleChanges && isFlashcardFlipped("silent")) {
+        setFlashcardFlipped("silent", false);
         clearSilentHints();
         setStudyState(StudyState.IDLE);
         runSilentLoop();
         return;
       }
 
-      silentAnswer.classList.remove("hidden");
+      setFlashcardFlipped("silent", true);
       setStudyState(StudyState.SHOWING_ANSWER);
       if (noScheduleChanges) {
         silentRatingButtons.classList.add("hidden");
@@ -5814,7 +5856,7 @@ setCardContent(voiceAnswerText, currentCard.answer);
 
     silentNextCardBtn.addEventListener("click", () => {
       if (!currentCard) return;
-      silentAnswer.classList.add("hidden");
+      setFlashcardFlipped("silent", false);
       clearSilentHints();
       setStudyState(StudyState.IDLE);
       runSilentLoop();
