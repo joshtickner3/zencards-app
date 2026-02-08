@@ -3397,6 +3397,7 @@ function setBgMusicDucked(ducked) {
   }
 
   isSpeaking = false;
+  setRepeatQuestionEnabled(true);
 
   // Stop browser speech recognition
   if (recognition) {
@@ -3424,6 +3425,7 @@ function speakWithWebTts(text, onEnd, opts = {}) {
   const { lang = "en-US" } = opts;
   if (!window.speechSynthesis) {
     setStatus("Text-to-speech not supported in this browser.");
+    setRepeatQuestionEnabled(true);
     if (onEnd) onEnd();
     return;
   }
@@ -3543,6 +3545,7 @@ function addCognitivePauses(str) {
         isSpeaking = false;
         setStatus("");
         setBgMusicDucked(false);
+        setRepeatQuestionEnabled(true);
         if (onEnd) onEnd();
         return;
       }
@@ -3559,6 +3562,7 @@ function addCognitivePauses(str) {
         if (myGeneration !== speakGeneration) return;
         isSpeaking = true;
         setStatus("Speaking...");
+        setRepeatQuestionEnabled(false);
       };
       utt.onend = () => {
         if (myGeneration !== speakGeneration) return;
@@ -3837,6 +3841,10 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
         function setVoiceSkipToAnswerEnabled(enabled) {
   if (!voiceSkipToAnswerBtn) return;
   voiceSkipToAnswerBtn.disabled = !enabled;
+}
+        function setRepeatQuestionEnabled(enabled) {
+  if (voiceRepeatQuestionBtn) voiceRepeatQuestionBtn.disabled = !enabled;
+  if (silentRepeatQuestionBtn) silentRepeatQuestionBtn.disabled = !enabled;
 }
 
     const silentNextCardBtn = document.getElementById("silentNextCardBtn");
