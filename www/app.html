@@ -2549,6 +2549,9 @@ function getDeckPhaseCounts(deck) {
   let learningCount = 0;
   let dueTodayCount = 0;
   const now = Date.now();
+  const endOfDay = new Date();
+  endOfDay.setHours(23, 59, 59, 999);
+  const endOfDayMs = endOfDay.getTime();
 
   deck.cards.forEach(card => {
     const key = scheduleKey(deck.id, card.id);
@@ -2565,7 +2568,7 @@ function getDeckPhaseCounts(deck) {
     const level = typeof normalized.level === "number" ? normalized.level : 1;
     const dueTime = typeof normalized.dueTime === "number" ? normalized.dueTime : now;
 
-    if (dueTime <= now) {
+    if (dueTime <= endOfDayMs) {
       dueTodayCount++;
     }
 
