@@ -5948,6 +5948,9 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
       silentUI.classList.remove("hidden");
       voiceUI.classList.add("hidden");
 
+      pauseBtn.disabled = true;
+      resumeBtn.disabled = true;
+
       showStudySection("silent");
       runSilentLoop();
     });
