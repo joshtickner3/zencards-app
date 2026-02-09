@@ -4650,9 +4650,9 @@ async function speakAndGoToMainMenu() {
       setStudyState(StudyState.SHOWING_QUESTION);
 
       hasSpokenCurrentQuestion = true;
-      setVoiceSkipToAnswerEnabled(true);
     speakWithWebTts(getPlainTextFromCard(currentCard.question), () => {
-  if (isPaused) return;
+      if (isPaused) return;
+      setVoiceSkipToAnswerEnabled(true);
 
   if (answerMode === "delay") {
     startOrResetQuestionDelayTimer();
@@ -5608,7 +5608,6 @@ if (!noScheduleChanges && !autoGoodMode && voiceRatingButtons) {
 }
 
       hasSpokenCurrentQuestion = true;
-      setVoiceSkipToAnswerEnabled(true);
 setStudyState(StudyState.SHOWING_QUESTION);
 
 // 🔊 Use the same MP3-capable helper for the question
@@ -5618,6 +5617,7 @@ speakWithWebTts(
   getPlainTextFromCard(currentCard.question),
   () => {
     if (isPaused) return;
+    setVoiceSkipToAnswerEnabled(true);
 
     if (answerMode === "delay") {
       if (!autoGoodMode) {
@@ -5810,7 +5810,8 @@ if (overdue.length > 0) {
       silentEditPanel.classList.add("hidden");
 
       setCardContent(voiceQuestionText, currentCard.question);
-setCardContent(voiceAnswerText, currentCard.answer);
+  setCardContent(voiceAnswerText, currentCard.answer);
+  setVoiceSkipToAnswerEnabled(false);
 
       if (noScheduleChanges) {
         silentNextCardBtn.classList.remove("hidden");
