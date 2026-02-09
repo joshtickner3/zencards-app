@@ -467,6 +467,10 @@ input[type="number"]:focus-visible{
       color: #e2e8f0;
       border: 1px solid rgba(148,163,184,0.18);
     }
+    .dueCount{
+      color: #f87171;
+      font-weight: 700;
+    }
     #status {
       margin-top: 0.75rem;
       font-size: 0.9rem;
@@ -802,8 +806,9 @@ input[type="number"]:focus-visible{
         </div>
         <!-- Legend for counts -->
         <p style="font-size:0.8rem;color:#9ca3af;margin-top:0.35rem;">
-  Legend: <em>Deck name (new / learning / review)</em>
+  Legend: <em>Deck name (new / learning / <span class="dueCount">due today</span>)</em>
 </p>
+        <p id="deckCountsDisplay" style="font-size:0.8rem;color:#9ca3af;margin-top:0.25rem;"></p>
       </div>
 
       <!-- Card editor / viewer -->
@@ -2542,7 +2547,8 @@ function getDefaultALangFor(deck, card) {
 function getDeckPhaseCounts(deck) {
   let newCount = 0;
   let learningCount = 0;
-  let reviewCount = 0;
+  let dueTodayCount = 0;
+  const now = Date.now();
 
   deck.cards.forEach(card => {
     const key = scheduleKey(deck.id, card.id);
@@ -2551,22 +2557,25 @@ function getDeckPhaseCounts(deck) {
     // New card: never scheduled
     if (!s) {
       newCount++;
+      dueTodayCount++;
       return;
     }
 
     const normalized = normalizeScheduleEntry(s);
     const level = typeof normalized.level === "number" ? normalized.level : 1;
+    const dueTime = typeof normalized.dueTime === "number" ? normalized.dueTime : now;
+
+    if (dueTime <= now) {
+      dueTodayCount++;
+    }
 
     if (normalized.phase === "ladder" && level <= 5) {
       // Learning cards (still in the 5-step ladder)
       learningCount++;
-    } else {
-      // Anything past the ladder is treated as review
-      reviewCount++;
     }
   });
 
-  return { newCount, learningCount, reviewCount };
+  return { newCount, learningCount, dueTodayCount };
 }
 
 // ===== Rebuild entire deck UI (called on init and after remote load) =====
@@ -2585,7 +2594,7 @@ function rebuildDeckUI() {
     opt.value = deck.id;
 
     const counts = getDeckPhaseCounts(deck);
-    opt.textContent = `${deck.name} (${counts.newCount}/${counts.learningCount}/${counts.reviewCount})`;
+    opt.textContent = `${deck.name} (${counts.newCount}/${counts.learningCount}/${counts.dueTodayCount})`;
     deckSelect.appendChild(opt);
   });
 
@@ -2608,6 +2617,19 @@ function rebuildDeckUI() {
   }
 
   refreshMoveDeckSelect();
+  updateDeckCountsDisplay();
+}
+
+function updateDeckCountsDisplay() {
+  const el = document.getElementById("deckCountsDisplay");
+  if (!el) return;
+  const deck = getDeckById(selectedDeckId);
+  if (!deck) {
+    el.textContent = "";
+    return;
+  }
+  const counts = getDeckPhaseCounts(deck);
+  el.innerHTML = `Selected deck: ${counts.newCount}/${counts.learningCount}/<span class="dueCount">${counts.dueTodayCount}</span>`;
 }
 
 // --- Web Speech API TTS for cards ---
