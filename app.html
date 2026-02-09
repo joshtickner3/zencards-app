@@ -4484,11 +4484,20 @@ document.addEventListener("keydown", (e) => {
       mainMenuDiv.classList.add("hidden");
       studySectionDiv.classList.remove("hidden");
       modeBadge.textContent = mode === "voice" ? "Hands-Free Mode" : "Silent Mode";
+      if (mode === "silent") {
+        pauseBtn.classList.add("hidden");
+        resumeBtn.classList.add("hidden");
+      } else {
+        pauseBtn.classList.remove("hidden");
+        resumeBtn.classList.remove("hidden");
+      }
       isPaused = false;
       resumeBtn.disabled = true;
       pauseBtn.disabled = false;
-      pauseBtn.classList.remove("hidden");
-      resumeBtn.classList.remove("hidden");
+      if (mode !== "silent") {
+        pauseBtn.classList.remove("hidden");
+        resumeBtn.classList.remove("hidden");
+      }
       updateDeckBadge();
     }
 
@@ -6080,11 +6089,6 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
 
       silentUI.classList.remove("hidden");
       voiceUI.classList.add("hidden");
-
-      pauseBtn.disabled = true;
-      resumeBtn.disabled = true;
-      pauseBtn.classList.add("btn-disabled");
-      resumeBtn.classList.add("btn-disabled");
 
       showStudySection("silent");
       runSilentLoop();
