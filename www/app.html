@@ -5329,6 +5329,7 @@ function speakAnswerThenAskDifficulty() {
         if (voiceRatingButtons) {
           voiceRatingButtons.classList.remove("hidden");
         }
+        setVoiceSkipToAnswerEnabled(true);
 
         const detailed = !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
         hasSpokenInstructionsOnce = true;
