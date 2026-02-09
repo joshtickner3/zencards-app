@@ -3559,8 +3559,17 @@ function speakWithWebTts(text, onEnd, opts = {}) {
     }
 
     // ===================== STUDY LOGIC (DUE / AHEAD) =====================
+    function getTodayBounds() {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date();
+  end.setHours(23, 59, 59, 999);
+  return { startMs: start.getTime(), endMs: end.getTime() };
+}
+
     function splitOverdueAndDue(deckId, cards) {
   const now = Date.now();
+  const { startMs, endMs } = getTodayBounds();
   const overdue = [];
   const due = [];
 
@@ -3575,9 +3584,8 @@ function speakWithWebTts(text, onEnd, opts = {}) {
     }
 
     const { dueTime } = normalizeScheduleEntry(s);
-    if (dueTime <= now) {
-      // Overdue if it was due before *today*
-      if (now - dueTime > 60 * 1000) {
+    if (dueTime <= endMs) {
+      if (dueTime < startMs) {
         overdue.push(card);
       } else {
         due.push(card);
@@ -3592,6 +3600,7 @@ function speakWithWebTts(text, onEnd, opts = {}) {
       const deck = getDeckById(deckId);
       if (!deck) return [];
       const now = Date.now();
+      const { startMs, endMs } = getTodayBounds();
 
       const filtered = deck.cards.filter(card => {
         const key = scheduleKey(deckId, card.id);
@@ -3606,16 +3615,17 @@ function speakWithWebTts(text, onEnd, opts = {}) {
 
         const normalized = normalizeScheduleEntry(s);
         const due = normalized.dueTime || now;
-        const isDueOrOverdue = due <= now;
-        const isFuture = due > now;
+        const isDueToday = due <= endMs;
+        const isOverdue = due < startMs;
+        const isFuture = due > endMs;
 
         if (!allowAhead) {
-          return isDueOrOverdue;
+          return isDueToday;
         }
 
         if (isFuture) return true;
-        if (includeOverdue && isDueOrOverdue) return true;
-        return false;
+        if (includeOverdue && (isOverdue || isDueToday)) return true;
+        return isDueToday;
       });
 
       // Still sort by dueTime so earlier due cards are "earlier" in the day,
