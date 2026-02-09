@@ -5821,8 +5821,8 @@ if (overdue.length > 0) {
       silentCompletionControls.classList.add("hidden");
       silentQuestion.classList.remove("hidden");
       showAnswerBtn.classList.remove("hidden");
-      pauseBtn.classList.remove("hidden");
-      resumeBtn.classList.remove("hidden");
+      pauseBtn.classList.add("hidden");
+      resumeBtn.classList.add("hidden");
 
       currentCard = nextCard;
       setStatus("Studying card...");
@@ -5934,8 +5934,8 @@ if (overdue.length > 0) {
 
       silentQuestion.classList.remove("hidden");
       showAnswerBtn.classList.remove("hidden");
-      pauseBtn.classList.remove("hidden");
-      resumeBtn.classList.remove("hidden");
+      pauseBtn.classList.add("hidden");
+      resumeBtn.classList.add("hidden");
       silentNextCardBtn.classList.remove("hidden");
       runSilentLoop();
     });
