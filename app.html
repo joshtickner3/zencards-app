@@ -435,6 +435,9 @@ input[type="number"]:focus-visible{
       box-shadow: none;
       opacity: 0.7;
     }
+    .btn-disabled{
+      pointer-events: none;
+    }
     #voiceSkipToAnswerBtn:disabled{
       background: #374151;
       color: #9ca3af;
@@ -4495,6 +4498,7 @@ document.addEventListener("keydown", (e) => {
     });
 
     pauseBtn.addEventListener("click", async () => {
+  if (currentMode === "silent") return;
   isPaused = true;
 
   // NEW: make Resume replay the SAME card in hands-free mode
@@ -4520,6 +4524,7 @@ await stopAllAudio();
 });
 
     resumeBtn.addEventListener("click", () => {
+  if (currentMode === "silent") return;
   if (!currentMode) return;
 
   isPaused = false;
@@ -6078,6 +6083,8 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
 
       pauseBtn.disabled = true;
       resumeBtn.disabled = true;
+      pauseBtn.classList.add("btn-disabled");
+      resumeBtn.classList.add("btn-disabled");
 
       showStudySection("silent");
       runSilentLoop();
