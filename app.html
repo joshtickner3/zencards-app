@@ -2154,6 +2154,9 @@ document.addEventListener("click", () => {
           level: 1,
           intervalMinutes: LADDER_LEVEL_MINUTES[1],
           timesGraduated: 0,
+          easeFactor: 2.5,
+          relearnStep: 0,
+          lastInterval: 0,
           dueTime: now
         };
       }
@@ -2161,6 +2164,12 @@ document.addEventListener("click", () => {
       let level = typeof raw.level === "number" ? raw.level : 1;
       let timesGraduated =
         typeof raw.timesGraduated === "number" ? raw.timesGraduated : 0;
+      let easeFactor =
+        typeof raw.easeFactor === "number" ? raw.easeFactor : 2.5;
+      let relearnStep =
+        typeof raw.relearnStep === "number" ? raw.relearnStep : 0;
+      let lastInterval =
+        typeof raw.lastInterval === "number" ? raw.lastInterval : 0;
       let intervalMinutes =
         typeof raw.intervalMinutes === "number" && raw.intervalMinutes > 0
           ? raw.intervalMinutes
@@ -2176,21 +2185,85 @@ document.addEventListener("click", () => {
         dueTime = now;
       }
 
-      return { phase, level, intervalMinutes, timesGraduated, dueTime };
+      const clampedEase = Math.max(1.3, Math.min(3.0, easeFactor));
+      return { phase, level, intervalMinutes, timesGraduated, easeFactor: clampedEase, relearnStep, lastInterval, dueTime };
     }
+
+    // Relearning steps (Anki-like): 10m, 1d
+    const RELEARN_STEPS = [10, MINUTES_PER_DAY];
 
     // Core scheduling logic implementing your rules
     function computeNextState(entry, ratingKey) {
       const s = normalizeScheduleEntry(entry);
       const result = { ...s };
+      const updateEase = (key) => {
+        let next = s.easeFactor || 2.5;
+        if (key === "again") next -= 0.3;
+        if (key === "hard") next -= 0.2;
+        if (key === "good") next += 0.05;
+        if (key === "easy") next += 0.1;
+        result.easeFactor = Math.max(1.3, Math.min(3.0, next));
+      };
+      const easeMult = (s.easeFactor || 2.5) / 2.5;
 
-      // "again" always: reset to level 1, ladder, 5 minutes
+      // Handle relearning phase
+      if (s.phase === "relearn") {
+        const step = s.relearnStep || 0;
+        if (ratingKey === "again") {
+          updateEase("again");
+          result.relearnStep = 0;
+          result.intervalMinutes = RELEARN_STEPS[0];
+          return result;
+        }
+        if (ratingKey === "hard") {
+          updateEase("hard");
+          result.relearnStep = step;
+          result.intervalMinutes = RELEARN_STEPS[step];
+          return result;
+        }
+        if (ratingKey === "good" || ratingKey === "easy") {
+          updateEase(ratingKey);
+          const nextStep = step + 1;
+          if (nextStep < RELEARN_STEPS.length) {
+            result.relearnStep = nextStep;
+            result.intervalMinutes = RELEARN_STEPS[nextStep];
+            return result;
+          }
+          // Graduated from relearning, return to mature with reduced interval
+          const alreadyGraduated = (s.timesGraduated || 0) > 0;
+          result.phase = alreadyGraduated ? "mature2" : "mature1";
+          result.level = 0;
+          result.relearnStep = 0;
+          // Return to last mature interval but reduced
+          const reducedInterval = Math.max(
+            MINUTES_PER_DAY,
+            (s.lastInterval || MINUTES_PER_DAY) * 0.5
+          );
+          result.intervalMinutes = reducedInterval;
+          result.lastInterval = result.intervalMinutes;
+          return result;
+        }
+      }
+
+      // "again": lapse handling (mature enters relearning, ladder resets to level 1)
       if (ratingKey === "again") {
-        result.phase = "ladder";
-        result.level = 1;
-        result.intervalMinutes = LADDER_LEVEL_MINUTES[1];
-        // keep timesGraduated so we know if it was ever mature before
-        return result;
+        updateEase("again");
+        const isMature = s.phase === "mature1" || s.phase === "mature2";
+        if (isMature) {
+          // Enter relearning with first step
+          result.phase = "relearn";
+          result.relearnStep = 0;
+          result.intervalMinutes = RELEARN_STEPS[0];
+          result.lastInterval = s.intervalMinutes;
+          // keep timesGraduated
+          return result;
+        } else {
+          // Ladder: reset to level 1
+          result.phase = "ladder";
+          result.level = 1;
+          result.intervalMinutes = LADDER_LEVEL_MINUTES[1];
+          return result;
+        }
       }
 
       // Ladder phase: 5 levels
@@ -2198,6 +2271,7 @@ document.addEventListener("click", () => {
         let lvl = s.level || 1;
 
         if (ratingKey === "hard") {
+          updateEase("hard");
           // Stay on same level, same interval as that level
           result.level = lvl;
           result.intervalMinutes = LADDER_LEVEL_MINUTES[lvl];
@@ -2205,6 +2279,7 @@ document.addEventListener("click", () => {
         }
 
         if (ratingKey === "good" || ratingKey === "easy") {
+          updateEase(ratingKey);
           const jump = ratingKey === "good" ? 1 : 2;
           let target = lvl + jump;
 
@@ -2224,25 +2299,24 @@ document.addEventListener("click", () => {
           result.timesGraduated = (s.timesGraduated || 0) + 1;
 
           if (result.phase === "mature1") {
-            // First time past level 5:
-            // hard: 1x, good: 1.75x, easy: 2.5x
+            // First time past level 5: apply mature1 multipliers from level 5 interval
             if (ratingKey === "good") {
-              result.intervalMinutes = prevInterval * 1.75;
+              result.intervalMinutes = prevInterval * 1.6 * easeMult;
             } else {
               // easy from level 5 into mature1
-              result.intervalMinutes = prevInterval * 2.5;
+              result.intervalMinutes = prevInterval * 2.2 * easeMult;
             }
           } else {
             // mature2 = after you've already been mature before,
             // passed through the ladder again and gone past level 5:
-            // hard: 1.2x, good: 2x, easy: 2.5x
+            // hard: 1.2x, good: 2.2x, easy: 2.5x
             const base = prevInterval;
             if (ratingKey === "hard") {
               result.intervalMinutes = base * 1.2;
             } else if (ratingKey === "good") {
-              result.intervalMinutes = base * 2.0;
+              result.intervalMinutes = base * 2.2 * easeMult;
             } else {
-              result.intervalMinutes = base * 2.5;
+              result.intervalMinutes = base * 2.5 * easeMult;
             }
           }
 
@@ -2250,30 +2324,43 @@ document.addEventListener("click", () => {
         }
       }
 
-      // Mature phases
+      // Mature phases (ease-based interval formula)
       const base = s.intervalMinutes || MINUTES_PER_DAY;
 
       if (s.phase === "mature1") {
-        // First mature phase: hard=1x, good=1.75x, easy=2.5x
+        // First mature phase: ease-based with Hard/Good/Easy multipliers
+        updateEase(ratingKey);
+        let newInterval;
         if (ratingKey === "hard") {
-          result.intervalMinutes = base * 1.0;
+          // Hard: 1.2x with ease adjustment
+          newInterval = base * 1.2 * (result.easeFactor / 2.5);
         } else if (ratingKey === "good") {
-          result.intervalMinutes = base * 1.75;
+          // Good: use ease factor directly
+          newInterval = base * result.easeFactor;
         } else if (ratingKey === "easy") {
-          result.intervalMinutes = base * 2.5;
+          // Easy: ease * 1.3
+          newInterval = base * result.easeFactor * 1.3;
         }
+        // Minimum interval: always grow by at least 1 day
+        result.intervalMinutes = Math.max(newInterval, base + MINUTES_PER_DAY);
+        result.lastInterval = result.intervalMinutes;
         return result;
       }
 
       if (s.phase === "mature2") {
-        // Second+ mature phase: hard=1.2x, good=2x, easy=2.5x
+        // Second+ mature phase: same ease-based formula
+        updateEase(ratingKey);
+        let newInterval;
         if (ratingKey === "hard") {
-          result.intervalMinutes = base * 1.2;
+          newInterval = base * 1.2 * (result.easeFactor / 2.5);
         } else if (ratingKey === "good") {
-          result.intervalMinutes = base * 2.0;
+          newInterval = base * result.easeFactor;
         } else if (ratingKey === "easy") {
-          result.intervalMinutes = base * 2.5;
+          newInterval = base * result.easeFactor * 1.3;
         }
+        // Minimum interval: always grow by at least 1 day
+        result.intervalMinutes = Math.max(newInterval, base + MINUTES_PER_DAY);
+        result.lastInterval = result.intervalMinutes;
         return result;
       }
 
