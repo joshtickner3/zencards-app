@@ -136,6 +136,7 @@ Deno.serve(async (req) => {
 
   try {
     const type = event.type;
+    console.log(`[stripe-webhook] Handling event: ${type}`);
 
     // 1) checkout.session.completed
     if (type === "checkout.session.completed") {
@@ -150,21 +151,28 @@ Deno.serve(async (req) => {
       const stripeCustomerId =
         typeof session.customer === "string" ? session.customer : (session.customer as any)?.id ?? null;
 
-      // const email = session.customer_details?.email || session.metadata?.email || null; // not used
+      console.log(`[stripe-webhook] checkout.session.completed - userId: ${userId}, subscriptionId: ${subscriptionId}, customerId: ${stripeCustomerId}`);
 
+      if (!userId) {
+        console.error("[stripe-webhook] No userId found in checkout.session.completed");
+        return json(200, { ok: true, handled: type, warning: "No userId found" });
+      }
 
       if (userId) {
-        // ✅ Prevent FK failures
+        console.log(`[stripe-webhook] Ensuring public user row for userId: ${userId}`);
         await ensurePublicUserRow(userId);
       }
 
       if (userId && stripeCustomerId) {
+        console.log(`[stripe-webhook] Upserting stripe customer mapping for userId: ${userId}, customerId: ${stripeCustomerId}`);
         await upsertStripeCustomerMapping(userId, stripeCustomerId);
       }
 
       if (userId && subscriptionId) {
+        console.log(`[stripe-webhook] Fetching subscription from Stripe: ${subscriptionId}`);
         // Fetch subscription immediately so status becomes trialing right away
         const sub = await stripe.subscriptions.retrieve(subscriptionId);
+        console.log(`[stripe-webhook] Subscription status: ${sub.status}`);
 
         // ✅ If trial started, mark it used
        // ✅ Permanently mark trial as used once the user has a real subscription start
@@ -173,6 +181,7 @@ Deno.serve(async (req) => {
 // - paid signup with no trial
 // and prevents ever getting a trial again later.
 if (sub.status === "trialing" || sub.status === "active") {
+  console.log(`[stripe-webhook] Marking trial as used for userId: ${userId}`);
   await markTrialUsed(userId);
 }
 
@@ -184,6 +193,7 @@ if (sub.status === "trialing" || sub.status === "active") {
         const trialEnd = sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null;
         const cancelAtPeriodEnd = Boolean(sub.cancel_at_period_end);
 
+        console.log(`[stripe-webhook] Upserting subscription row for userId: ${userId}, status: ${sub.status}`);
         await upsertSubscriptionRow({
           userId,
           subscriptionId,
@@ -193,6 +203,9 @@ if (sub.status === "trialing" || sub.status === "active") {
           trialEnd,
           cancelAtPeriodEnd,
         });
+        console.log(`[stripe-webhook] Successfully upserted subscription row`);
+      } else {
+        console.log(`[stripe-webhook] Missing userId or subscriptionId, skipping subscription upsert`);
       }
 
       return json(200, { ok: true, handled: type });
