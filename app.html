@@ -5884,6 +5884,8 @@ setCardContent(voiceAnswerText, currentCard.answer);
 
       // 🚨 Enable edit button now that we have a card to edit
       if (voiceEditToggleBtn) voiceEditToggleBtn.disabled = false;
+      if (studyAddCardBtn) studyAddCardBtn.disabled = false;
+      if (studyInstructionsBtn) studyInstructionsBtn.disabled = false;
    // Show rating buttons immediately AND make them clickable right away
 if (!noScheduleChanges && !autoGoodMode && voiceRatingButtons) {
   voiceRatingButtons.classList.remove("hidden");
@@ -6319,6 +6321,8 @@ startVoiceBtn.addEventListener("click", async () => {
 
   // 🚨 Disable edit button until first card question is shown
   if (voiceEditToggleBtn) voiceEditToggleBtn.disabled = true;
+  if (studyAddCardBtn) studyAddCardBtn.disabled = true;
+  if (studyInstructionsBtn) studyInstructionsBtn.disabled = true;
 
   // Determine answer mode from user selection (NOT forced by autoGoodMode)
   // autoGoodMode just changes HOW we rate, not WHEN we show the answer
