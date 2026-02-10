@@ -4528,14 +4528,12 @@ function closeAddCardModal() {
   addCardModal.classList.add("hidden");
   addCardModal.setAttribute("aria-hidden", "true");
 
-  // Resume study session and announce
-  if (isPaused) {
-    isPaused = false;
-    if (currentMode === "voice" && typeof speak === "function") {
-      speak("Resuming study session", () => runVoiceLoop());
-    } else if (currentMode === "silent" && typeof runSilentLoop === "function") {
-      runSilentLoop();
-    }
+  // Always restart the current card, do not advance
+  if (currentMode === "voice" && typeof runVoiceLoop === "function") {
+    runVoiceLoop();
+  }
+  if (currentMode === "silent" && typeof runSilentLoop === "function") {
+    runSilentLoop();
   }
 }
 async function openInstructionsModal() {
