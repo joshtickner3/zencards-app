@@ -4661,11 +4661,12 @@ await stopAllAudio();
 if (studyAddCardBtn) {
   studyAddCardBtn.addEventListener("click", () => {
     if (!currentDeckId) return;
-    openAddCardModal();
-    // After closing the modal, restart the current card (re-read question)
-    if (currentMode === "voice" && typeof runVoiceLoop === "function") {
-      setTimeout(() => runVoiceLoop(), 250); // slight delay to allow modal to close
+    // Pause the study session first
+    isPaused = true;
+    if (currentMode === "voice" && currentCard) {
+      restartCardOnResumeVoice = true;
     }
+    openAddCardModal();
   });
 }
 
@@ -5049,8 +5050,9 @@ function parseRatingFromText(text) {
 
   // “Good” synonyms / common mishears
   // (Web Speech often returns could/hood/gud/go when you say "good")
+  // Note: 'okay', 'ok', and 'fine' are intentionally excluded and will NOT trigger 'good'.
   const goodLike = new Set([
-    "good", "fine", "okay", "ok", "k",
+    "good", "k",
     "could", "hood", "gud", "go", "goo", "gould"
   ]);
   if (goodLike.has(first) || t.includes(" good ") || t.endsWith(" good")) return "good";
