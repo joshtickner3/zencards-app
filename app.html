@@ -3867,6 +3867,18 @@ function addCognitivePauses(str) {
         return isDueToday;
       });
 
+      // 🚨 NEW: If no cards are due, check for short-interval cards and include them immediately
+      if (!allowAhead && filtered.length === 0) {
+        const shortIntervalCards = deck.cards.filter(card => {
+          const key = scheduleKey(deckId, card.id);
+          const s = schedule[key];
+          if (!s) return false;
+          const normalized = normalizeScheduleEntry(s);
+          return normalized.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES && normalized.dueTime > now;
+        });
+        filtered.push(...shortIntervalCards);
+      }
+
       // Still sort by dueTime so earlier due cards are "earlier" in the day,
       // but we will add randomness at selection time.
       return filtered.sort((a, b) => {
@@ -5651,6 +5663,21 @@ function speakAnswerThenAskDifficulty() {
       const reviewCandidates = reviewQueue.slice();
       const dueCandidates = uniqueDue;
 
+      // Helper: check if a card is "new" (no schedule entry)
+      function isNewCard(card) {
+        const key = scheduleKey(currentDeckId, card.id);
+        return !schedule[key];
+      }
+
+      // Helper: check if a card has short interval (≤10 min)
+      function hasShortInterval(card) {
+        const key = scheduleKey(currentDeckId, card.id);
+        const s = schedule[key];
+        if (!s) return false;
+        const normalized = normalizeScheduleEntry(s);
+        return normalized.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES;
+      }
+
       function pickFromPool(pool) {
         if (pool.length === 0) return null;
         let candidates = pool;
@@ -5667,24 +5694,37 @@ function speakAnswerThenAskDifficulty() {
       function chooseRandom() {
         if (reviewCandidates.length === 0 && dueCandidates.length === 0) return null;
 
+        // 🚨 NEW: Prevent back-to-back new cards
+        const lastWasNew = lastId && dueCandidates.some(c => c.id === lastId && isNewCard(c));
+        let reviewPool = reviewCandidates;
+        let duePool = dueCandidates;
+
+        if (lastWasNew) {
+          // Filter out new cards from due pool unless it's the only option
+          const nonNewDue = dueCandidates.filter(c => !isNewCard(c));
+          if (nonNewDue.length > 0 || reviewCandidates.length > 0) {
+            duePool = nonNewDue;
+          }
+        }
+
         let poolType;
-        if (reviewCandidates.length && dueCandidates.length) {
+        if (reviewPool.length && duePool.length) {
           // 50/50 mix when both exist
           poolType = Math.random() < 0.5 ? "review" : "due";
-        } else if (reviewCandidates.length) {
+        } else if (reviewPool.length) {
           poolType = "review";
         } else {
           poolType = "due";
         }
 
-        let candidate = pickFromPool(poolType === "review" ? reviewCandidates : dueCandidates);
+        let candidate = pickFromPool(poolType === "review" ? reviewPool : duePool);
 
         // If we couldn't get a candidate from that pool (e.g., only lastId and we're avoiding it),
         // fall back to the other pool if possible.
         if (!candidate && poolType === "review") {
-          candidate = pickFromPool(dueCandidates);
+          candidate = pickFromPool(duePool);
         } else if (!candidate && poolType === "due") {
-          candidate = pickFromPool(reviewCandidates);
+          candidate = pickFromPool(reviewPool);
         }
 
         // In silent mode we prefer never to repeat the same card back-to-back
