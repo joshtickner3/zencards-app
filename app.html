@@ -4528,9 +4528,13 @@ function closeAddCardModal() {
   addCardModal.classList.add("hidden");
   addCardModal.setAttribute("aria-hidden", "true");
 
-  // If you were in voice mode, resume your normal loop
-  if (currentMode === "voice" && !isPaused) runVoiceLoop();
-  if (currentMode === "silent" && !isPaused) runSilentLoop();
+  // Always restart the current card, do not advance
+  if (currentMode === "voice" && typeof runVoiceLoop === "function") {
+    runVoiceLoop();
+  }
+  if (currentMode === "silent" && typeof runSilentLoop === "function") {
+    runSilentLoop();
+  }
 }
 async function openInstructionsModal() {
   // pause audio/listening so the modal isn’t chaotic in hands-free mode
