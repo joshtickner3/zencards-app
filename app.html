@@ -4532,13 +4532,7 @@ function closeAddCardModal() {
   if (isPaused) {
     isPaused = false;
     if (currentMode === "voice" && typeof speak === "function") {
-      speak("Resuming study session", () => {
-        if (typeof restartCurrentCardVoiceFlow === "function") {
-          restartCurrentCardVoiceFlow();
-        } else {
-          runVoiceLoop();
-        }
-      });
+      speak("Resuming study session", () => runVoiceLoop());
     } else if (currentMode === "silent" && typeof runSilentLoop === "function") {
       runSilentLoop();
     }
