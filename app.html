@@ -3065,6 +3065,7 @@ window.speakCardText = function(questionRaw, answerRaw, deckId, cardObj) {
   saveLastDeckId(selectedDeckId);
   refreshCardsList();
   refreshCardLanguageDropdownsForCurrentDeck(null);
+  updateDeckCountsDisplay();
 });
 
     addCardBtn.addEventListener("click", () => {
