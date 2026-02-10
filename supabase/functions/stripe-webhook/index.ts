@@ -10,6 +10,8 @@ function json(status: number, body: unknown) {
 }
 
 Deno.serve(async (req) => {
+  console.log("[stripe-webhook] Received request, method:", req.method);
+  
   if (req.method !== "POST") return json(405, { error: "Method not allowed" });
 
   const STRIPE_WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET");
@@ -17,7 +19,15 @@ Deno.serve(async (req) => {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
+  console.log("[stripe-webhook] Environment check:", {
+    hasWebhookSecret: !!STRIPE_WEBHOOK_SECRET,
+    hasStripeKey: !!STRIPE_SECRET_KEY,
+    hasSupabaseUrl: !!SUPABASE_URL,
+    hasServiceRole: !!SUPABASE_SERVICE_ROLE_KEY
+  });
+
   if (!STRIPE_WEBHOOK_SECRET || !STRIPE_SECRET_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("[stripe-webhook] Missing env vars");
     return json(500, {
       error:
         "Missing env vars (need STRIPE_WEBHOOK_SECRET, STRIPE_SECRET_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)",
@@ -25,7 +35,12 @@ Deno.serve(async (req) => {
   }
 
   const sigHeader = req.headers.get("stripe-signature");
-  if (!sigHeader) return json(400, { error: "Missing stripe-signature header" });
+  console.log("[stripe-webhook] Stripe signature header present:", !!sigHeader);
+  
+  if (!sigHeader) {
+    console.error("[stripe-webhook] Missing stripe-signature header");
+    return json(400, { error: "Missing stripe-signature header" });
+  }
 
   // ✅ raw body exactly once
   const rawBody = await req.text();
