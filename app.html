@@ -4659,6 +4659,10 @@ if (studyAddCardBtn) {
   studyAddCardBtn.addEventListener("click", () => {
     if (!currentDeckId) return;
     openAddCardModal();
+    // After closing the modal, restart the current card (re-read question)
+    if (currentMode === "voice" && typeof runVoiceLoop === "function") {
+      setTimeout(() => runVoiceLoop(), 250); // slight delay to allow modal to close
+    }
   });
 }
 
@@ -6353,9 +6357,13 @@ startVoiceBtn.addEventListener("click", async () => {
     // <<< END MODIFIED HANDLER <<<
 
     if (studyInstructionsBtn) {
-  studyInstructionsBtn.addEventListener("click", () => {
-    openInstructionsModal();
-  });
+      studyInstructionsBtn.addEventListener("click", () => {
+        openInstructionsModal();
+        // After closing the modal, restart the current card (re-read question)
+        if (currentMode === "voice" && typeof runVoiceLoop === "function") {
+          setTimeout(() => runVoiceLoop(), 250);
+        }
+      });
 }
 
  async function init() {
