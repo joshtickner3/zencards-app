@@ -1577,15 +1577,17 @@ const instructionsCloseBtn = document.getElementById("instructionsCloseBtn");
 // ===== BUTTON EVENT HOOKS =====
 
 if (signOutBtn) {
-  signOutBtn.addEventListener("click", () => {
-    signOutFromApp();
+  studyAddCardBtn.addEventListener("click", () => {
+    if (!currentDeckId) return;
+    // Pause the study session first
+    isPaused = true;
+    if (currentMode === "voice" && currentCard) {
+      restartCardOnResumeVoice = true;
+      speak("Pausing study session", () => openAddCardModal());
+    } else {
+      openAddCardModal();
+    }
   });
-}
-// ===================== BILLING (STRIPE PORTAL) =====================
-
-// Helper: returns a good redirect base for GitHub Pages + local
-function getBaseUrlForSameFolder() {
-  // app.html, reset.html, etc are in the same folder
   return new URL(".", window.location.href).href; // ends with trailing slash
 }
 
@@ -1598,6 +1600,7 @@ async function openStripeCustomerPortal() {
     const session = sessionData?.session;
     if (!session?.access_token) {
       alert("No active session. Please log in again.");
+
       window.location.replace("index.html");
       return;
     }

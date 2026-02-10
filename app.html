@@ -4665,8 +4665,10 @@ if (studyAddCardBtn) {
     isPaused = true;
     if (currentMode === "voice" && currentCard) {
       restartCardOnResumeVoice = true;
+      speak("Pausing study session", () => openAddCardModal());
+    } else {
+      openAddCardModal();
     }
-    openAddCardModal();
   });
 }
 
@@ -4681,6 +4683,7 @@ if (addCardModal) {
     }
   });
 }
+
 
 // Save card into CURRENT deck
 if (addCardModalSaveBtn) {
