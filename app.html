@@ -1324,7 +1324,7 @@ input[type="number"]:focus-visible{
 
       <ul style="margin-top:0.5rem;">
         <li>
-          <strong>Hands-Free Study</strong> — best when you want audio + speaking (driving/walking/eyes-free).
+          <strong>Hands-Free Study</strong> — best when you want audio + speaking to allow you to study on the move.
           Use voice commands like <em>"repeat question"</em> and when prompted, rate with <em>again / hard / good / easy</em>.
         </li>
         <li>
@@ -5880,6 +5880,9 @@ setCardContent(voiceAnswerText, currentCard.answer);
 
       setFlashcardFlipped("voice", false);
       voiceEditPanel.classList.add("hidden");
+
+      // 🚨 Enable edit button now that we have a card to edit
+      if (voiceEditToggleBtn) voiceEditToggleBtn.disabled = false;
    // Show rating buttons immediately AND make them clickable right away
 if (!noScheduleChanges && !autoGoodMode && voiceRatingButtons) {
   voiceRatingButtons.classList.remove("hidden");
@@ -6312,6 +6315,9 @@ startVoiceBtn.addEventListener("click", async () => {
   aheadQueueIndex = 0;
   hasSpokenCurrentQuestion = false;
   hasSpokenCurrentAnswer = false;
+
+  // 🚨 Disable edit button until first card question is shown
+  if (voiceEditToggleBtn) voiceEditToggleBtn.disabled = true;
 
   // Determine answer mode from user selection (NOT forced by autoGoodMode)
   // autoGoodMode just changes HOW we rate, not WHEN we show the answer
