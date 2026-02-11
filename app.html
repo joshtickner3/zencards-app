@@ -6794,6 +6794,9 @@ startVoiceBtn.addEventListener("click", async () => {
   showStudySection("voice");
   setStudyState(StudyState.IDLE);
 
+  // 🚫 Disable pause/resume during opening prompt
+  setPauseResumeEnabled(false);
+
   const intro = autoGoodMode
     ? describeAutoIntro()
     : "Starting hands free study session. I will read a question, then the answer, then ask how hard it was.";
