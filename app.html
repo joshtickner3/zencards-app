@@ -5894,6 +5894,7 @@ if (awaitingAnswerSignal && currentMode === "voice") {
   // If we're choosing what to do after finishing all due cards
   if (awaitingPostCompletionChoice) {
     const wantsMainMenu = isMainMenuCommand(text);
+    const wantsStudyAhead = text.includes("study ahead") || text.includes("study-ahead");
 
     awaitingPostCompletionChoice = false;
 
@@ -5902,7 +5903,17 @@ if (awaitingAnswerSignal && currentMode === "voice") {
       return;
     }
 
-    // Otherwise: enter study-ahead mode (no schedule changes)
+    if (!wantsStudyAhead) {
+      // User said something else - prompt them again
+      awaitingPostCompletionChoice = true;
+      speak(
+        "Please say 'main menu' to go back, or 'study ahead mode' to continue studying.",
+        () => listenForCommand(handleVoiceTranscript)
+      );
+      return;
+    }
+
+    // Enter study-ahead mode (no schedule changes)
     studyAheadSession = true;
     noScheduleChanges = true;
     studyAheadPromptedOnceVoice = false;
