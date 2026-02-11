@@ -4528,15 +4528,9 @@ function closeAddCardModal() {
   addCardModal.classList.add("hidden");
   addCardModal.setAttribute("aria-hidden", "true");
 
-  // Resume study session and announce
-  if (isPaused) {
-    isPaused = false;
-    if (currentMode === "voice" && typeof speak === "function") {
-      speak("Resuming study session", () => runVoiceLoop());
-    } else if (currentMode === "silent" && typeof runSilentLoop === "function") {
-      runSilentLoop();
-    }
-  }
+  // If you were in voice mode, resume your normal loop
+  if (currentMode === "voice" && !isPaused) runVoiceLoop();
+  if (currentMode === "silent" && !isPaused) runSilentLoop();
 }
 async function openInstructionsModal() {
   // pause audio/listening so the modal isn’t chaotic in hands-free mode
@@ -4663,13 +4657,10 @@ await stopAllAudio();
 if (studyAddCardBtn) {
   studyAddCardBtn.addEventListener("click", () => {
     if (!currentDeckId) return;
-    // Pause the study session first
-    isPaused = true;
-    if (currentMode === "voice" && currentCard) {
-      restartCardOnResumeVoice = true;
-      speak("Pausing study session", () => openAddCardModal());
-    } else {
-      openAddCardModal();
+    openAddCardModal();
+    // After closing the modal, restart the current card (re-read question)
+    if (currentMode === "voice" && typeof runVoiceLoop === "function") {
+      setTimeout(() => runVoiceLoop(), 250); // slight delay to allow modal to close
     }
   });
 }
@@ -4685,7 +4676,6 @@ if (addCardModal) {
     }
   });
 }
-
 
 // Save card into CURRENT deck
 if (addCardModalSaveBtn) {
@@ -5055,9 +5045,8 @@ function parseRatingFromText(text) {
 
   // “Good” synonyms / common mishears
   // (Web Speech often returns could/hood/gud/go when you say "good")
-  // Note: 'okay', 'ok', and 'fine' are intentionally excluded and will NOT trigger 'good'.
   const goodLike = new Set([
-    "good", "k",
+    "good", "fine", 
     "could", "hood", "gud", "go", "goo", "gould"
   ]);
   if (goodLike.has(first) || t.includes(" good ") || t.endsWith(" good")) return "good";
