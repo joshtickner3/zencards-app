@@ -3587,119 +3587,6 @@ function speakWithWebTts(text, onEnd, opts = {}) {
     return str.replace(/\b([A-Z]{2,})\b/g, (m) => m.split('').join(' '));
   }
 
-  // Humanize numbers for better TTS pronunciation
-  function humanizeNumbers(str) {
-    // Convert percentages: "95%" → "95 percent"
-    str = str.replace(/(\d+)%/g, "$1 percent");
-    
-    // Convert years: "2024" → "twenty twenty-four" (for years 2000+)
-    str = str.replace(/\b(20\d{2})\b/g, (match) => {
-      const year = parseInt(match);
-      if (year >= 2000 && year <= 2099) {
-        const decade = Math.floor((year % 100) / 10);
-        const single = year % 10;
-        if (year % 100 === 0) return "two thousand";
-        if (year < 2010) return `two thousand ${single}`;
-        return `twenty ${decade > 1 ? decade + "ty" : ""} ${single || ""}`.trim();
-      }
-      return match;
-    });
-    
-    // Add commas to large numbers for better pacing: "1000" → "1,000"
-    str = str.replace(/\b(\d{1,3})(\d{3})\b/g, "$1,$2");
-    
-    // Convert ordinals: "1st" → "first", "2nd" → "second"
-    const ordinals = {
-      "1st": "first", "2nd": "second", "3rd": "third", "4th": "fourth",
-      "5th": "fifth", "6th": "sixth", "7th": "seventh", "8th": "eighth",
-      "9th": "ninth", "10th": "tenth"
-    };
-    Object.keys(ordinals).forEach(key => {
-      str = str.replace(new RegExp(`\\b${key}\\b`, "gi"), ordinals[key]);
-    });
-    
-    return str;
-  }
-
-  // Add breath pauses naturally like humans need
-  function addBreathPauses(str) {
-    const words = str.split(/\s+/);
-    const result = [];
-    let wordsSinceBreath = 0;
-    
-    for (let i = 0; i < words.length; i++) {
-      result.push(words[i]);
-      wordsSinceBreath++;
-      
-      // Add breath pause every 12-15 words at natural breaks
-      if (wordsSinceBreath >= 12) {
-        const nextWord = words[i + 1] || "";
-        // Only pause at natural breaks (commas, conjunctions, etc.)
-        if ([",", ".", "and", "but", "or", "so", "yet"].some(w => 
-            words[i].endsWith(w) || nextWord.toLowerCase() === w)) {
-          result.push("___BREATH___");
-          wordsSinceBreath = 0;
-        }
-      }
-      
-      // Reset counter after periods
-      if (words[i].endsWith(".")) {
-        wordsSinceBreath = 0;
-      }
-    }
-    
-    return result.join(" ");
-  }
-
-  // Handle lists with appropriate pausing
-  function handleLists(str) {
-    // Detect bulleted/numbered lists
-    str = str.replace(/([•\-*]|\d+\.)\s+/g, "___LISTITEM___ $1 ");
-    
-    // Detect comma-separated lists: "apples, oranges, and bananas"
-    // Add slight pause before "and" in lists
-    str = str.replace(/(,\s+\w+){2,},\s+and\s+/gi, (match) => {
-      return match.replace(/,\s+and\s+/gi, ", ___LISTPAUSE___ and ");
-    });
-    
-    return str;
-  }
-
-  // Add pauses around parenthetical phrases
-  function handleParentheticals(str) {
-    // Detect em-dashes or parenthetical commas
-    str = str.replace(/\s*—\s*/g, " ___PARENTHETICAL___ ");
-    
-    // Detect phrases like "however,", "therefore,", "in fact,"
-    const parentheticalPhrases = [
-      "however", "therefore", "moreover", "furthermore", "nevertheless",
-      "in fact", "for example", "for instance", "in other words", "that is"
-    ];
-    
-    parentheticalPhrases.forEach(phrase => {
-      const re = new RegExp(`\\b(${phrase}),`, "gi");
-      str = str.replace(re, `___PARENTHETICAL___ $1,`);
-    });
-    
-    return str;
-  }
-
-  // Detect important/emphasis words for subtle rate changes
-  function markEmphasisWords(str) {
-    // Words that typically carry emphasis
-    const emphasisWords = [
-      "very", "extremely", "absolutely", "never", "always", "must", "critical",
-      "important", "essential", "key", "fundamental", "crucial", "vital"
-    ];
-    
-    emphasisWords.forEach(word => {
-      const re = new RegExp(`\\b(${word})\\b`, "gi");
-      str = str.replace(re, "___EMPHASIS___$1___/EMPHASIS___");
-    });
-    
-    return str;
-  }
-
   // Normalize punctuation so TTS doesn't read symbols aloud
   function normalizePunctuation(str) {
     return str
@@ -3812,10 +3699,10 @@ function addCognitivePauses(str) {
   if (!str) return str;
 
   // Words that should get a pause BEFORE they are spoken
-  // Focus on strong transition words that signal a shift in thought
   const pauseWords = [
-    "so", "but", "since", "although", "while", "after", "before", "because",
-    "until", "nor", "yet", "either", "though", "unless"
+    "and", "so", "but", "or", "if", "since", "as", "when",
+    "although", "while", "after", "before", "because",
+    "until", "for", "nor", "yet", "either", "though", "unless"
   ];
 
   // 1) Pause BEFORE conjunctions / transition words
@@ -3840,6 +3727,18 @@ function addCognitivePauses(str) {
   
   // 4) Small pause at sentence beginnings after conjunctions
   str = str.replace(/\.\s+(And|But|So|Or|Yet)\s+/gi, ". , $1 ");
+
+  return str;
+}
+    const re = new RegExp(`\\s+\\b(${word})\\b`, "gi");
+    str = str.replace(re, ", $1");
+  });
+
+  // 2) Pause BEFORE quoted text
+  // "something" or “something”
+  str = str
+    .replace(/\s+(")/g, ", $1")
+    .replace(/\s+(“)/g, ", $1");
 
   return str;
 }
