@@ -951,14 +951,14 @@ input[type="number"]:focus-visible{
             <label class="inline" for="handsFreeNextDelaySeconds">
               Delay after rating before next question
             </label>
-            <input type="number" id="handsFreeNextDelaySeconds" min="0" max="30" value="4" style="width:60px;" />
+            <input type="number" id="handsFreeNextDelaySeconds" min="3" max="30" value="3" style="width:60px;" />
             <span>seconds</span>
           </div>
           <div style="margin-top:0.5rem;">
             <label class="inline" for="answerToRatingDelaySeconds">
               Delay after answer before rating prompt
             </label>
-            <input type="number" id="answerToRatingDelaySeconds" min="0" max="30" value="4" style="width:60px;" />
+            <input type="number" id="answerToRatingDelaySeconds" min="3" max="30" value="5" style="width:60px;" />
             <span>seconds</span>
           </div>
           <!-- NEW: auto study-ahead options -->
@@ -994,7 +994,7 @@ input[type="number"]:focus-visible{
             <label class="inline" for="studyAheadGapSeconds">
               Study-ahead: delay after answer before next question
             </label>
-            <input type="number" id="studyAheadGapSeconds" min="1" max="60" value="4" style="width:60px;" />
+            <input type="number" id="studyAheadGapSeconds" min="3" max="60" value="6" style="width:60px;" />
             <span>seconds</span>
           </div>
           <!-- NEW: Restate question in answer for better retention -->
@@ -4410,20 +4410,20 @@ function getStudyPrefs() {
   if (typeof p.skipInstructionsAfterFirst !== "boolean") p.skipInstructionsAfterFirst = true;
   if (typeof p.answerMode !== "string") p.answerMode = "voice"; // "delay" | "voice"
   if (typeof p.answerDelaySec !== "number") p.answerDelaySec = 4;
-  if (typeof p.answerToRatingDelaySec !== "number") p.answerToRatingDelaySec = 4;
+  if (typeof p.answerToRatingDelaySec !== "number") p.answerToRatingDelaySec = 5;
   if (typeof p.autoGoodMode !== "boolean") p.autoGoodMode = false;
   if (typeof p.autoModeBehavior !== "string") p.autoModeBehavior = "good"; // again|hard|good|easy|tomorrow
-  if (typeof p.handsFreeNextDelaySec !== "number") p.handsFreeNextDelaySec = 4;
-  if (typeof p.studyAheadGapSec !== "number") p.studyAheadGapSec = 4;
+  if (typeof p.handsFreeNextDelaySec !== "number") p.handsFreeNextDelaySec = 3;
+  if (typeof p.studyAheadGapSec !== "number") p.studyAheadGapSec = 6;
   if (typeof p.autoEnterStudyAhead !== "boolean") p.autoEnterStudyAhead = true;
   if (typeof p.loopStudyAhead !== "boolean") p.loopStudyAhead = true;
   if (typeof p.restateQuestionInAnswer !== "boolean") p.restateQuestionInAnswer = true; // default enabled
 
   // Clamp numeric values
   p.answerDelaySec = Math.max(1, Math.min(60, Math.floor(p.answerDelaySec)));
-  p.answerToRatingDelaySec = Math.max(0, Math.min(30, Math.floor(p.answerToRatingDelaySec)));
-  p.handsFreeNextDelaySec = Math.max(0, Math.min(30, Math.floor(p.handsFreeNextDelaySec)));
-  p.studyAheadGapSec = Math.max(1, Math.min(60, Math.floor(p.studyAheadGapSec)));
+  p.answerToRatingDelaySec = Math.max(3, Math.min(30, Math.floor(p.answerToRatingDelaySec)));
+  p.handsFreeNextDelaySec = Math.max(3, Math.min(30, Math.floor(p.handsFreeNextDelaySec)));
+  p.studyAheadGapSec = Math.max(3, Math.min(60, Math.floor(p.studyAheadGapSec)));
 
   return p;
 }
