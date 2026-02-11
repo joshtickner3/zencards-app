@@ -5699,6 +5699,7 @@ if (awaitingAnswerSignal && currentMode === "voice") {
     aheadQueue = shuffleArray(getDueCardsForDeck(currentDeckId, true, false));
     aheadQueueIndex = 0;
 
+    setVoiceSkipToAnswerEnabled(false);
     speak(
       "Okay, entering study ahead mode. These reviews will not change your future schedule.",
       () => {
@@ -5977,6 +5978,7 @@ function speakAnswerThenAskDifficulty() {
 
       if (!restartOnly && !studyAheadPromptedOnceVoice) {
         studyAheadPromptedOnceVoice = true;
+        setVoiceSkipToAnswerEnabled(false);
         speakSafe("You are in study ahead mode. You can say repeat answer, repeat question, pause study session, resume study session, or main menu before the next card.", () => {
           if (isPaused) return;
           startListeningAndTimer();
@@ -6150,6 +6152,7 @@ function speakAnswerThenAskDifficulty() {
     aheadQueueIndex = 0;
 
     setStudyState(StudyState.IDLE);
+    setVoiceSkipToAnswerEnabled(false);
     speak(
       "Congratulations, you are all caught up, no more cards are due today. Entering study ahead mode.",
       () => {
@@ -6162,6 +6165,7 @@ function speakAnswerThenAskDifficulty() {
   // Old behavior: ask if they want study-ahead
   setStudyState(StudyState.IDLE);
   awaitingPostCompletionChoice = true;
+  setVoiceSkipToAnswerEnabled(false);
   speak(
     "Congratulations, you are all caught up, no more cards are due today.",
     () => {
@@ -6191,6 +6195,7 @@ function speakAnswerThenAskDifficulty() {
 
   setStudyState(StudyState.IDLE);
   awaitingPostCompletionChoice = true;
+  setVoiceSkipToAnswerEnabled(false);
   speak(
     "There are no more cards available to study in this deck right now.",
     () => {
