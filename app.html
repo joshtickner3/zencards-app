@@ -6963,6 +6963,8 @@ startVoiceBtn.addEventListener("click", async () => {
 
   // 🚫 Disable pause/resume during opening prompt
   setPauseResumeEnabled(false);
+  // 🚫 Disable skip-to-answer during opening prompt
+  setVoiceSkipToAnswerEnabled(false);
 
   const intro = autoGoodMode
     ? describeAutoIntro()
