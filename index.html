@@ -934,6 +934,9 @@ a:hover{
 </head>
 
 <body>
+    <!-- Background Music -->
+    <audio id="bgMusic" src="Zen-Meditation.mp3" loop preload="auto"></audio>
+    
     <!-- ===== Loading Overlay ===== -->
   <div class="loadingOverlay" id="loadingOverlay" aria-hidden="true">
     <div class="loadingCard" role="status" aria-live="polite">
@@ -981,7 +984,7 @@ a:hover{
       <!-- ===== Student pain strip (NEW) ===== -->
 <div class="painStrip">
   <div class="painTitle">
-    <h3 class="collapsible-header" id="studentTrapHeader" tabindex="0" style="cursor:pointer;user-select:none;">The student trap: A lack of usable time <span class="collapsible-arrow">▼</span></h3>
+    <h3 class="collapsible-header" id="studentTrapHeader" tabindex="0" style="cursor:pointer;user-select:none;">Lacking usable time sabotages students lives<span class="collapsible-arrow">▼</span></h3>
     <div class="muted" style="font-size:0.9rem;"></div>
   </div>
   <div class="collapsible-content" id="studentTrapContent" style="display:none;">
@@ -989,7 +992,7 @@ a:hover{
       <div class="painItem">
         <div class="painItemTop">
           <div class="painIcon">⏱</div>
-          <h4>Grades slip</h4>
+          <h4>Grades slip, opportunities close</h4>
         </div>
         <p>I refused to sacrifice seeing friends and family when beginnning college. <span style="color:#dc2626;font-weight:700;">I was stressed out trying to maintain my slipping grades because of no time to study. I was wasting my educational opportunity, burning my chances for post-graduation scholarships, grad school admissions, job opportunities and internships.</span> I knew changing my habits rapidly was essential as each day that passed lowered my chances for future success.</p>
       </div>
@@ -998,14 +1001,14 @@ a:hover{
           <div class="painIcon">💸</div>
           <h4>Money stays tight</h4>
         </div>
-        <p> Sophomore year, I decided to forego my full time job in pursuit of heavy studying for academic success and a social life, <span style="color:#dc2626;font-weight:700;">however I was being burned financially having no money to invest with into my future.</span> I dreamt of financial freedom and knew  <span style="color:#dc2626;font-weight:700;">saving as early as possible was critical to do so, otherwise I would be stuck after college with no money to invest into a business or assets </span>and be working around the clock to survive.</p>
+        <p> Sophomore year, I decided to forego my full time job in pursuit of heavy studying for academic success and a social life, <span style="color:#dc2626;font-weight:700;">however I was being burned financially, earning no money to invest into my future with.</span> I dreamt of financial freedom and knew  <span style="color:#dc2626;font-weight:700;">saving as early as possible was critical to do so, otherwise I would be stuck after college with no money to invest into a business or assets </span>and be working around the clock to live comfortably.</p>
       </div>
       <div class="painItem">
         <div class="painItemTop">
           <div class="painIcon">💤</div>
-          <h4>Health can suffer</h4>
+          <h4>Health and wellness suffers</h4>
         </div>
-        <p> Throughout college, I would slip into periods of <span style="color:#dc2626;font-weight:700;">neglecting my well-being in attempting to maintain all three areas of my life.</span> I felt like it was the only way to have the time I needed to do so, <span style="color:#dc2626;font-weight:700;">leaving me out of shape from neglecting the gym and dissatisfied with my personal appearance while feeling lethargic from inconsistent sleep patterns.</span></p>
+        <p> Throughout college, I would slip into periods of <span style="color:#dc2626;font-weight:700;">neglecting my well-being in attempting to maintain all three areas of my life.</span> I felt like it was the only way to have the time I needed to do so, <span style="color:#dc2626;font-weight:700;">leaving me out of shape from neglecting the gym and dissatisfied with my personal appearance while feeling lethargic from inconsistent sleep.</span></p>
       </div>
       <div class="painItem">
         <div class="painItemTop">
@@ -1108,7 +1111,7 @@ a:hover{
           <span style="color:#22c55e;font-weight:700;font-size:1.2em;">$9.99</span>
           <span style="font-size:0.9rem;font-weight:700;color:var(--muted);">/month</span>
         </p>
-        <div style="color:#f59e42;font-weight:600;margin-bottom:0.25rem;">
+        <div style="color:#42cbf5;font-weight:600;margin-bottom:0.25rem;">
           Limited time: become a member before May 1st at a <span style="color:#22c55e;">50% discount</span> - forever.
         </div>
         <p class="muted" style="margin-top:0.25rem;">
@@ -1174,8 +1177,8 @@ a:hover{
 
       <div class="fineprint">
         <strong>Billing:</strong> Your 3-day free trial starts when you create an account.
-        You will be <strong>charged $9.99/month automatically</strong> at the end of the trial unless you cancel beforehand. <span style="color:#f59e42;font-weight:600;">Limited time: 50% off.</span>
-        <strong></strong>Cancel anytime<strong></strong> from the “Manage billing” button after logging in to avoid being charged. <span style="color:#f59e42;font-weight:600;">We restrict users to one free trial period.</span> 
+        You will be <strong>charged $9.99/month automatically</strong> at the end of the trial unless you cancel beforehand. <span style="color:#42cbf5;font-weight:600;">Limited time: 50% off.</span>
+        <strong></strong>Cancel anytime<strong></strong> from the “Manage billing” button after logging in to avoid being charged. <span style="color:#3dd5f4;font-weight:600;">We restrict users to one free trial period.</span> 
       </div>
     </div>
 
@@ -2278,6 +2281,40 @@ function openTermsModal(){
 function closeTermsModal(){
   termsModal.classList.remove("show");
 }
+
+// ===== Background Music =====
+const bgMusicEl = document.getElementById("bgMusic");
+let bgmMuted = false;
+let bgmVolume = 0.04; // Default volume
+
+function ensureBgMusicPlayback() {
+  if (!bgMusicEl) return;
+  if (bgmMuted) {
+    try { bgMusicEl.pause(); } catch (_) {}
+    return;
+  }
+  bgMusicEl.volume = bgmVolume;
+  const p = bgMusicEl.play();
+  if (p && typeof p.catch === "function") {
+    p.catch(() => {
+      // Auto-play blocked, will play on first user interaction
+    });
+  }
+}
+
+// Try to start music on page load
+if (bgMusicEl) {
+  ensureBgMusicPlayback();
+}
+
+// Ensure music plays on first user interaction
+let hasInteracted = false;
+document.addEventListener("click", () => {
+  if (!hasInteracted) {
+    hasInteracted = true;
+    ensureBgMusicPlayback();
+  }
+}, { once: true });
 
 // Make inline "Terms of Service" link open the modal (instead of jumping)
 document.addEventListener("click", (e) => {
