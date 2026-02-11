@@ -1207,6 +1207,14 @@ a:hover{
       loginMsg.className = "modalMsg error";
       loginSubmitBtn.disabled = false;
       loginSubmitBtn.textContent = "Log in";
+    } finally {
+      // Defensive: ensure the login button isn't left disabled by any unexpected path
+      try {
+        if (loginSubmitBtn && loginSubmitBtn.disabled) {
+          loginSubmitBtn.disabled = false;
+          loginSubmitBtn.textContent = "Log in";
+        }
+      } catch (_) {}
     }
   });
 

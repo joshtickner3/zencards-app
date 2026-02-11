@@ -2513,6 +2513,13 @@ let loginAbortController = null;
     console.error("[LOGIN] exception:", e);
     failLogin((e && e.message) ? e.message : "Something went wrong. Try again.");
   }
+  finally {
+    // Defensive fallback: if something left the UI locked, reset the login UI state.
+    try {
+      loginInFlight = false;
+      resetLoginButton();
+    } catch (_) {}
+  }
 });
 
 // Clear login error as soon as the user starts typing again
