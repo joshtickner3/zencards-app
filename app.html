@@ -5896,24 +5896,20 @@ if (awaitingAnswerSignal && currentMode === "voice") {
     const wantsMainMenu = isMainMenuCommand(text);
     const wantsStudyAhead = text.includes("study ahead") || text.includes("study-ahead");
 
-    awaitingPostCompletionChoice = false;
-
     if (wantsMainMenu) {
+      awaitingPostCompletionChoice = false;
       speakAndGoToMainMenu();
       return;
     }
 
     if (!wantsStudyAhead) {
-      // User said something else - prompt them again
-      awaitingPostCompletionChoice = true;
-      speak(
-        "Please say 'main menu' to go back, or 'study ahead mode' to continue studying.",
-        () => listenForCommand(handleVoiceTranscript)
-      );
+      // User said something else - silently ignore and keep listening
+      listenForCommand(handleVoiceTranscript);
       return;
     }
 
     // Enter study-ahead mode (no schedule changes)
+    awaitingPostCompletionChoice = false;
     studyAheadSession = true;
     noScheduleChanges = true;
     studyAheadPromptedOnceVoice = false;
