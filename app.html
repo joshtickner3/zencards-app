@@ -3700,6 +3700,97 @@ function speakWithWebTts(text, onEnd, opts = {}) {
     return str;
   }
 
+  // Fix run-on sentences by adding virtual punctuation at natural breaks
+  function fixRunOnSentences(str) {
+    if (!str) return str;
+    
+    // 1) Add comma before coordinating conjunctions that connect independent clauses
+    // Pattern: [word] and/but/or/so/yet [word] (but not short phrases)
+    const coordinatingConjunctions = ["and", "but", "or", "so", "yet"];
+    coordinatingConjunctions.forEach(conj => {
+      // Look for pattern: multiple words, then conjunction, then more words
+      // Only add comma if there are enough words on both sides (likely independent clauses)
+      const pattern = new RegExp(`(\\w+\\s+\\w+\\s+\\w+)\\s+(${conj})\\s+(?=\\w+\\s+\\w+)`, "gi");
+      str = str.replace(pattern, "$1, $2 ");
+    });
+    
+    // 2) Add pauses after relative clause starters if missing
+    const relativePronouns = ["that", "which", "who", "whom", "whose", "where"];
+    relativePronouns.forEach(pronoun => {
+      // Add comma before relative pronoun if it's starting a non-restrictive clause
+      // (after multiple words, suggesting it's additional info)
+      const pattern = new RegExp(`(\\w+\\s+\\w+\\s+\\w+)\\s+(${pronoun})\\s+`, "gi");
+      str = str.replace(pattern, (match, before, pron) => {
+        // Don't add comma if one already exists
+        if (before.trim().endsWith(",")) return match;
+        return `${before}, ${pron} `;
+      });
+    });
+    
+    // 3) Break up very long sentences (40+ words) at subordinating conjunctions
+    const sentences = str.split(/([.!?]+)/);
+    const fixedSentences = [];
+    
+    for (let i = 0; i < sentences.length; i++) {
+      let sentence = sentences[i];
+      
+      // Skip delimiters
+      if (/^[.!?]+$/.test(sentence)) {
+        fixedSentences.push(sentence);
+        continue;
+      }
+      
+      const wordCount = sentence.trim().split(/\s+/).length;
+      
+      // If sentence is very long, add virtual commas at natural breaks
+      if (wordCount > 40) {
+        // Add comma after introductory subordinate clauses
+        const subordClauseStarters = [
+          "when", "while", "as", "since", "if", "although", "though",
+          "because", "unless", "until", "before", "after", "whereas"
+        ];
+        
+        subordClauseStarters.forEach(starter => {
+          // Pattern: sentence starts with subordinate clause (5-15 words) then main clause
+          const pattern = new RegExp(`^(${starter}\\s+(?:\\w+\\s+){4,14})(\\w+)`, "gi");
+          sentence = sentence.replace(pattern, "$1, $2");
+        });
+        
+        // Add virtual commas every 15-20 words at conjunctions/prepositions if none exist
+        const words = sentence.split(/\s+/);
+        let wordsSinceComma = 0;
+        const result = [];
+        
+        for (let j = 0; j < words.length; j++) {
+          result.push(words[j]);
+          wordsSinceComma++;
+          
+          // Every 15-20 words, try to add a comma at next conjunction/transition
+          if (wordsSinceComma >= 15 && wordsSinceComma <= 20) {
+            const nextWord = words[j + 1] ? words[j + 1].toLowerCase() : "";
+            const breakWords = ["and", "but", "or", "so", "yet", "for", "nor"];
+            
+            if (breakWords.includes(nextWord) && !words[j].endsWith(",")) {
+              result[result.length - 1] = words[j] + ",";
+              wordsSinceComma = 0;
+            }
+          }
+          
+          // Reset counter at existing punctuation
+          if (words[j].match(/[,;:]/)) {
+            wordsSinceComma = 0;
+          }
+        }
+        
+        sentence = result.join(" ");
+      }
+      
+      fixedSentences.push(sentence);
+    }
+    
+    return fixedSentences.join("");
+  }
+
   // Normalize punctuation so TTS doesn't read symbols aloud
   function normalizePunctuation(str) {
     return str
@@ -3716,8 +3807,10 @@ function speakWithWebTts(text, onEnd, opts = {}) {
          addBreathPauses(
            addCognitivePauses(
              normalizePunctuation(
-               humanizeNumbers(
-                 expandAcronyms(text)
+               fixRunOnSentences(
+                 humanizeNumbers(
+                   expandAcronyms(text)
+                 )
                )
              )
            )

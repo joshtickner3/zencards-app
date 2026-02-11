@@ -41,12 +41,25 @@
       redirectToAppIfLoggedIn();
     </script>
   <meta charset="UTF-8" />
+  <link rel="icon" href="favicon.png" />
+  <link rel="shortcut icon" href="favicon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="favicon.png" />
+  <meta property="og:title" content="Live Life to the Fullest as a Student" />
+  <meta property="og:image" content="favicon.png" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Live Life to the Fullest as a Student" />
+  <meta name="twitter:image" content="favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <meta
   name="viewport"
   content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes, maximum-scale=5.0"
 />
-  <title>ZenCards — Hands-Free Flashcards (3-Day Free Trial)</title>
+  <title>Zencards: Live Life to the Fullest as a Student</title>
   <script>
     // Prevent double-tap to zoom on iOS
     (function() {
@@ -173,44 +186,40 @@
 
     #billingModal { z-index: 10000; }
     :root{
-  /* Backgrounds (deep slate blue = trust/premium) */
-  --bg1:#0f172a;            /* deep slate */
-  --bg2:#020617;            /* near-black blue */
+  --bg1:#0b1222;
+  --bg2:#020617;
+  --bg3:#0a1224;
 
-  /* Surfaces */
-  --card: rgba(15,23,42,0.92);
-  --border:#1e293b;
+  --card: rgba(9,16,30,0.92);
+  --border: rgba(148,163,184,0.12);
 
-  /* Text */
-  --text:#e5e7eb;
-  --muted:#94a3b8;
+  --text:#eef2ff;
+  --muted:#9aa8bf;
 
-  /* CTA (Green) */
-  --green:#22c55e;          /* emerald */
-  --green2:#16a34a;         /* hover emerald */
+  --accent:#22d3ee;
+  --accent2:#38bdf8;
+  --green:#22c55e;
+  --green2:#16a34a;
 
-  /* Secondary button */
+  --link:#38bdf8;
+  --link2:#7dd3fc;
+
   --slate:#334155;
-
-  /* NEW: Amber for badges */
-  --amber:#f59e0b;
-  --amber2:#d97706;
-
-  /* NEW: Soft blue for links */
-  --link:#60a5fa;
-  --link2:#93c5fd;
-
-  --shadow: 0 18px 35px rgba(0,0,0,0.55), 0 0 0 1px rgba(15,23,42,0.7);
+  --shadow: 0 18px 35px rgba(2,6,23,0.6), 0 0 0 1px rgba(148,163,184,0.08);
 }
 
     *{box-sizing:border-box}
     body{
   margin:0;
   padding: clamp(16px, 3vw, 36px);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   background: radial-gradient(circle at top, var(--bg1) 0, var(--bg2) 55%);
   color:var(--text);
   line-height:1.5;
+}
+::selection{
+  background: rgba(34,211,238,0.32);
+  color: #001018;
 }
   a{
   color: var(--link);
@@ -227,12 +236,19 @@ a:hover{
   padding: 0 clamp(0px, 1vw, 10px);
 }
     .card{
-  background: var(--card);
-  border-radius: 0.9rem;
-  padding: clamp(14px, 2vw, 22px); /* 👈 THIS is the change */
+  background: linear-gradient(180deg, rgba(10,18,36,0.95), rgba(3,7,18,0.9));
+  border-radius: 1rem;
+  padding: clamp(14px, 2vw, 22px);
   margin-top: 1rem;
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card:hover{
+  transform: translateY(-3px);
+  box-shadow: 0 24px 50px rgba(2,6,23,0.72), 0 0 0 1px rgba(148,163,184,0.14);
 }
     .row{
       display:flex;
@@ -323,25 +339,27 @@ a:hover{
       border-radius:999px;
       border:none;
       cursor:pointer;
-      background: var(--green);
-      color: #020617;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #001018;
       font-weight:700;
       font-size:0.98rem;
       text-decoration:none;
-      box-shadow: 0 8px 18px rgba(16,185,129,0.28);
-      transition: background 0.15s ease, transform 0.08s ease, box-shadow 0.12s ease;
+      box-shadow: 0 10px 24px rgba(56,189,248,0.28);
+      transition: background 0.2s ease, transform 0.08s ease, box-shadow 0.2s ease;
       white-space:nowrap;
     }
-    .btn:hover{background:var(--green2); transform:translateY(-1px); box-shadow:0 10px 22px rgba(34,197,94,0.35);}
+    .btn:hover{background: linear-gradient(135deg, var(--accent), var(--accent2)); transform:translateY(-2px); box-shadow:0 14px 28px rgba(56,189,248,0.4);}
     .btn:active{transform:translateY(0); box-shadow:0 4px 10px rgba(15,23,42,0.6);}
     .btn.secondary{
       background: var(--slate);
       color: var(--text);
       box-shadow:none;
+      border: 1px solid rgba(148,163,184,0.22);
     }
    .btn.secondary:hover{
   background:#475569; 
-  box-shadow:0 6px 14px rgba(15,23,42,0.65);
+  box-shadow:0 8px 16px rgba(2,6,23,0.55);
+  transform: translateY(-1px);
 }
     .btn.small{padding:0.35rem 0.85rem; font-size:0.85rem}
     /* Make the Start Free Trial button feel more “primary” */
@@ -575,13 +593,6 @@ a:hover{
   color: var(--muted);
 }
 
-    .note{
-      background: rgba(34,197,94,0.10);
-      border: 1px solid rgba(34,197,94,0.25);
-      color: #d1fae5;
-      border-radius: 0.85rem;
-      padding: 0.85rem;
-    }
     code.inline{
       background:#111827;
       padding:0.15rem 0.4rem;
@@ -681,11 +692,12 @@ a:hover{
     .modal{
       width: 100%;
       max-width: 440px;
-      background: #020617;
-      border: 1px solid #111827;
+      background: linear-gradient(180deg, rgba(10,18,36,0.95), rgba(3,7,18,0.9));
+      border: 1px solid rgba(148,163,184,0.18);
       border-radius: 1rem;
       box-shadow: var(--shadow);
       padding: 1rem;
+      animation: slideUp 180ms ease-out;
     }
     .modalHeader{
       display:flex;
@@ -712,10 +724,14 @@ a:hover{
       width: 100%;
       padding: 0.65rem 0.75rem;
       border-radius: 0.75rem;
-      border: 1px solid #1f2937;
-      background: #0b1220;
+      border: 1px solid rgba(148,163,184,0.18);
+      background: linear-gradient(180deg, rgba(2,6,23,0.7), rgba(2,6,23,0.5));
       color: var(--text);
       outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+    }
+    .input::placeholder{
+      color: rgba(148,163,184,0.7);
     }
     .input:focus{
       border-color: rgba(34,197,94,0.55);
@@ -777,6 +793,22 @@ a:hover{
 
 .legalModalBody ul{
   margin: 0.5rem 0 0 1.15rem;
+}
+
+@keyframes fadeIn{
+  from{ opacity:0; }
+  to{ opacity:1; }
+}
+@keyframes slideUp{
+  from{ opacity:0; transform: translateY(10px) scale(0.99); }
+  to{ opacity:1; transform: translateY(0) scale(1); }
+}
+@keyframes softIn{
+  from{ opacity:0; transform: translateY(6px); }
+  to{ opacity:1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
 
 /* ===== iOS app portrait safe-area fix (website unchanged) ===== */
@@ -935,14 +967,14 @@ a:hover{
     <div class="appHeader">
   <img class="brandLogo" src="zencards-logo.png" alt="ZenCards" />
 </div>
-    <p class="subtitle">Hands and eyes-free spaced-repetition audio flashcards</p>
+    <p class="subtitle">Live the student experience to the fullest</p>
 
     <!-- HERO -->
     <div class="card hero">
       <span class="badge">3-Day Free Trial</span>
       <span class="badge"><span style="text-decoration:line-through;color:#b91c1c;">$19.99</span> $9.99/month</span>
 
-      <h1> From one goal-driven student to another, the hours in the day are your most valuable asset. Stop throwing them away and make the most of your life as a student with ZenCards.</h1>
+      <h1> As a student, the hours in the day are your most valuable asset. Stop throwing them away and make the most of your life with ZenCards.</h1>
       <p>
         For dedicated full time students or working professionals taking some classes on the side who wish to have it all: an impressive GPA, strong finances, and an active social life, ZenCards is your solution.
       </p>
@@ -1024,7 +1056,7 @@ a:hover{
     <div class="kpiRow">
       <div class="kpi">
         <p class="big">What is ZenCards? </p>
-        <p class="small"><span style="color:#0ed428;font-weight:700;">ZenCards features audio flashcards controlled by your voice commands</span>. You will turn every single second of unusable time throughout the day (commuting, walking to class, cleaning, etc.) into high quality review time. <span style="color:#0dee32;font-weight:700;"> Students requiring noteable amounts of time to study average 2.5 extra hours per day of free time gained.</span></p>
+        <p class="small"><span style="color:#0ed428;font-weight:700;">ZenCards features audio flashcards controlled by your voice commands</span>. You will turn every single second of unusable time throughout the day (eating, walking to class, cleaning, etc.) into high quality review time. <span style="color:#0dee32;font-weight:700;"> Students requiring noteable amounts of time to study average 2.5 extra hours per day of free time gained.</span></p>
       </div>
 
       <div class="kpi">
@@ -1043,7 +1075,7 @@ a:hover{
         <p class="big">Simplicity and convenience </p>
         <p class="small">
           We optimize spaced repetition intervals for you so you never need to worry about what or when to review.
-          <span style="color:#0ed428;font-weight:700;">We put an emphasis on convenience so studying feels like a choce, never a chore</span>.
+          <span style="color:#0ed428;font-weight:700;">We put an emphasis on convenience so studying feels like a choice, never a chore</span>.
         </p>
       </div>
     </div>
@@ -1052,7 +1084,7 @@ a:hover{
     <div class="dualCodingCard">
     <p class="dualCodingHeader"><span style="color:#ffffff;font-weight:700;">Your new academic game-changer: The dual coding effect</span></p>
       <p class="dualCodingBody">
-         <span style="color:#0ed428;font-weight:700;">ZenCards enables dual coding</span>. Whenever you are taking time solely to study, you will be encoding information via visual AND auditory pathways.  <span style="color:#0ed428;font-weight:700;">As a conservative estimate, studies show that dual coding enables learning content in 30% less time than visually based traditional flashcards</span>. Long term retention is substantially higher for dual coded information, so  <span style="color:#0ed428;font-weight:700;">you will need far less time and effort to review the whole semester's worth of material for final exams. Less time stressed, more time partying.</span>
+         <span style="color:#0ed428;font-weight:700;">ZenCards enables dual coding</span>. Whenever you are taking time solely to study, you will be encoding information via visual AND auditory pathways.  <span style="color:#0ed428;font-weight:700;">As a conservative estimate, studies show that dual coding enables learning content in 30% less time than visually based traditional flashcards</span>. Long term retention is substantially higher for dual coded information, so  <span style="color:#0ed428;font-weight:700;">you will need far less time and effort to review the whole semester's worth of material for final exams. Less time stressed, more time enjoying.</span>
       </p>
     </div>
 
@@ -1133,7 +1165,7 @@ a:hover{
 
       <button class="btn" id="lpGoBtn" type="button" disabled
         style="background:#334155;color:#94a3b8;box-shadow:none;cursor:not-allowed;">
-        Study Now (locked)
+        Study Now 
       </button>
     </div>
   </div>
@@ -1175,7 +1207,8 @@ a:hover{
           <div class="feature">
             <h3>Spaced repetition scheduling</h3>
             <p>
-              We handle spaced repetition scheduling for you. You will never need to worry about when to review cards again for long term retention. 
+              We handle spaced repetition scheduling for you. You will never need to worry about when to review cards again for long term retention. ZenCards optimizes scheduling so users avoid wasting time studying what they already know while prioritizing review of information they are struggling with.
+             
             </p>
           </div>
           <div class="feature">
@@ -1187,7 +1220,7 @@ a:hover{
           <div class="feature">
             <h3>Traditional flashcards built in</h3>
             <p>
-              In case you want to study the old fashioned way, ZenCards supports manual flashcard review as well.
+              In case you want to study the old fashioned way, ZenCards supports manual flashcard review as well. 
             </p>
           </div>
         </div>
@@ -1197,8 +1230,8 @@ a:hover{
     <!-- HOW IT WORKS -->
     <div class="card">
       <h2 class="collapsible-header" id="howWorksHeader" tabindex="0" style="cursor:pointer;user-select:none;">How it works <span class="collapsible-arrow">▼</span></h2>
-      <div class="collapsible-content" id="howWorksContent" style="display:none;">
-           <div class="row">
+       <div class="collapsible-content" id="howWorksContent" style="display:none;">
+         <div class="row howWorksRow">
           <div>
             <h3 style="margin-top:0;">1) Add cards</h3>
             <p class="muted">
@@ -1225,10 +1258,6 @@ a:hover{
                <li><strong>Automatic mode</strong>: auto-assign the same rating to every card (no voice commands needed)</li>
             </p>
 
-            <div class="note" style="margin-top:0.75rem;">
-              <strong>Pro tip:</strong> Use hands-free mode while moving, then do quick silent sessions when you’re sitting.
-              Same decks, same progress.
-            </div>
           </div>
         </div>
       </div>
@@ -1248,6 +1277,9 @@ a:hover{
   border-radius: 0.85rem;
   background: rgba(15,23,42,0.92);
   border: 1px solid #111827;
+}
+    .howWorksRow{
+  align-items: flex-start;
 }
 
 .collapsible-header:focus{
@@ -2203,7 +2235,7 @@ function setAuthMode(mode) {
       `and <a href="#privacy" class="legalLink">Privacy Policy</a>.` +
       `<br><br>` +
       `<strong style="color:#bbf7d0;">` +
-      `Upon creation of your free trial, navigate back to zencardstudy.com to log in. ` +
+      `Upon creation of your free trial, navigate back to log in. ` +
       `Happy studying!` +
       `</strong>`;
   }
@@ -2368,114 +2400,139 @@ loginBtn?.addEventListener("click", () => openLoginModal("login"));
       });
     });
 
+    function failLogin(message) {
+  hideLoading(); // in case anything was showing
+  loginMsg.textContent = message;
+  loginMsg.className = "modalMsg error";
+
+  loginInFlight = false;
+  try { loginAbortController?.abort(); } catch (_) {}
+  loginAbortController = null;
+
+  resetLoginButton();
+}
+
+
 let loginInFlight = false;
 let loginAbortController = null;
     loginSubmitBtn.addEventListener("click", async () => {
-      if (loginInFlight) return;
-      loginInFlight = true;
+  if (loginInFlight) return;
+  loginInFlight = true;
 
-      // kill any previous in-flight login
-      try { loginAbortController?.abort(); } catch (_) {}
-      loginAbortController = new AbortController();
+  // kill any previous in-flight login
+  try { loginAbortController?.abort(); } catch (_) {}
+  loginAbortController = new AbortController();
 
-      const email = (loginEmail.value || "").trim();
-      const password = loginPassword.value || "";
+  const email = (loginEmail.value || "").trim();
+  const password = loginPassword.value || "";
 
-      if (!email || !password) {
-        loginMsg.textContent = "Please enter your email and password.";
-        loginMsg.className = "modalMsg error";
-        loginInFlight = false;
+  if (!email || !password) {
+    failLogin("Please enter your email and password.");
+    return;
+  }
+
+  loginSubmitBtn.disabled = true;
+  loginSubmitBtn.textContent = (authMode === "signup") ? "Creating…" : "Logging in…";
+  loginMsg.textContent = "";
+  loginMsg.className = "modalMsg";
+
+  try {
+    if (authMode === "signup") {
+      const res = await supabaseClient.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: "https://zencardstudy.com/confirm.html" }
+      });
+
+      if (res.error) {
+        failLogin(res.error.message || "Could not create account.");
         return;
       }
 
-      loginSubmitBtn.disabled = true;
-      loginSubmitBtn.textContent = (authMode === "signup") ? "Creating…" : "Logging in…";
+      // success message, then unlock button so they can close / switch modes
+      loginMsg.textContent =
+        "Account created ✅ Check your email to confirm, then you'll be sent to Stripe. Once you start your trial, come back to this page to log in.";
+      loginMsg.className = "modalMsg ok";
+
+      loginInFlight = false;
+      resetLoginButton();
+      return;
+    }
+
+    // LOGIN
+    const res = await supabaseClient.auth.signInWithPassword({ email, password });
+    console.log("[LOGIN RESULT]", res);
+
+    if (res.error) {
+      // Normalize the most common error so users understand it
+      const msg = (res.error.message || "").toLowerCase();
+      const friendly =
+        msg.includes("invalid login credentials")
+          ? "Incorrect email or password."
+          : (res.error.message || "Login failed.");
+
+      // Make sure we’re not left in a weird auth state
+      try { await supabaseClient.auth.signOut({ scope: "local" }); } catch (_) {}
+      try { localStorage.removeItem("zencards-auth"); } catch (_) {}
+
+      failLogin(friendly);
+      return;
+    }
+
+    // Session should exist now
+    const { data: sess } = await supabaseClient.auth.getSession();
+    if (!sess?.session?.user) {
+      failLogin("Login succeeded but session did not load. Try again.");
+      return;
+    }
+
+    closeLoginModal();
+    showLoading("Signing you in…", "Checking your subscription status…");
+
+    const uid = sess.session.user.id;
+    const access = await checkUserAccess(uid);
+
+    if (access?.hasAccess) {
+      await refreshLandingGate();
+      hideLoading();
+      loginInFlight = false;
+      resetLoginButton();
+      return;
+    }
+
+    if (access?.isPastDue) {
+      await openPortalFromLanding("https://zencardstudy.com/");
+      // navigating away, no need to reset UI
+      return;
+    }
+
+    await startCheckoutFromLanding();
+    // navigating away, no need to reset UI
+
+  } catch (e) {
+    console.error("[LOGIN] exception:", e);
+    failLogin((e && e.message) ? e.message : "Something went wrong. Try again.");
+  }
+  finally {
+    // Defensive fallback: if something left the UI locked, reset the login UI state.
+    try {
+      loginInFlight = false;
+      resetLoginButton();
+    } catch (_) {}
+  }
+});
+
+// Clear login error as soon as the user starts typing again
+[loginEmail, loginPassword].forEach(el => {
+  if (!el) return;
+  el.addEventListener("input", () => {
+    if (loginMsg.classList.contains("error")) {
       loginMsg.textContent = "";
       loginMsg.className = "modalMsg";
+    }
+  });
+});
 
-      try {
-        if (authMode === "signup") {
-          const res = await supabaseClient.auth.signUp({
-            email,
-            password,
-            options: { emailRedirectTo: "https://zencardstudy.com/confirm.html" }
-          });
-
-          console.log("[SIGNUP RESULT]", res);
-
-          if (res.error) {
-            loginMsg.textContent = res.error.message;
-            loginMsg.className = "modalMsg error";
-            return;
-          }
-
-          loginMsg.textContent =
-            "Account created ✅ Check your email to confirm, then you'll be sent to Stripe. Once you start your trial, come back to this page to log in.";
-          loginMsg.className = "modalMsg ok";
-          return;
-        }
-
-        // LOGIN
-        // NOTE: supabase-js doesn't accept AbortController directly here, but the lock prevents double submits
-        const res = await supabaseClient.auth.signInWithPassword({ email, password });
-        console.log("[LOGIN RESULT]", res);
-
-        if (res.error) {
-          // If login fails, clear session/localStorage and show error
-          try { await supabaseClient.auth.signOut(); } catch (e) { console.warn("[LOGIN] signOut failed", e); }
-          try {
-            for (let i = localStorage.length - 1; i >= 0; i--) {
-              const k = localStorage.key(i);
-              if (k && (k.endsWith("-auth-token") || k === "zencards-auth")) {
-                localStorage.removeItem(k);
-              }
-            }
-          } catch (e) { console.warn("[LOGIN] localStorage cleanup failed", e); }
-          loginMsg.textContent = res.error.message;
-          loginMsg.className = "modalMsg error";
-          return;
-        }
-
-        // ✅ Ensure session is actually hydrated before you do anything else
-        const { data: sess } = await supabaseClient.auth.getSession();
-        if (!sess?.session?.user) {
-          throw new Error("Session not ready after login. Try again.");
-        }
-
-        closeLoginModal();
-        showLoading("Signing you in…", "Checking your subscription status…");
-
-        const uid = sess.session.user.id;
-        const access = await checkUserAccess(uid);
-
-        if (access?.hasAccess) {
-          // IMPORTANT: do not startCheckout / portal in parallel with auth events
-          await refreshLandingGate();
-          hideLoading();
-          return;
-        }
-
-        if (access?.isPastDue) {
-          await openPortalFromLanding("https://zencardstudy.com/");
-          return;
-        }
-
-        await startCheckoutFromLanding();
-
-      } catch (e) {
-        console.error("[LOGIN] exception:", e);
-        hideLoading();
-        loginMsg.textContent = (e && e.message) ? e.message : "Something went wrong. Check console.";
-        loginMsg.className = "modalMsg error";
-      } finally {
-        loginInFlight = false;
-
-        // If we didn’t navigate away, re-enable the button
-        if (document.visibilityState === "visible") {
-          resetLoginButton();
-        }
-      }
-    });
 
     forgotPwBtn.addEventListener("click", async () => {
       const email = (loginEmail.value || "").trim();
