@@ -2997,7 +2997,7 @@ window.speakCardText = function(questionRaw, answerRaw, deckId, cardObj) {
 
   refreshCardLanguageDropdownsForCurrentDeck(card);
 
-  selectedCardInfo.textContent = `Editing card: ${card.id}`;
+  selectedCardInfo.textContent = ''; // Don't show card ID
   updateCardBtn.disabled = false;
   refreshMoveDeckSelect();
 });
