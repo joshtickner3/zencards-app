@@ -980,7 +980,7 @@ input[type="number"]:focus-visible{
               <div class="inline">
                 <input type="radio" name="answerMode" id="answerModeDelay" value="delay" />
                 <label for="answerModeDelay">Wait</label>
-                <input type="number" id="answerDelaySeconds" min="1" max="60" value="4" style="width:60px;" />
+                <input type="number" id="answerDelaySeconds" min="3" max="60" value="10" style="width:60px;" />
                 <span>seconds before answer</span>
               </div>
               <div class="inline">
@@ -4409,7 +4409,7 @@ function getStudyPrefs() {
   // Defaults (match your current defaults)
   if (typeof p.skipInstructionsAfterFirst !== "boolean") p.skipInstructionsAfterFirst = true;
   if (typeof p.answerMode !== "string") p.answerMode = "voice"; // "delay" | "voice"
-  if (typeof p.answerDelaySec !== "number") p.answerDelaySec = 4;
+  if (typeof p.answerDelaySec !== "number") p.answerDelaySec = 10;
   if (typeof p.answerToRatingDelaySec !== "number") p.answerToRatingDelaySec = 5;
   if (typeof p.autoGoodMode !== "boolean") p.autoGoodMode = false;
   if (typeof p.autoModeBehavior !== "string") p.autoModeBehavior = "good"; // again|hard|good|easy|tomorrow
@@ -4420,7 +4420,7 @@ function getStudyPrefs() {
   if (typeof p.restateQuestionInAnswer !== "boolean") p.restateQuestionInAnswer = true; // default enabled
 
   // Clamp numeric values
-  p.answerDelaySec = Math.max(1, Math.min(60, Math.floor(p.answerDelaySec)));
+  p.answerDelaySec = Math.max(3, Math.min(60, Math.floor(p.answerDelaySec)));
   p.answerToRatingDelaySec = Math.max(3, Math.min(30, Math.floor(p.answerToRatingDelaySec)));
   p.handsFreeNextDelaySec = Math.max(3, Math.min(30, Math.floor(p.handsFreeNextDelaySec)));
   p.studyAheadGapSec = Math.max(3, Math.min(60, Math.floor(p.studyAheadGapSec)));
