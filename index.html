@@ -2463,8 +2463,19 @@ let loginAbortController = null;
               }
             }
           } catch (e) { console.warn("[LOGIN] localStorage cleanup failed", e); }
-          loginMsg.textContent = res.error.message;
+          
+          // Check error type for better messages
+          const errMsg = res.error.message.toLowerCase();
+          if (errMsg.includes("invalid login credentials") || errMsg.includes("invalid password")) {
+            loginMsg.textContent = "Incorrect password";
+          } else if (errMsg.includes("user not found") || errMsg.includes("email not found")) {
+            loginMsg.textContent = "User not found";
+          } else {
+            loginMsg.textContent = res.error.message;
+          }
           loginMsg.className = "modalMsg error";
+          loginInFlight = false;
+          resetLoginButton();
           return;
         }
 
