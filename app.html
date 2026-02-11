@@ -1171,10 +1171,28 @@ input[type="number"]:focus-visible{
                 <!-- Rating buttons for hands-free mode (optional tap) -->
         <div id="voiceRatingButtons" class="hidden" style="margin-top:0.5rem;">
           <span>How was that?</span><br />
-          <button data-voice-rating="again">Again</button>
-          <button data-voice-rating="hard">Hard</button>
-          <button data-voice-rating="good">Good</button>
-          <button data-voice-rating="easy">Easy</button>
+          
+          <div class="ratingRow">
+            <div class="ratingItem">
+              <button data-voice-rating="again">Again</button>
+              <span id="voice-hint-again" class="dueHint"></span>
+            </div>
+
+            <div class="ratingItem">
+              <button data-voice-rating="hard">Hard</button>
+              <span id="voice-hint-hard" class="dueHint"></span>
+            </div>
+
+            <div class="ratingItem">
+              <button data-voice-rating="good">Good</button>
+              <span id="voice-hint-good" class="dueHint"></span>
+            </div>
+
+            <div class="ratingItem">
+              <button data-voice-rating="easy">Easy</button>
+              <span id="voice-hint-easy" class="dueHint"></span>
+            </div>
+          </div>
         </div>
       </div> <!-- end of #voiceUI -->
 
@@ -4275,6 +4293,11 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
     const hintGood = document.getElementById("hint-good");
     const hintEasy = document.getElementById("hint-easy");
 
+    const voiceHintAgain = document.getElementById("voice-hint-again");
+    const voiceHintHard = document.getElementById("voice-hint-hard");
+    const voiceHintGood = document.getElementById("voice-hint-good");
+    const voiceHintEasy = document.getElementById("voice-hint-easy");
+
     const voiceUI = document.getElementById("voiceUI");
     const voiceQuestion = document.getElementById("voiceQuestion");
     const voiceQuestionText = document.getElementById("voiceQuestionText");
@@ -5746,6 +5769,7 @@ if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
 awaitingDifficulty = false;
 if (voiceRatingButtons) {
   voiceRatingButtons.classList.add("hidden");
+  clearVoiceHints();
 }
 
 // ✅ NEW: echo the rating word with mic OFF, then continue
@@ -5885,6 +5909,7 @@ function speakAnswerThenAskDifficulty() {
         awaitingDifficulty = true;
         if (voiceRatingButtons) {
           voiceRatingButtons.classList.remove("hidden");
+          if (!noScheduleChanges) updateVoiceDueHints();
         }
         setVoiceSkipToAnswerEnabled(true);
 
@@ -6197,8 +6222,10 @@ setCardContent(voiceAnswerText, currentCard.answer);
 if (!noScheduleChanges && !autoGoodMode && voiceRatingButtons) {
   voiceRatingButtons.classList.remove("hidden");
   setVoiceRatingButtonsEnabled(true);
+  updateVoiceDueHints();
 } else if (voiceRatingButtons) {
   voiceRatingButtons.classList.add("hidden");
+  clearVoiceHints();
 }
 
       hasSpokenCurrentQuestion = true;
@@ -6235,6 +6262,13 @@ speakWithWebTts(
       hintHard.textContent = "";
       hintGood.textContent = "";
       hintEasy.textContent = "";
+    }
+
+    function clearVoiceHints() {
+      voiceHintAgain.textContent = "";
+      voiceHintHard.textContent = "";
+      voiceHintGood.textContent = "";
+      voiceHintEasy.textContent = "";
     }
 
     function updateSilentDueHints() {
@@ -6275,6 +6309,46 @@ speakWithWebTts(
       hintHard.textContent = "Next in " + formatInterval(hardMinutes);
       hintGood.textContent = "Next in " + formatInterval(goodMinutes);
       hintEasy.textContent = "Next in " + formatInterval(easyMinutes);
+    }
+
+    function updateVoiceDueHints() {
+      if (!currentCard || noScheduleChanges) {
+        clearVoiceHints();
+        return;
+      }
+      const deckId = currentDeckId;
+      const cardId = currentCard.id;
+
+      // "Again" always means ~5 minutes (back to ladder level 1)
+      voiceHintAgain.textContent = "5 min >";
+
+      const hardMinutes = previewIntervalMinutes(deckId, cardId, "hard");
+      const goodMinutes = previewIntervalMinutes(deckId, cardId, "good");
+      const easyMinutes = previewIntervalMinutes(deckId, cardId, "easy");
+
+      function formatInterval(minutes) {
+        if (minutes < 60) {
+          const m = Math.max(1, Math.round(minutes));
+          return m + " min";
+        }
+        const hours = minutes / 60;
+        if (hours < 24) {
+          const h = Math.max(1, Math.round(hours));
+          return h + " hr" + (h === 1 ? "" : "s");
+        }
+        const days = minutes / MINUTES_PER_DAY;
+        if (days < 14) {
+          const d = Math.max(1, Math.round(days));
+          return d + " day" + (d === 1 ? "" : "s");
+        }
+        const weeks = days / 7;
+        const w = Math.max(1, Math.round(weeks));
+        return w + " wk" + (w === 1 ? "" : "s");
+      }
+
+      voiceHintHard.textContent = "Next in " + formatInterval(hardMinutes);
+      voiceHintGood.textContent = "Next in " + formatInterval(goodMinutes);
+      voiceHintEasy.textContent = "Next in " + formatInterval(easyMinutes);
     }
 
     function runSilentLoop() {
@@ -6485,6 +6559,7 @@ if (overdue.length > 0) {
     }
 
     voiceRatingButtons.classList.add("hidden");
+    clearVoiceHints();
     runVoiceLoopAfterRating();
   });
 }
