@@ -4362,6 +4362,17 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
   if (!voiceSkipToAnswerBtn) return;
   voiceSkipToAnswerBtn.disabled = !enabled;
 }
+        function setPauseResumeEnabled(enabled) {
+  if (!pauseBtn || !resumeBtn) return;
+  // Only enable pause if not currently paused, only enable resume if paused
+  if (enabled) {
+    pauseBtn.disabled = isPaused;
+    resumeBtn.disabled = !isPaused;
+  } else {
+    pauseBtn.disabled = true;
+    resumeBtn.disabled = true;
+  }
+}
         function setRepeatQuestionEnabled(enabled) {
   if (voiceRepeatQuestionBtn) voiceRepeatQuestionBtn.disabled = !enabled;
   if (silentRepeatQuestionBtn) silentRepeatQuestionBtn.disabled = !enabled;
@@ -5265,12 +5276,17 @@ async function speakAndGoToMainMenu() {
       hasSpokenCurrentAnswer = false;
       hasSpokenCurrentQuestion = false;
 
+      // 🚫 Disable pause/resume during repeat question
+      setPauseResumeEnabled(false);
+
       setStatus("Repeating card...");
       setStudyState(StudyState.SHOWING_QUESTION);
 
       hasSpokenCurrentQuestion = true;
     speakWithWebTts(getPlainTextFromCard(currentCard.question), () => {
       if (isPaused) return;
+      // ✅ Re-enable pause/resume after repeat question finishes
+      setPauseResumeEnabled(true);
       setVoiceSkipToAnswerEnabled(true);
 
   if (answerMode === "delay") {
@@ -5475,6 +5491,7 @@ async function handleGlobalVoiceCommands(text) {
       pendingStudyAheadAdvance = false;
       stopListeningForCommand();
     }
+    // ✅ Pause/resume stays enabled during repeat answer (already enabled)
      speakPlainAnswerWithCardLang("", () => {
     if (isPaused) return;
 
@@ -5868,6 +5885,9 @@ function echoRatingThenContinue(ratingKey, next) {
   const prevMicMuted = isMicMuted;
   isMicMuted = true;
 
+  // 🚫 Disable pause/resume during rating confirmation
+  setPauseResumeEnabled(false);
+
   // Optional: disable onscreen rating buttons during echo (prevents accidental taps)
   setVoiceRatingButtonsEnabled(false);
 
@@ -5878,6 +5898,7 @@ function echoRatingThenContinue(ratingKey, next) {
 
     // Re-enable rating buttons (though you usually hide them right after)
     setVoiceRatingButtonsEnabled(true);
+    // ✅ Pause/resume stays disabled until next card's question finishes
 
     next && next();
   }, { lang: "en-US" });
@@ -5894,6 +5915,9 @@ function speakAnswerThenAskDifficulty() {
   setFlashcardFlipped("voice", true);
   setCardContent(voiceAnswerText, currentCard.answer);
 
+  // ✅ Pause/resume stays enabled during answer window and answer audio
+  // (already enabled after question finished)
+
   // ✅ get language for the ANSWER
   const deck = getDeckById(currentDeckId);
   const { aLang } = getCardLangs(deck, currentCard);
@@ -5904,6 +5928,7 @@ function speakAnswerThenAskDifficulty() {
     getPlainTextFromCard(currentCard.answer),
     async () => {
       if (isPaused) return;
+      // ✅ Pause/resume stays enabled during rating prompt
 
       // ===== STUDY-AHEAD HANDS-FREE: always respect the study-ahead gap and never ask for rating =====
       if (noScheduleChanges && studyAheadSession) {
@@ -6125,6 +6150,9 @@ function speakAnswerThenAskDifficulty() {
         return;
       }
 
+      // 🚫 Disable pause/resume buttons at start of new card
+      setPauseResumeEnabled(false);
+
         stopListeningForCommand(); // ✅ ensure nothing is listening from study-ahead gap
 
       clearStudyAheadGapTimer();
@@ -6280,6 +6308,8 @@ speakWithWebTts(
   getPlainTextFromCard(currentCard.question),
   () => {
     if (isPaused) return;
+    // ✅ Enable pause/resume after question audio finishes
+    setPauseResumeEnabled(true);
     setVoiceSkipToAnswerEnabled(true);
 
       if (answerMode === "delay") {
