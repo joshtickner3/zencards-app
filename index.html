@@ -2463,20 +2463,8 @@ let loginAbortController = null;
               }
             }
           } catch (e) { console.warn("[LOGIN] localStorage cleanup failed", e); }
-          
-          // Check error type for better messages
-          const errMsg = res.error.message.toLowerCase();
-          if (errMsg.includes("invalid login credentials")) {
-            // Supabase returns this for both wrong password AND user not found (for security)
-            loginMsg.textContent = "User not found or incorrect password";
-          } else if (errMsg.includes("email not confirmed")) {
-            loginMsg.textContent = "Please confirm your email first. Check your inbox.";
-          } else {
-            loginMsg.textContent = res.error.message;
-          }
+          loginMsg.textContent = res.error.message;
           loginMsg.className = "modalMsg error";
-          loginInFlight = false;
-          resetLoginButton();
           return;
         }
 
