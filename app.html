@@ -3298,6 +3298,43 @@ let speakGeneration = 0;
       recognition.interimResults = false;
       recognition.continuous = false;
       recognition.maxAlternatives = 3; // tiny robustness boost, still using top result
+      
+      // Request higher quality audio for better accuracy
+      try {
+        if (navigator.mediaDevices && navigator.mediaDevices.getSupportedConstraints) {
+          const constraints = navigator.mediaDevices.getSupportedConstraints();
+          if (constraints.echoCancellation) recognition.echoCancellation = true;
+          if (constraints.noiseSuppression) recognition.noiseSuppression = true;
+          if (constraints.autoGainControl) recognition.autoGainControl = true;
+        }
+      } catch (e) {
+        console.warn("Could not set audio quality constraints:", e);
+      }
+      
+      // Grammar hints - tell browser what commands to expect
+      // (Note: SpeechGrammarList support is limited, but helps in supported browsers)
+      try {
+        const SpeechGrammarList = window.SpeechGrammarList || window.webkitSpeechGrammarList;
+        if (SpeechGrammarList) {
+          const grammarList = new SpeechGrammarList();
+          const commands = [
+            "again", "hard", "good", "easy",
+            "repeat question", "repeat answer",
+            "show answer", "skip to answer",
+            "pause study session", "resume study session",
+            "main menu", "go to the next card",
+            "study ahead mode", "study ahead",
+            "edit card", "delete card"
+          ];
+          // Create a simple grammar (higher weight = more likely)
+          const grammar = '#JSGF V1.0; grammar commands; public <command> = ' + 
+            commands.join(' | ') + ' ;';
+          grammarList.addFromString(grammar, 1);
+          recognition.grammars = grammarList;
+        }
+      } catch (e) {
+        console.warn("Could not set grammar hints:", e);
+      }
     }
 
     // >>> NEW: explicit microphone permission helper (kept as-is, though not called now) <<<
