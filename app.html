@@ -997,6 +997,14 @@ input[type="number"]:focus-visible{
             <input type="number" id="studyAheadGapSeconds" min="1" max="60" value="4" style="width:60px;" />
             <span>seconds</span>
           </div>
+          <!-- NEW: Restate question in answer for better retention -->
+          <div style="margin-top:0.5rem;">
+            <label class="inline">
+              <input type="checkbox" id="restateQuestionInAnswer" checked />
+              Restate question as statement before answer (improves retention)
+              <span class="badge">New</span>
+            </label>
+          </div>
         </div>
       </div>
 
@@ -2865,8 +2873,17 @@ function speakPlainAnswerWithCardLang(prefixText = "", onEnd) {
   if (!card) { if (onEnd) onEnd(); return; }
 
   const { aLang } = getCardLangs(deck, card);
-  const answer = getPlainTextFromCard(card.answer || "");
+  let answer = getPlainTextFromCard(card.answer || "");
   if (!answer.trim()) { if (onEnd) onEnd(); return; }
+
+  // Add question restatement if enabled
+  if (restateQuestionEnabled && card.question && !prefixText) {
+    const questionText = getPlainTextFromCard(card.question);
+    const statementPrefix = questionToStatement(questionText);
+    if (statementPrefix) {
+      answer = statementPrefix + ' ' + answer;
+    }
+  }
 
   const textToSpeak = prefixText ? (prefixText + answer) : answer;
   speakWithWebTts(textToSpeak, onEnd, { lang: aLang });
@@ -3266,6 +3283,132 @@ function setCardContent(el, raw) {
       console.error("MathJax error:", err);
     });
   }
+}
+
+// Convert a question into a statement for answer reinforcement
+// Examples:
+//   "What is the capital of France?" -> "The capital of France is"
+//   "Who invented the telephone?" -> "The inventor of the telephone is"
+//   "When did WWII end?" -> "WWII ended"
+//   "How does photosynthesis work?" -> "Photosynthesis works"
+//   "Why is the sky blue?" -> "The sky is blue because"
+function questionToStatement(question) {
+  if (!question || typeof question !== 'string') return '';
+  
+  let q = question.trim();
+  
+  // Remove question mark and any trailing punctuation
+  q = q.replace(/[?!.]+$/, '').trim();
+  
+  // Common question patterns with transformations
+  
+  // "What is/are/was/were..." -> "... is/are/was/were"
+  if (/^what\s+(is|are|was|were|will be|has been)\s+/i.test(q)) {
+    return q.replace(/^what\s+(is|are|was|were|will be|has been)\s+(.+)/i, 'The $2 $1') + ',';
+  }
+  
+  // "Who is/was/invented/discovered..." -> "... is/was"
+  if (/^who\s+(is|are|was|were|invented|discovered|created|founded)\s+/i.test(q)) {
+    return q.replace(/^who\s+(invented|discovered|created|founded)\s+(.+)/i, 'The inventor of $2 is') + ',';
+  }
+  if (/^who\s+(is|are|was|were)\s+/i.test(q)) {
+    return q.replace(/^who\s+(is|are|was|were)\s+(.+)/i, '$2 $1') + ',';
+  }
+  
+  // "When did/does/will..." -> "... happened/occurs/will occur in"
+  if (/^when\s+(did|does|will|was|is)\s+/i.test(q)) {
+    return q.replace(/^when\s+(did)\s+(.+)/i, '$2,') + '';
+  }
+  
+  // "Where is/was/are..." -> "... is/was/are located at/in"
+  if (/^where\s+(is|are|was|were)\s+/i.test(q)) {
+    return q.replace(/^where\s+(is|are|was|were)\s+(.+)/i, '$2 $1 located at') + ',';
+  }
+  
+  // "How does/do/did..." -> "... works/work/worked"
+  if (/^how\s+(does|do|did|can|could)\s+/i.test(q)) {
+    return q.replace(/^how\s+does\s+(.+)/i, '$1') + ',';
+  }
+  if (/^how\s+(many|much)\s+/i.test(q)) {
+    return q.replace(/^how\s+(many|much)\s+(.+)/i, 'The number of $2 is') + ',';
+  }
+  
+  // "Why is/does/did..." -> "... is/does/did ... because"
+  if (/^why\s+(is|are|does|do|did|was|were)\s+/i.test(q)) {
+    return q.replace(/^why\s+(is|are|does|do|did|was|were)\s+(.+)/i, '$2 $1,') + ' because';
+  }
+  
+  // "Which..." -> "The one that..."
+  if (/^which\s+/i.test(q)) {
+    return q.replace(/^which\s+(.+)/i, 'The $1 that') + ',';
+  }
+  
+  // "Can/Could/Should/Would..." -> "Yes/No,"
+  if (/^(can|could|should|would|will|is|are|do|does|did)\s+/i.test(q)) {
+    return 'The answer is,';
+  }
+  
+  // Imperative/command prompts: "Describe...", "Explain...", "List...", "Name...", "Define..."
+  if (/^(describe|explain|list|name|define|identify|compare|contrast|discuss|summarize|outline|state|give|provide|calculate|determine|find|solve|prove|show|demonstrate)\s+/i.test(q)) {
+    return q.replace(/^(describe|explain|list|name|define|identify|compare|contrast|discuss|summarize|outline|state|give|provide|calculate|determine|find|solve|prove|show|demonstrate)\s+(.+)/i, 
+      function(match, verb, rest) {
+        // Convert imperative to gerund form when possible
+        const verbMap = {
+          'describe': 'Describing',
+          'explain': 'Explaining',
+          'list': 'Listing',
+          'name': 'Naming',
+          'define': 'Defining',
+          'identify': 'Identifying',
+          'compare': 'Comparing',
+          'contrast': 'Contrasting',
+          'discuss': 'Discussing',
+          'summarize': 'Summarizing',
+          'outline': 'Outlining',
+          'state': 'Stating',
+          'give': 'Giving',
+          'provide': 'Providing',
+          'calculate': 'Calculating',
+          'determine': 'Determining',
+          'find': 'Finding',
+          'solve': 'Solving',
+          'prove': 'Proving',
+          'show': 'Showing',
+          'demonstrate': 'Demonstrating'
+        };
+        const gerund = verbMap[verb.toLowerCase()] || verb;
+        return gerund + ' ' + rest + ':';
+      }
+    );
+  }
+  
+  // "What are the..." (plural form) -> "The ... are"
+  if (/^what\s+are\s+the\s+/i.test(q)) {
+    return q.replace(/^what\s+are\s+the\s+(.+)/i, 'The $1 are') + ',';
+  }
+  
+  // "True or false" questions -> "The statement is"
+  if (/^(true\s+or\s+false|t\/f)/i.test(q)) {
+    return 'The statement is';
+  }
+  
+  // "Fill in the blank" or similar -> just use the text
+  if (/^(fill\s+in|complete\s+the)/i.test(q)) {
+    return q + ':';
+  }
+  
+  // "Translate..." -> "Translating..."
+  if (/^translate\s+/i.test(q)) {
+    return q.replace(/^translate\s+(.+)/i, 'Translating $1:');
+  }
+  
+  // "Convert..." -> "Converting..."
+  if (/^convert\s+/i.test(q)) {
+    return q.replace(/^convert\s+(.+)/i, 'Converting $1:');
+  }
+  
+  // Default: just return the question text with a comma (no transformation)
+  return q + ',';
 }
 
 // Strip HTML tags so TTS doesn't try to read "<img ...>" etc
@@ -4274,6 +4417,7 @@ function getStudyPrefs() {
   if (typeof p.studyAheadGapSec !== "number") p.studyAheadGapSec = 4;
   if (typeof p.autoEnterStudyAhead !== "boolean") p.autoEnterStudyAhead = true;
   if (typeof p.loopStudyAhead !== "boolean") p.loopStudyAhead = true;
+  if (typeof p.restateQuestionInAnswer !== "boolean") p.restateQuestionInAnswer = true; // default enabled
 
   // Clamp numeric values
   p.answerDelaySec = Math.max(1, Math.min(60, Math.floor(p.answerDelaySec)));
@@ -4312,6 +4456,7 @@ function saveStudyPrefs(patch = {}) {
     const studyAheadGapSecondsInput = document.getElementById("studyAheadGapSeconds");
 const autoEnterStudyAheadCheckbox = document.getElementById("autoEnterStudyAhead");
 const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
+    const restateQuestionInAnswerCheckbox = document.getElementById("restateQuestionInAnswer");
     const startVoiceBtn = document.getElementById("startVoiceBtn");
 
     const startSilentBtn = document.getElementById("startSilentBtn");
@@ -4430,6 +4575,10 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
   if (autoEnterStudyAheadCheckbox) autoEnterStudyAheadCheckbox.checked = !!p.autoEnterStudyAhead;
   if (loopStudyAheadCheckbox) loopStudyAheadCheckbox.checked = !!p.loopStudyAhead;
 
+  if (restateQuestionInAnswerCheckbox) {
+    restateQuestionInAnswerCheckbox.checked = (p.restateQuestionInAnswer !== false); // default true
+  }
+
   // Make auto rating select enabled/disabled correctly
   if (autoRatingSelect && autoGoodToggle) {
     autoRatingSelect.disabled = !autoGoodToggle.checked;
@@ -4454,6 +4603,8 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
 
   autoEnterStudyAhead = !!p.autoEnterStudyAhead;
   loopStudyAhead = !!p.loopStudyAhead;
+
+  restateQuestionEnabled = (p.restateQuestionInAnswer !== false); // default true
 }
 function wireStudyPrefsListeners() {
   if (skipInstructionsAfterFirstCheckbox) {
@@ -4544,6 +4695,13 @@ function wireStudyPrefsListeners() {
       applyStudyPrefsToUIAndState();
     });
   }
+
+  if (restateQuestionInAnswerCheckbox) {
+    restateQuestionInAnswerCheckbox.addEventListener("change", () => {
+      saveStudyPrefs({ restateQuestionInAnswer: !!restateQuestionInAnswerCheckbox.checked });
+      applyStudyPrefsToUIAndState();
+    });
+  }
 }
 
 
@@ -4590,6 +4748,7 @@ let loopStudyAhead = false;       // from Study Options
       handsFreeNextDelayMs = Math.max(0, Math.min(30, Number(handsFreeNextDelaySecondsInput.value))) * 1000;
     }
     let autoModeBehavior = "good"; // again | hard | good | easy | tomorrow
+    let restateQuestionEnabled = true; // Whether to prepend question-as-statement to answers
 
     function runVoiceLoopAfterRating() {
       setStudyState(StudyState.IDLE);
@@ -5920,10 +6079,20 @@ function speakAnswerThenAskDifficulty() {
   const deck = getDeckById(currentDeckId);
   const { aLang } = getCardLangs(deck, currentCard);
 
+  // Prepare answer text with optional question restatement
+  let answerText = getPlainTextFromCard(currentCard.answer);
+  if (restateQuestionEnabled && currentCard.question) {
+    const questionText = getPlainTextFromCard(currentCard.question);
+    const statementPrefix = questionToStatement(questionText);
+    if (statementPrefix) {
+      answerText = statementPrefix + ' ' + answerText;
+    }
+  }
+
   // 🔊 Speak the answer in its language
   stopListeningForCommand();
   speakWithWebTts(
-    getPlainTextFromCard(currentCard.answer),
+    answerText,
     async () => {
       if (isPaused) return;
       // ✅ Pause/resume stays enabled during rating prompt
