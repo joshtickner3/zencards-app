@@ -6317,9 +6317,9 @@ function speakAnswerThenAskDifficulty() {
       inStudyAheadAnswerGap = true;
 
       const startListeningAndTimer = () => {
-        if (!isPaused && currentMode === "voice") {
-          listenForCommand(handleVoiceTranscript);
-        }
+        // Don't listen for commands during the study-ahead gap countdown
+        // This prevents speaking from resetting the timer
+        // Global commands (pause, main menu) are still handled via button taps
         
         // Start countdown display
         const startTime = Date.now();
