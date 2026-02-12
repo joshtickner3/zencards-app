@@ -131,8 +131,8 @@ document.addEventListener('visibilitychange', function() {
       clearAnswerAfterSpeechDelay();
       if (typeof pauseBtn !== 'undefined') pauseBtn.disabled = true;
       if (typeof resumeBtn !== 'undefined') resumeBtn.disabled = false;
-      setStatus('Paused. Say "resume study session" or tap Resume.');
-      speakSafe('Paused.', () => {
+      setStatus('Paused study session. Say "resume study session" or tap Resume.');
+      speakSafe('Paused study session.', () => {
         listenForCommand(handleVoiceTranscript);
       });
     }
@@ -5242,7 +5242,7 @@ await stopAllAudio();
   if (currentMode === "voice") {
     setVoiceSkipToAnswerEnabled(false);
   }
-  setStatus("Paused. Say 'resume study session' or tap Resume.");
+  setStatus("Paused study session. Say 'resume study session' or tap Resume.");
 
   // keep listening while paused when paused via button
   if (currentMode === "voice" && speechSupported && recognition) {
@@ -5796,10 +5796,10 @@ if (
 
     pauseBtn.disabled = true;
     resumeBtn.disabled = false;
-    setStatus("Paused. Say 'resume study session' or tap Resume.");
+    setStatus("Paused study session. Say 'resume study session' or tap Resume.");
 
     // optional: quick confirmation, but it won't affect pause state
-    speakSafe("Paused.", () => {
+    speakSafe("Paused study session.", () => {
       // keep listening while paused so you can say "resume study session"
       listenForCommand(handleVoiceTranscript);
     });
@@ -5876,7 +5876,7 @@ if (
       });
     } else {
       // Stay paused, keep listening indefinitely
-      setStatus("Paused. Say 'resume study session' or tap Resume.");
+      setStatus("Paused study session. Say 'resume study session' or tap Resume.");
       listenForCommand(handleVoiceTranscript);
     }
     return;
@@ -5897,7 +5897,7 @@ if (
       if (autoGoodMode) {
         setStatus("You may not give voice commands in this mode.");
       } else {
-        setStatus("Wait until after answer to give voice commands in this answer behavior mode...");
+        setStatus("Wait until after answer to give voice commands in this answer behavior mode.");
       }
       startOrResetQuestionDelayTimer();
       return;
@@ -6411,7 +6411,7 @@ function speakAnswerThenAskDifficulty() {
 
     function runVoiceLoop() {
       if (isPaused) {
-        setStatus("Paused.");
+        setStatus("Paused study session.");
         return;
       }
 
@@ -6690,7 +6690,7 @@ speakWithWebTts(
 
     function runSilentLoop() {
       if (isPaused) {
-        setStatus("Paused.");
+        setStatus("Paused study session.");
         return;
       }
       const deck = getDeckById(currentDeckId);
