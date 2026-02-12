@@ -1155,10 +1155,39 @@ input[type="number"]:focus-visible{
         </div>
 
         <!-- Inline edit for voice mode -->
-        <div style="margin-top:0.5rem;">
-          <button id="voiceRepeatQuestionBtn" class="secondary small">Repeat Question</button>
-          <button id="voiceSkipToAnswerBtn" class="secondary small">Skip to Answer</button>
-          <button id="voiceEditToggleBtn" class="secondary small">Edit Card</button>
+        <div style="margin-top:0.5rem;display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;">
+          <div>
+            <button id="voiceRepeatQuestionBtn" class="secondary small">Repeat Question</button>
+            <button id="voiceSkipToAnswerBtn" class="secondary small">Skip to Answer</button>
+            <button id="voiceEditToggleBtn" class="secondary small">Edit Card</button>
+          </div>
+          
+          <!-- Rating buttons for hands-free mode (optional tap) - aligned to the right -->
+          <div id="voiceRatingButtons" class="hidden">
+            <span>How was that?</span><br />
+            
+            <div class="ratingRow">
+              <div class="ratingItem">
+                <button data-voice-rating="again">Again</button>
+                <span id="voice-hint-again" class="dueHint"></span>
+              </div>
+
+              <div class="ratingItem">
+                <button data-voice-rating="hard">Hard</button>
+                <span id="voice-hint-hard" class="dueHint"></span>
+              </div>
+
+              <div class="ratingItem">
+                <button data-voice-rating="good">Good</button>
+                <span id="voice-hint-good" class="dueHint"></span>
+              </div>
+
+              <div class="ratingItem">
+                <button data-voice-rating="easy">Easy</button>
+                <span id="voice-hint-easy" class="dueHint"></span>
+              </div>
+            </div>
+          </div>
         </div>
         <div id="voiceEditPanel" class="hidden" style="margin-top:0.75rem;">
           <label for="voiceEditQuestionLang">Question language (TTS):</label>
@@ -1174,32 +1203,6 @@ input[type="number"]:focus-visible{
           <div style="margin-top:0.5rem;">
             <button id="voiceSaveEditBtn">Save</button>
             <button id="voiceCancelEditBtn" class="secondary">Cancel</button>
-          </div>
-        </div>
-                <!-- Rating buttons for hands-free mode (optional tap) -->
-        <div id="voiceRatingButtons" class="hidden" style="margin-top:0.5rem;">
-          <span>How was that?</span><br />
-          
-          <div class="ratingRow">
-            <div class="ratingItem">
-              <button data-voice-rating="again">Again</button>
-              <span id="voice-hint-again" class="dueHint"></span>
-            </div>
-
-            <div class="ratingItem">
-              <button data-voice-rating="hard">Hard</button>
-              <span id="voice-hint-hard" class="dueHint"></span>
-            </div>
-
-            <div class="ratingItem">
-              <button data-voice-rating="good">Good</button>
-              <span id="voice-hint-good" class="dueHint"></span>
-            </div>
-
-            <div class="ratingItem">
-              <button data-voice-rating="easy">Easy</button>
-              <span id="voice-hint-easy" class="dueHint"></span>
-            </div>
           </div>
         </div>
       </div> <!-- end of #voiceUI -->
@@ -1240,37 +1243,41 @@ input[type="number"]:focus-visible{
           </div>
         </div>
 
-        <div style="margin-top:0.75rem;">
-          <button id="silentRepeatQuestionBtn" class="secondary">Repeat Question</button>
-          <button id="showAnswerBtn">Show Answer</button>
-          <!-- next card button for silent study-ahead -->
-          <button id="silentNextCardBtn" class="secondary hidden">Next Card</button>
+        <div style="margin-top:0.75rem;display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;">
+          <div>
+            <button id="silentRepeatQuestionBtn" class="secondary">Repeat Question</button>
+            <button id="showAnswerBtn">Show Answer</button>
+            <!-- next card button for silent study-ahead -->
+            <button id="silentNextCardBtn" class="secondary hidden">Next Card</button>
+          </div>
+          
+          <!-- Rating buttons for silent mode - aligned to the right -->
+          <div id="silentRatingButtons" class="hidden">
+            <span>How was that?</span>
+
+            <div class="ratingRow">
+              <div class="ratingItem">
+                <button data-rating="again">Again</button>
+                <span id="hint-again" class="dueHint"></span>
+              </div>
+
+              <div class="ratingItem">
+                <button data-rating="hard">Hard</button>
+                <span id="hint-hard" class="dueHint"></span>
+              </div>
+
+              <div class="ratingItem">
+                <button data-rating="good">Good</button>
+                <span id="hint-good" class="dueHint"></span>
+              </div>
+
+              <div class="ratingItem">
+                <button data-rating="easy">Easy</button>
+                <span id="hint-easy" class="dueHint"></span>
+              </div>
+            </div>
+          </div>
         </div>
-        <div id="silentRatingButtons" class="hidden" style="margin-top:0.5rem;">
-  <span>How was that?</span>
-
-  <div class="ratingRow">
-    <div class="ratingItem">
-      <button data-rating="again">Again</button>
-      <span id="hint-again" class="dueHint"></span>
-    </div>
-
-    <div class="ratingItem">
-      <button data-rating="hard">Hard</button>
-      <span id="hint-hard" class="dueHint"></span>
-    </div>
-
-    <div class="ratingItem">
-      <button data-rating="good">Good</button>
-      <span id="hint-good" class="dueHint"></span>
-    </div>
-
-    <div class="ratingItem">
-      <button data-rating="easy">Easy</button>
-      <span id="hint-easy" class="dueHint"></span>
-    </div>
-  </div>
-</div>
         <!-- Completion controls for silent mode -->
         <div id="silentCompletionControls" class="hidden" style="margin-top:0.75rem;">
           <button id="silentMainMenuBtn">Main Menu</button>
