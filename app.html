@@ -6536,9 +6536,8 @@ speakWithWebTts(
     // 🚫 Add Card stays disabled during answer window
 
       if (answerMode === "delay") {
-        if (!autoGoodMode) {
-          listenForCommand(handleVoiceTranscript);
-        }
+        // Always listen for voice commands during the delay period
+        listenForCommand(handleVoiceTranscript);
         startOrResetQuestionDelayTimer();
       } else {
       awaitingAnswerSignal = true;
