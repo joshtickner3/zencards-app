@@ -1507,7 +1507,8 @@ const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
           await supabaseClient.auth.signOut();
           modal.remove();
           alert('Your account and subscription have been deleted.');
-          window.location.reload();
+          // Redirect to landing page instead of reloading
+          window.location.href = 'index.html';
         } catch (e) {
           console.error('[DeleteAccount] Exception:', e);
           errorDiv.textContent = 'Failed to delete account. Please contact support.';
