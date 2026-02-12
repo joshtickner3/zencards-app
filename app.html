@@ -5358,13 +5358,13 @@ setCardContent(voiceAnswerText, currentCard.answer);
         setFlashcardFlipped("silent", false);
         setStudyState(StudyState.SHOWING_QUESTION);
         if (showAnswerBtn) showAnswerBtn.classList.remove("hidden");
-        if (silentRatingButtons) silentRatingButtons.classList.add("hidden");
+        // Keep rating buttons visible during question
         if (noScheduleChanges) {
           silentNextCardBtn.classList.remove("hidden");
         } else {
           silentNextCardBtn.classList.add("hidden");
         }
-        clearSilentHints();
+        // Don't clear hints - keep them visible
       });
     }
 
@@ -5456,7 +5456,7 @@ async function speakAndGoToMainMenu() {
 
       // Hide answer again and reset flags
       setFlashcardFlipped("voice", false);
-      if (voiceRatingButtons) voiceRatingButtons.classList.add("hidden");
+      // Keep rating buttons visible during question
       setVoiceSkipToAnswerEnabled(false);
       hasSpokenCurrentAnswer = false;
       hasSpokenCurrentQuestion = false;
@@ -6751,7 +6751,12 @@ if (overdue.length > 0) {
       setCardContent(silentQuestionText, currentCard.question);
     setCardContent(silentAnswerText, currentCard.answer);
       setFlashcardFlipped("silent", false);
-      silentRatingButtons.classList.add("hidden");
+      if (noScheduleChanges) {
+        silentRatingButtons.classList.add("hidden");
+      } else {
+        silentRatingButtons.classList.remove("hidden");
+        updateSilentDueHints();
+      }
       clearSilentHints();
       silentEditPanel.classList.add("hidden");
 
