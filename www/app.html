@@ -1,19 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-   <style>
-    .instructions-top-right {
-      position: static;
-      display: flex;
-      justify-content: center;
-      margin: 0.35rem 0 0.9rem;
-      z-index: auto;
-    }
-    .instructions-top-right button{
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-    }
-  </style>
+    <style>
+  .instructions-top-right {
+    position: static;
+    display: flex;
+    justify-content: center;
+    margin: 0.35rem 0 0.9rem;
+    z-index: auto;
+  }
+  .instructions-top-right button{
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+</style>
     <!-- Capacitor Preferences for robust session persistence on iOS -->
     <script type="module">
       import { Preferences } from '@capacitor/preferences';
@@ -35,16 +35,16 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <meta charset="UTF-8" />
-  <link rel="icon" href="../favicon.png" />
-  <link rel="shortcut icon" href="../favicon.png" />
-  <link rel="icon" type="image/png" sizes="32x32" href="../favicon.png" />
-  <link rel="apple-touch-icon" sizes="180x180" href="../favicon.png" />
+  <link rel="icon" href="favicon.png" />
+  <link rel="shortcut icon" href="favicon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="favicon.png" />
   <meta property="og:title" content="Live Life to the Fullest as a Student" />
-  <meta property="og:image" content="../favicon.png" />
+  <meta property="og:image" content="favicon.png" />
   <meta property="og:type" content="website" />
   <meta name="twitter:card" content="summary" />
   <meta name="twitter:title" content="Live Life to the Fullest as a Student" />
-  <meta name="twitter:image" content="../favicon.png" />
+  <meta name="twitter:image" content="favicon.png" />
   <title>Live Life to the Fullest as a Student</title>
   <script>
     // --- Persist and Restore Study Settings ---
@@ -160,7 +160,7 @@ document.addEventListener('visibilitychange', function() {
 </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root{
   --bg1:#0b1222;
@@ -245,7 +245,7 @@ document.addEventListener('visibilitychange', function() {
   margin:0;
   padding:1.25rem;
   padding-top: calc(var(--topBarClearance) + env(safe-area-inset-top, 0px));
-  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: "Inter Tight", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   color-scheme: dark;
   background:
     radial-gradient(800px 400px at 20% -10%, rgba(56,189,248,0.12), transparent 55%),
@@ -253,6 +253,9 @@ document.addEventListener('visibilitychange', function() {
     linear-gradient(160deg, var(--bg1), var(--bg2));
   color: var(--text);
   line-height:1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.011em;
 }
 ::selection{
   background: rgba(34,211,238,0.32);
@@ -797,7 +800,13 @@ input[type="number"]:focus-visible{
   <img src="zencards-logo.png" alt="ZenCards logo" class="brandLogo" />
 </div>
 
-    <p class="appSubtitle">Hands-free & silent spaced&nbsp;repetition flashcards</p>
+    <p class="appSubtitle">Live the student experience to the fullest</p>
+
+        <div class="instructions-top-right">
+  <button id="openInstructionsBtn" class="secondary small" type="button">
+    Instructions / Voice Commands
+  </button>
+</div>
 
     <!-- ========== MAIN SETTINGS / MENU ========== -->
     <div id="mainMenu" class="card">
@@ -945,14 +954,14 @@ input[type="number"]:focus-visible{
             <label class="inline" for="handsFreeNextDelaySeconds">
               Delay after rating before next question
             </label>
-            <input type="number" id="handsFreeNextDelaySeconds" min="0" max="30" value="4" style="width:60px;" />
+            <input type="number" id="handsFreeNextDelaySeconds" min="3" max="30" value="3" style="width:60px;" />
             <span>seconds</span>
           </div>
           <div style="margin-top:0.5rem;">
             <label class="inline" for="answerToRatingDelaySeconds">
               Delay after answer before rating prompt
             </label>
-            <input type="number" id="answerToRatingDelaySeconds" min="0" max="30" value="4" style="width:60px;" />
+            <input type="number" id="answerToRatingDelaySeconds" min="3" max="30" value="5" style="width:60px;" />
             <span>seconds</span>
           </div>
           <!-- NEW: auto study-ahead options -->
@@ -974,7 +983,7 @@ input[type="number"]:focus-visible{
               <div class="inline">
                 <input type="radio" name="answerMode" id="answerModeDelay" value="delay" />
                 <label for="answerModeDelay">Wait</label>
-                <input type="number" id="answerDelaySeconds" min="1" max="60" value="4" style="width:60px;" />
+                <input type="number" id="answerDelaySeconds" min="3" max="60" value="10" style="width:60px;" />
                 <span>seconds before answer</span>
               </div>
               <div class="inline">
@@ -988,8 +997,23 @@ input[type="number"]:focus-visible{
             <label class="inline" for="studyAheadGapSeconds">
               Study-ahead: delay after answer before next question
             </label>
-            <input type="number" id="studyAheadGapSeconds" min="1" max="60" value="4" style="width:60px;" />
+            <input type="number" id="studyAheadGapSeconds" min="3" max="60" value="6" style="width:60px;" />
             <span>seconds</span>
+          </div>
+          <!-- NEW: Restate question in answer for better retention -->
+          <div style="margin-top:0.5rem;">
+            <label class="inline">
+              <input type="checkbox" id="restateQuestionInAnswer" checked />
+              Restate question as statement before answer (improves retention)
+              <span class="badge">New</span>
+            </label>
+          </div>
+          <!-- NEW: Disable opening prompt -->
+          <div style="margin-top:0.5rem;">
+            <label class="inline">
+              <input type="checkbox" id="disableOpeningPrompt" />
+              Disable opening prompt (skip intro, start with first question)
+            </label>
           </div>
         </div>
       </div>
@@ -1074,6 +1098,9 @@ input[type="number"]:focus-visible{
       </div>
 
       <audio id="bgMusic" src="Zen-Meditation.mp3" loop preload="auto"></audio>
+      <div style="text-align:center;font-size:0.7rem;color:#64748b;margin-top:0.5rem;opacity:0.6;">
+        Music: "Zen meditation" by yura.megis
+      </div>
 
       <!-- Study mode buttons -->
       <div class="card">
@@ -1084,17 +1111,9 @@ input[type="number"]:focus-visible{
 
         </div>
 
-
-           <!-- Instructions Button Top Right -->
-    <div class="instructions-top-right">
-      <button id="openInstructionsBtn" class="secondary small" type="button">
-        Instructions / Voice Commands
-      </button>
-    </div>
-
         <p style="font-size:0.85rem;color:#9ca3af;margin-top:0.5rem;">
           Voice commands (hands-free): "again", "hard", "good", "easy", "go to the next card",
-          "repeat question", "repeat answer", "pause study session",
+          "repeat question", "repeat answer", "pause study session", "show answer", "skip to answer",
           "resume study session", "main menu", "mute microphone".
         </p>
       </div>
@@ -1149,10 +1168,37 @@ input[type="number"]:focus-visible{
         </div>
 
         <!-- Inline edit for voice mode -->
-        <div style="margin-top:0.5rem;">
-          <button id="voiceRepeatQuestionBtn" class="secondary small">Repeat Question</button>
-          <button id="voiceSkipToAnswerBtn" class="secondary small">Skip to Answer</button>
-          <button id="voiceEditToggleBtn" class="secondary small">Edit Card</button>
+        <div style="margin-top:0.5rem;display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;">
+          <div>
+            <button id="voiceRepeatQuestionBtn" class="secondary small">Repeat Question</button>
+            <button id="voiceSkipToAnswerBtn" class="secondary small">Skip to Answer</button>
+            <button id="voiceEditToggleBtn" class="secondary small">Edit Card</button>
+          </div>
+          
+          <!-- Rating buttons for hands-free mode (optional tap) - aligned to the right -->
+          <div id="voiceRatingButtons" class="hidden">
+            <div class="ratingRow">
+              <div class="ratingItem">
+                <button data-voice-rating="again">Again</button>
+                <span id="voice-hint-again" class="dueHint"></span>
+              </div>
+
+              <div class="ratingItem">
+                <button data-voice-rating="hard">Hard</button>
+                <span id="voice-hint-hard" class="dueHint"></span>
+              </div>
+
+              <div class="ratingItem">
+                <button data-voice-rating="good">Good</button>
+                <span id="voice-hint-good" class="dueHint"></span>
+              </div>
+
+              <div class="ratingItem">
+                <button data-voice-rating="easy">Easy</button>
+                <span id="voice-hint-easy" class="dueHint"></span>
+              </div>
+            </div>
+          </div>
         </div>
         <div id="voiceEditPanel" class="hidden" style="margin-top:0.75rem;">
           <label for="voiceEditQuestionLang">Question language (TTS):</label>
@@ -1169,14 +1215,6 @@ input[type="number"]:focus-visible{
             <button id="voiceSaveEditBtn">Save</button>
             <button id="voiceCancelEditBtn" class="secondary">Cancel</button>
           </div>
-        </div>
-                <!-- Rating buttons for hands-free mode (optional tap) -->
-        <div id="voiceRatingButtons" class="hidden" style="margin-top:0.5rem;">
-          <span>How was that?</span><br />
-          <button data-voice-rating="again">Again</button>
-          <button data-voice-rating="hard">Hard</button>
-          <button data-voice-rating="good">Good</button>
-          <button data-voice-rating="easy">Easy</button>
         </div>
       </div> <!-- end of #voiceUI -->
 
@@ -1216,37 +1254,39 @@ input[type="number"]:focus-visible{
           </div>
         </div>
 
-        <div style="margin-top:0.75rem;">
-          <button id="silentRepeatQuestionBtn" class="secondary">Repeat Question</button>
-          <button id="showAnswerBtn">Show Answer</button>
-          <!-- next card button for silent study-ahead -->
-          <button id="silentNextCardBtn" class="secondary hidden">Next Card</button>
+        <div style="margin-top:0.75rem;display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;">
+          <div>
+            <button id="silentRepeatQuestionBtn" class="secondary">Repeat Question</button>
+            <button id="showAnswerBtn">Show Answer</button>
+            <!-- next card button for silent study-ahead -->
+            <button id="silentNextCardBtn" class="secondary hidden">Next Card</button>
+          </div>
+          
+          <!-- Rating buttons for silent mode - aligned to the right -->
+          <div id="silentRatingButtons" class="hidden">
+            <div class="ratingRow">
+              <div class="ratingItem">
+                <button data-rating="again">Again</button>
+                <span id="hint-again" class="dueHint"></span>
+              </div>
+
+              <div class="ratingItem">
+                <button data-rating="hard">Hard</button>
+                <span id="hint-hard" class="dueHint"></span>
+              </div>
+
+              <div class="ratingItem">
+                <button data-rating="good">Good</button>
+                <span id="hint-good" class="dueHint"></span>
+              </div>
+
+              <div class="ratingItem">
+                <button data-rating="easy">Easy</button>
+                <span id="hint-easy" class="dueHint"></span>
+              </div>
+            </div>
+          </div>
         </div>
-        <div id="silentRatingButtons" class="hidden" style="margin-top:0.5rem;">
-  <span>How was that?</span>
-
-  <div class="ratingRow">
-    <div class="ratingItem">
-      <button data-rating="again">Again</button>
-      <span id="hint-again" class="dueHint"></span>
-    </div>
-
-    <div class="ratingItem">
-      <button data-rating="hard">Hard</button>
-      <span id="hint-hard" class="dueHint"></span>
-    </div>
-
-    <div class="ratingItem">
-      <button data-rating="good">Good</button>
-      <span id="hint-good" class="dueHint"></span>
-    </div>
-
-    <div class="ratingItem">
-      <button data-rating="easy">Easy</button>
-      <span id="hint-easy" class="dueHint"></span>
-    </div>
-  </div>
-</div>
         <!-- Completion controls for silent mode -->
         <div id="silentCompletionControls" class="hidden" style="margin-top:0.75rem;">
           <button id="silentMainMenuBtn">Main Menu</button>
@@ -1295,63 +1335,79 @@ input[type="number"]:focus-visible{
 
   <div class="modalCard" role="dialog" aria-modal="true" aria-labelledby="instructionsModalTitle">
     <div class="row" style="justify-content:space-between;align-items:center;">
-      <h3 id="instructionsModalTitle" style="margin:0;">How ZenCards Works</h3>
+      <h3 id="instructionsModalTitle" style="margin:0;">How to Study with ZenCards</h3>
       <button id="instructionsCloseBtn" class="secondary small" type="button">Close</button>
     </div>
 
     <div style="margin-top:0.75rem;max-height:70vh;overflow:auto;">
 
-      <h3>📊 Ratings (Again / Hard / Good / Easy)</h3>
-      <p style="color:#9ca3af;margin-top:0.25rem;">
-        Ratings decide when you’ll see the card again. “Again” brings it back soonest, “Easy” pushes it out the farthest.
-      </p>
-      <ul style="margin-top:0.5rem;">
-        <li><strong>Again</strong> — you didn’t remember it (restarts the learning ladder).</li>
-        <li><strong>Hard</strong> — you remembered, but it was tough (slower progress).</li>
-        <li><strong>Good</strong> — you remembered normally (standard progress).</li>
-        <li><strong>Easy</strong> — you remembered instantly (faster progress).</li>
+      <!-- QUICK START -->
+      <div style="background:#064e3b;border:2px solid #10b981;border-radius:8px;padding:1rem;margin-bottom:1rem;">
+        <h3 style="margin:0 0 0.5rem 0;color:#10b981;">🚀 Quick Start</h3>
+        <ol style="margin:0;padding-left:1.5rem;color:#d1d5db;">
+          <li>Choose a deck and tap <strong>Hands-Free Study</strong></li>
+          <li>Listen to the question, wait for the audio to finish, then say <strong>"answer"</strong> or <strong>"skip to answer"</strong>. You may use any of the voice commands from the list below at this time.</li>
+          <li>After the answer plays, the system will prompt you — say <strong>again / hard / good / easy</strong>. Any of the voice commands from the below list may be used here as well, except for "mute microphone".</li>
+        </ol>
+      </div>
+
+      <!-- GOLDEN RULE -->
+      <div style="background:#78350f;border:2px solid #f59e0b;border-radius:8px;padding:1rem;margin-bottom:1rem;">
+        <h3 style="margin:0 0 0.5rem 0;color:#fbbf24;">⚠️ Golden Rule</h3>
+        <p style="margin:0;color:#fde68a;font-size:1.05rem;">
+          <strong>Only speak AFTER the audio finishes.</strong> Wait for the system to finish speaking the question audio or rating prompt before giving voice commands. Voice commands during playback will not work. ZenCards requires exact wording for voice commands and ratings to ensure users can maintain complete control over their study session without background noise interference.
+        </p>
+      </div>
+
+      <!-- CARD FLOW -->
+      <div style="background:#1e3a8a;border:2px solid #3b82f6;border-radius:8px;padding:1rem;margin-bottom:1rem;">
+        <h3 style="margin:0 0 0.5rem 0;color:#60a5fa;">🔄 How Each Card Works</h3>
+        <ol style="margin:0;padding-left:1.5rem;color:#bfdbfe;">
+          <li><strong>System reads the question</strong> → Wait for it to finish</li>
+          <li><strong>You say "answer"</strong> (or "skip to answer") → System plays the answer</li>
+          <li><strong>System asks for rating</strong> → Say <strong>again / hard / good / easy</strong></li>
+        </ol>
+      </div>
+
+      <!-- RATINGS -->
+      <h3 style="margin-top:1.5rem;">📊 What Each Rating Means</h3>
+      <ul style="margin-top:0.5rem;color:#9ca3af;">
+        <li><strong style="color:#ef4444;">Again</strong> — Didn't remember (card comes back soonest)</li>
+        <li><strong style="color:#f97316;">Hard</strong> — Remembered but tough (slower progress)</li>
+        <li><strong style="color:#22c55e;">Good</strong> — Remembered normally (standard progress)</li>
+        <li><strong style="color:#3b82f6;">Easy</strong> — Remembered instantly (fastest progress)</li>
       </ul>
 
-      <hr style="border:0;border-top:1px solid #111827;margin:1rem 0;" />
+      <!-- COLLAPSIBLE: VOICE COMMANDS -->
+      <details style="margin-top:1.5rem;border:1px solid #374151;border-radius:6px;padding:0.75rem;">
+        <summary style="cursor:pointer;font-weight:600;color:#60a5fa;">🗣️ All Voice Commands</summary>
+        <ul style="margin-top:0.75rem;color:#9ca3af;">
+          <li><strong>answer</strong> or <strong>skip to answer</strong> — after question plays</li>
+          <li><strong>again / hard / good / easy</strong> — rate the card when prompted</li>
+          <li><strong>repeat question</strong> — hear the question again</li>
+          <li><strong>repeat answer</strong> — hear the answer again</li>
+          <li><strong>pause study session</strong> / <strong>resume study session</strong></li>
+          <li><strong>main menu</strong> — exit to deck selection</li>
+          <li><strong>go to the next card</strong> — move to the next card, automatically assigns easy rating</li>
+          <li><strong>mute microphone</strong> → then say <strong>10 / 20 / 30 / 40 / 50 / 60</strong> seconds</li>
+        </ul>
+      </details>
 
-      <h3>🎤 When to say voice commands</h3>
-      <ul>
-   <li><strong>After the question</strong>: you can say <em>repeat question or mute microphone </em> or <em></em>.</li>
-        <li><strong>After the answer</strong>: say your rating when prompted (<em>again / hard / good / easy</em>).</li>
-        <li><strong>Any time</strong>: <em>"pause study session"</em>, <em>"resume study session"</em>, <em>"main menu"</em>.</li>
-      </ul>
-
-      <hr style="border:0;border-top:1px solid #111827;margin:1rem 0;" />
-
-      <h3>➡️ Important</h3>
-      <p style="color:#9ca3af;margin-top:0.25rem;">
-    Say <strong></strong> ZenCards requires exact wording of these voice commands for a smooth user experience. New users- navigate to study options and settings to customize your study session. 
-      </p>
-
-      <hr style="border:0;border-top:1px solid #111827;margin:1rem 0;" />
-
-      <h3>🔇 Mute Microphone (Hands-Free mode)</h3>
-      <p style="color:#9ca3af;margin-top:0.25rem;">
-        If you need time to think or you’re in a noisy place, you can temporarily stop listening.
-      </p>
-      <ul>
-        <li>Say <strong>“mute microphone”</strong></li>
-        <li>Then say a duration: <strong>10 / 20 / 30 / 40 / 50 / 60</strong> seconds</li>
-        <li>While muted, ZenCards will not process commands until the timer ends.</li>
-      </ul>
-
-      <hr style="border:0;border-top:1px solid #111827;margin:1rem 0;" />
-
-      <h3>🗣️ Full voice command list</h3>
-      <ul>
-        <li><strong>again</strong>, <strong>hard</strong>, <strong>good</strong>, <strong>easy</strong> — rate the card</li>
-        <li><strong>repeat question</strong></li>
-        <li><strong>repeat answer</strong></li>
-        <li><strong>pause study session</strong></li>
-        <li><strong>resume study session</strong></li>
-        <li><strong>main menu</strong></li>
-        <li><strong>mute microphone</strong> (then say: 10/20/30/40/50/60)</li>
-      </ul>
+      <!-- COLLAPSIBLE: STUDY OPTIONS -->
+      <details style="margin-top:1rem;border:1px solid #374151;border-radius:6px;padding:0.75rem;">
+        <summary style="cursor:pointer;font-weight:600;color:#60a5fa;">⚙️ Study Options & Timing</summary>
+        <div style="margin-top:0.75rem;color:#9ca3af;">
+          <p><strong>Hands-Free Study</strong> — Audio + voice commands (best for studying on the move)</p>
+          <p><strong>Silent Study</strong> — Traditional flashcards (tap to reveal, rate with buttons)</p>
+          
+          <p style="margin-top:1rem;"><strong>Timing Tips:</strong></p>
+          <ul>
+            <li><strong>Delay after rating</strong> — We recommend 5+ seconds for better retention</li>
+            <li><strong>Answer delay</strong> — Set to 0 for instant, or 5+ seconds to give yourself think time</li>
+            <li><strong>Study-ahead mode</strong> — Review extra cards after completing your due cards</li>
+          </ul>
+        </div>
+      </details>
 
     </div>
   </div>
@@ -1457,7 +1513,8 @@ const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
           await supabaseClient.auth.signOut();
           modal.remove();
           alert('Your account and subscription have been deleted.');
-          window.location.reload();
+          // Redirect to landing page instead of reloading
+          window.location.href = 'index.html';
         } catch (e) {
           console.error('[DeleteAccount] Exception:', e);
           errorDiv.textContent = 'Failed to delete account. Please contact support.';
@@ -1577,17 +1634,15 @@ const instructionsCloseBtn = document.getElementById("instructionsCloseBtn");
 // ===== BUTTON EVENT HOOKS =====
 
 if (signOutBtn) {
-  studyAddCardBtn.addEventListener("click", () => {
-    if (!currentDeckId) return;
-    // Pause the study session first
-    isPaused = true;
-    if (currentMode === "voice" && currentCard) {
-      restartCardOnResumeVoice = true;
-      speak("Pausing study session", () => openAddCardModal());
-    } else {
-      openAddCardModal();
-    }
+  signOutBtn.addEventListener("click", () => {
+    signOutFromApp();
   });
+}
+// ===================== BILLING (STRIPE PORTAL) =====================
+
+// Helper: returns a good redirect base for GitHub Pages + local
+function getBaseUrlForSameFolder() {
+  // app.html, reset.html, etc are in the same folder
   return new URL(".", window.location.href).href; // ends with trailing slash
 }
 
@@ -1600,7 +1655,6 @@ async function openStripeCustomerPortal() {
     const session = sessionData?.session;
     if (!session?.access_token) {
       alert("No active session. Please log in again.");
-
       window.location.replace("index.html");
       return;
     }
@@ -2759,10 +2813,63 @@ function cacheDanielVoice() {
   }
 }
 
+function getActiveDeckAndCardForTts() {
+  const deck = currentDeckId ? getDeckById(currentDeckId) : null;
+  const card = currentCard || null;
+  return { deck, card };
+}
+
+function speakCurrentAnswerWithLang(onEnd) {
+  const { deck, card } = getActiveDeckAndCardForTts();
+  const { aLang } = getCardLangs(deck, card);
+
+  const answer = getPlainTextFromCard(card?.answer || "");
+  if (!answer.trim()) {
+    if (onEnd) onEnd();
+    return;
+  }
+
+  speakWithWebTts(answer, onEnd, { lang: aLang });
+}
+
+function speakCurrentQuestionWithLang(onEnd) {
+  const { deck, card } = getActiveDeckAndCardForTts();
+  const { qLang } = getCardLangs(deck, card);
+
+  const question = getPlainTextFromCard(card?.question || "");
+  if (!question.trim()) {
+    if (onEnd) onEnd();
+    return;
+  }
+
+  speakWithWebTts(question, onEnd, { lang: qLang });
+}
+
 function getCardLangs(deck, card) {
   const qLang = (card && card.qLang) || (deck && deck.qLang) || "en-US";
   const aLang = (card && card.aLang) || (deck && deck.aLang) || "en-US";
   return { qLang, aLang };
+}
+
+function speakPlainAnswerWithCardLang(prefixText = "", onEnd) {
+  const { deck, card } = getActiveDeckAndCardForTts();
+  if (!card) { if (onEnd) onEnd(); return; }
+
+  const { aLang } = getCardLangs(deck, card);
+  let answer = getPlainTextFromCard(card.answer || "");
+  if (!answer.trim()) { if (onEnd) onEnd(); return; }
+
+  // Add question restatement if enabled
+  if (restateQuestionEnabled && card.question && !prefixText) {
+    const questionText = getPlainTextFromCard(card.question);
+    const statementPrefix = questionToStatement(questionText);
+    if (statementPrefix) {
+      answer = statementPrefix + ' ' + answer;
+    }
+  }
+
+  const textToSpeak = prefixText ? (prefixText + answer) : answer;
+  speakWithWebTts(textToSpeak, onEnd, { lang: aLang });
 }
 
 if (typeof window.speechSynthesis !== 'undefined') {
@@ -2782,7 +2889,7 @@ window.speakCardText = function(questionRaw, answerRaw, deckId, cardObj) {
     if (answer && answer.trim()) {
       setTimeout(() => {
         speakWithWebTts(answer, null, { lang: aLang });
-      }, 5000); // 5 second pause
+      }, 5000);
     }
   }, { lang: qLang });
 };
@@ -2873,7 +2980,7 @@ window.speakCardText = function(questionRaw, answerRaw, deckId, cardObj) {
 
   refreshCardLanguageDropdownsForCurrentDeck(card);
 
-  selectedCardInfo.textContent = `Editing card: ${card.id}`;
+  selectedCardInfo.textContent = ''; // Don't show card ID
   updateCardBtn.disabled = false;
   refreshMoveDeckSelect();
 });
@@ -3161,6 +3268,132 @@ function setCardContent(el, raw) {
   }
 }
 
+// Convert a question into a statement for answer reinforcement
+// Examples:
+//   "What is the capital of France?" -> "The capital of France is"
+//   "Who invented the telephone?" -> "The inventor of the telephone is"
+//   "When did WWII end?" -> "WWII ended"
+//   "How does photosynthesis work?" -> "Photosynthesis works"
+//   "Why is the sky blue?" -> "The sky is blue because"
+function questionToStatement(question) {
+  if (!question || typeof question !== 'string') return '';
+  
+  let q = question.trim();
+  
+  // Remove question mark and any trailing punctuation
+  q = q.replace(/[?!.]+$/, '').trim();
+  
+  // Common question patterns with transformations
+  
+  // "What is/are/was/were..." -> "... is/are/was/were"
+  if (/^what\s+(is|are|was|were|will be|has been)\s+/i.test(q)) {
+    return q.replace(/^what\s+(is|are|was|were|will be|has been)\s+(.+)/i, 'The $2 $1') + ',';
+  }
+  
+  // "Who is/was/invented/discovered..." -> "... is/was"
+  if (/^who\s+(is|are|was|were|invented|discovered|created|founded)\s+/i.test(q)) {
+    return q.replace(/^who\s+(invented|discovered|created|founded)\s+(.+)/i, 'The inventor of $2 is') + ',';
+  }
+  if (/^who\s+(is|are|was|were)\s+/i.test(q)) {
+    return q.replace(/^who\s+(is|are|was|were)\s+(.+)/i, '$2 $1') + ',';
+  }
+  
+  // "When did/does/will..." -> "... happened/occurs/will occur in"
+  if (/^when\s+(did|does|will|was|is)\s+/i.test(q)) {
+    return q.replace(/^when\s+(did)\s+(.+)/i, '$2,') + '';
+  }
+  
+  // "Where is/was/are..." -> "... is/was/are located at/in"
+  if (/^where\s+(is|are|was|were)\s+/i.test(q)) {
+    return q.replace(/^where\s+(is|are|was|were)\s+(.+)/i, '$2 $1 located at') + ',';
+  }
+  
+  // "How does/do/did..." -> "... works/work/worked"
+  if (/^how\s+(does|do|did|can|could)\s+/i.test(q)) {
+    return q.replace(/^how\s+does\s+(.+)/i, '$1') + ',';
+  }
+  if (/^how\s+(many|much)\s+/i.test(q)) {
+    return q.replace(/^how\s+(many|much)\s+(.+)/i, 'The number of $2 is') + ',';
+  }
+  
+  // "Why is/does/did..." -> "... is/does/did ... because"
+  if (/^why\s+(is|are|does|do|did|was|were)\s+/i.test(q)) {
+    return q.replace(/^why\s+(is|are|does|do|did|was|were)\s+(.+)/i, '$2 $1,') + ' because';
+  }
+  
+  // "Which..." -> "The one that..."
+  if (/^which\s+/i.test(q)) {
+    return q.replace(/^which\s+(.+)/i, 'The $1 that') + ',';
+  }
+  
+  // "Can/Could/Should/Would..." -> "Yes/No,"
+  if (/^(can|could|should|would|will|is|are|do|does|did)\s+/i.test(q)) {
+    return 'The answer is,';
+  }
+  
+  // Imperative/command prompts: "Describe...", "Explain...", "List...", "Name...", "Define..."
+  if (/^(describe|explain|list|name|define|identify|compare|contrast|discuss|summarize|outline|state|give|provide|calculate|determine|find|solve|prove|show|demonstrate)\s+/i.test(q)) {
+    return q.replace(/^(describe|explain|list|name|define|identify|compare|contrast|discuss|summarize|outline|state|give|provide|calculate|determine|find|solve|prove|show|demonstrate)\s+(.+)/i, 
+      function(match, verb, rest) {
+        // Convert imperative to gerund form when possible
+        const verbMap = {
+          'describe': 'Describing',
+          'explain': 'Explaining',
+          'list': 'Listing',
+          'name': 'Naming',
+          'define': 'Defining',
+          'identify': 'Identifying',
+          'compare': 'Comparing',
+          'contrast': 'Contrasting',
+          'discuss': 'Discussing',
+          'summarize': 'Summarizing',
+          'outline': 'Outlining',
+          'state': 'Stating',
+          'give': 'Giving',
+          'provide': 'Providing',
+          'calculate': 'Calculating',
+          'determine': 'Determining',
+          'find': 'Finding',
+          'solve': 'Solving',
+          'prove': 'Proving',
+          'show': 'Showing',
+          'demonstrate': 'Demonstrating'
+        };
+        const gerund = verbMap[verb.toLowerCase()] || verb;
+        return gerund + ' ' + rest + ':';
+      }
+    );
+  }
+  
+  // "What are the..." (plural form) -> "The ... are"
+  if (/^what\s+are\s+the\s+/i.test(q)) {
+    return q.replace(/^what\s+are\s+the\s+(.+)/i, 'The $1 are') + ',';
+  }
+  
+  // "True or false" questions -> "The statement is"
+  if (/^(true\s+or\s+false|t\/f)/i.test(q)) {
+    return 'The statement is';
+  }
+  
+  // "Fill in the blank" or similar -> just use the text
+  if (/^(fill\s+in|complete\s+the)/i.test(q)) {
+    return q + ':';
+  }
+  
+  // "Translate..." -> "Translating..."
+  if (/^translate\s+/i.test(q)) {
+    return q.replace(/^translate\s+(.+)/i, 'Translating $1:');
+  }
+  
+  // "Convert..." -> "Converting..."
+  if (/^convert\s+/i.test(q)) {
+    return q.replace(/^convert\s+(.+)/i, 'Converting $1:');
+  }
+  
+  // Default: just return the question text with a comma (no transformation)
+  return q + ',';
+}
+
 // Strip HTML tags so TTS doesn't try to read "<img ...>" etc
 function getPlainTextFromCard(raw) {
   const tmp = document.createElement("div");
@@ -3191,6 +3424,43 @@ let speakGeneration = 0;
       recognition.interimResults = false;
       recognition.continuous = false;
       recognition.maxAlternatives = 3; // tiny robustness boost, still using top result
+      
+      // Request higher quality audio for better accuracy
+      try {
+        if (navigator.mediaDevices && navigator.mediaDevices.getSupportedConstraints) {
+          const constraints = navigator.mediaDevices.getSupportedConstraints();
+          if (constraints.echoCancellation) recognition.echoCancellation = true;
+          if (constraints.noiseSuppression) recognition.noiseSuppression = true;
+          if (constraints.autoGainControl) recognition.autoGainControl = true;
+        }
+      } catch (e) {
+        console.warn("Could not set audio quality constraints:", e);
+      }
+      
+      // Grammar hints - tell browser what commands to expect
+      // (Note: SpeechGrammarList support is limited, but helps in supported browsers)
+      try {
+        const SpeechGrammarList = window.SpeechGrammarList || window.webkitSpeechGrammarList;
+        if (SpeechGrammarList) {
+          const grammarList = new SpeechGrammarList();
+          const commands = [
+            "again", "hard", "good", "easy",
+            "repeat question", "repeat answer",
+            "show answer", "skip to answer",
+            "pause study session", "resume study session",
+            "main menu", "go to the next card",
+            "study ahead mode", "study ahead",
+            "edit card", "delete card"
+          ];
+          // Create a simple grammar (higher weight = more likely)
+          const grammar = '#JSGF V1.0; grammar commands; public <command> = ' + 
+            commands.join(' | ') + ' ;';
+          grammarList.addFromString(grammar, 1);
+          recognition.grammars = grammarList;
+        }
+      } catch (e) {
+        console.warn("Could not set grammar hints:", e);
+      }
     }
 
     // >>> NEW: explicit microphone permission helper (kept as-is, though not called now) <<<
@@ -3431,8 +3701,9 @@ function setBgMusicDucked(ducked) {
   // Invalidate any in-flight TTS callbacks
   speakGeneration++;
   clearAnswerAfterSpeechDelay();
-  clearAnswerToRatingDelayTimer();
-  clearAfterRatingDelayTimer();
+      clearAutoGoodNextCardTimer();
+      clearAnswerToRatingDelayTimer();
+      clearAfterRatingDelayTimer();
   setBgMusicDucked(false);
 
   // Stop browser TTS
@@ -3474,6 +3745,13 @@ function speakWithWebTts(text, onEnd, opts = {}) {
     return;
   }
 
+    // ✅ IMPORTANT: stop STT while we speak so we don’t “hear ourselves”
+  try {
+    keepListening = false;
+    if (recognition) recognition.stop();
+  } catch (e) {}
+
+
   // 🧹 Clear any queued / half-finished utterances so we get a clean read.
   try {
     window.speechSynthesis.cancel();
@@ -3490,6 +3768,210 @@ function speakWithWebTts(text, onEnd, opts = {}) {
     return str.replace(/\b([A-Z]{2,})\b/g, (m) => m.split('').join(' '));
   }
 
+  // Humanize numbers for better TTS pronunciation
+  function humanizeNumbers(str) {
+    // Convert percentages: "95%" → "95 percent"
+    str = str.replace(/(\d+)%/g, "$1 percent");
+    
+    // Convert years: "2024" → "twenty twenty-four" (for years 2000+)
+    str = str.replace(/\b(20\d{2})\b/g, (match) => {
+      const year = parseInt(match);
+      if (year >= 2000 && year <= 2099) {
+        const decade = Math.floor((year % 100) / 10);
+        const single = year % 10;
+        if (year % 100 === 0) return "two thousand";
+        if (year < 2010) return `two thousand ${single}`;
+        return `twenty ${decade > 1 ? decade + "ty" : ""} ${single || ""}`.trim();
+      }
+      return match;
+    });
+    
+    // Add commas to large numbers for better pacing: "1000" → "1,000"
+    str = str.replace(/\b(\d{1,3})(\d{3})\b/g, "$1,$2");
+    
+    // Convert ordinals: "1st" → "first", "2nd" → "second"
+    const ordinals = {
+      "1st": "first", "2nd": "second", "3rd": "third", "4th": "fourth",
+      "5th": "fifth", "6th": "sixth", "7th": "seventh", "8th": "eighth",
+      "9th": "ninth", "10th": "tenth"
+    };
+    Object.keys(ordinals).forEach(key => {
+      str = str.replace(new RegExp(`\\b${key}\\b`, "gi"), ordinals[key]);
+    });
+    
+    return str;
+  }
+
+  // Add breath pauses naturally like humans need
+  function addBreathPauses(str) {
+    const words = str.split(/\s+/);
+    const result = [];
+    let wordsSinceBreath = 0;
+    
+    for (let i = 0; i < words.length; i++) {
+      result.push(words[i]);
+      wordsSinceBreath++;
+      
+      // Add breath pause every 12-15 words at natural breaks
+      if (wordsSinceBreath >= 12) {
+        const nextWord = words[i + 1] || "";
+        // Only pause at natural breaks (commas, conjunctions, etc.)
+        if ([",", ".", "and", "but", "or", "so", "yet"].some(w => 
+            words[i].endsWith(w) || nextWord.toLowerCase() === w)) {
+          result.push("___BREATH___");
+          wordsSinceBreath = 0;
+        }
+      }
+      
+      // Reset counter after periods
+      if (words[i].endsWith(".")) {
+        wordsSinceBreath = 0;
+      }
+    }
+    
+    return result.join(" ");
+  }
+
+  // Handle lists with appropriate pausing
+  function handleLists(str) {
+    // Detect bulleted/numbered lists
+    str = str.replace(/([•\-*]|\d+\.)\s+/g, "___LISTITEM___ $1 ");
+    
+    // Detect comma-separated lists: "apples, oranges, and bananas"
+    // Add slight pause before "and" in lists
+    str = str.replace(/(,\s+\w+){2,},\s+and\s+/gi, (match) => {
+      return match.replace(/,\s+and\s+/gi, ", ___LISTPAUSE___ and ");
+    });
+    
+    return str;
+  }
+
+  // Add pauses around parenthetical phrases
+  function handleParentheticals(str) {
+    // Detect em-dashes or parenthetical commas
+    str = str.replace(/\s*—\s*/g, " ___PARENTHETICAL___ ");
+    
+    // Detect phrases like "however,", "therefore,", "in fact,"
+    const parentheticalPhrases = [
+      "however", "therefore", "moreover", "furthermore", "nevertheless",
+      "in fact", "for example", "for instance", "in other words", "that is"
+    ];
+    
+    parentheticalPhrases.forEach(phrase => {
+      const re = new RegExp(`\\b(${phrase}),`, "gi");
+      str = str.replace(re, `___PARENTHETICAL___ $1,`);
+    });
+    
+    return str;
+  }
+
+  // Detect important/emphasis words for subtle rate changes
+  function markEmphasisWords(str) {
+    // Words that typically carry emphasis
+    const emphasisWords = [
+      "very", "extremely", "absolutely", "never", "always", "must", "critical",
+      "important", "essential", "key", "fundamental", "crucial", "vital"
+    ];
+    
+    emphasisWords.forEach(word => {
+      const re = new RegExp(`\\b(${word})\\b`, "gi");
+      str = str.replace(re, "___EMPHASIS___$1___/EMPHASIS___");
+    });
+    
+    return str;
+  }
+
+  // Fix run-on sentences by adding virtual punctuation at natural breaks
+  function fixRunOnSentences(str) {
+    if (!str) return str;
+    
+    // 1) Add comma before coordinating conjunctions that connect independent clauses
+    // Pattern: [word] and/but/or/so/yet [word] (but not short phrases)
+    const coordinatingConjunctions = ["and", "but", "or", "so", "yet"];
+    coordinatingConjunctions.forEach(conj => {
+      // Look for pattern: multiple words, then conjunction, then more words
+      // Only add comma if there are enough words on both sides (likely independent clauses)
+      const pattern = new RegExp(`(\\w+\\s+\\w+\\s+\\w+)\\s+(${conj})\\s+(?=\\w+\\s+\\w+)`, "gi");
+      str = str.replace(pattern, "$1, $2 ");
+    });
+    
+    // 2) Add pauses after relative clause starters if missing
+    const relativePronouns = ["that", "which", "who", "whom", "whose", "where"];
+    relativePronouns.forEach(pronoun => {
+      // Add comma before relative pronoun if it's starting a non-restrictive clause
+      // (after multiple words, suggesting it's additional info)
+      const pattern = new RegExp(`(\\w+\\s+\\w+\\s+\\w+)\\s+(${pronoun})\\s+`, "gi");
+      str = str.replace(pattern, (match, before, pron) => {
+        // Don't add comma if one already exists
+        if (before.trim().endsWith(",")) return match;
+        return `${before}, ${pron} `;
+      });
+    });
+    
+    // 3) Break up very long sentences (40+ words) at subordinating conjunctions
+    const sentences = str.split(/([.!?]+)/);
+    const fixedSentences = [];
+    
+    for (let i = 0; i < sentences.length; i++) {
+      let sentence = sentences[i];
+      
+      // Skip delimiters
+      if (/^[.!?]+$/.test(sentence)) {
+        fixedSentences.push(sentence);
+        continue;
+      }
+      
+      const wordCount = sentence.trim().split(/\s+/).length;
+      
+      // If sentence is very long, add virtual commas at natural breaks
+      if (wordCount > 40) {
+        // Add comma after introductory subordinate clauses
+        const subordClauseStarters = [
+          "when", "while", "as", "since", "if", "although", "though",
+          "because", "unless", "until", "before", "after", "whereas"
+        ];
+        
+        subordClauseStarters.forEach(starter => {
+          // Pattern: sentence starts with subordinate clause (5-15 words) then main clause
+          const pattern = new RegExp(`^(${starter}\\s+(?:\\w+\\s+){4,14})(\\w+)`, "gi");
+          sentence = sentence.replace(pattern, "$1, $2");
+        });
+        
+        // Add virtual commas every 15-20 words at conjunctions/prepositions if none exist
+        const words = sentence.split(/\s+/);
+        let wordsSinceComma = 0;
+        const result = [];
+        
+        for (let j = 0; j < words.length; j++) {
+          result.push(words[j]);
+          wordsSinceComma++;
+          
+          // Every 15-20 words, try to add a comma at next conjunction/transition
+          if (wordsSinceComma >= 15 && wordsSinceComma <= 20) {
+            const nextWord = words[j + 1] ? words[j + 1].toLowerCase() : "";
+            const breakWords = ["and", "but", "or", "so", "yet", "for", "nor"];
+            
+            if (breakWords.includes(nextWord) && !words[j].endsWith(",")) {
+              result[result.length - 1] = words[j] + ",";
+              wordsSinceComma = 0;
+            }
+          }
+          
+          // Reset counter at existing punctuation
+          if (words[j].match(/[,;:]/)) {
+            wordsSinceComma = 0;
+          }
+        }
+        
+        sentence = result.join(" ");
+      }
+      
+      fixedSentences.push(sentence);
+    }
+    
+    return fixedSentences.join("");
+  }
+
   // Normalize punctuation so TTS doesn't read symbols aloud
   function normalizePunctuation(str) {
     return str
@@ -3500,17 +3982,142 @@ function speakWithWebTts(text, onEnd, opts = {}) {
       .replace(/\s{2,}/g, " ");
   }
 
-  const processedText = normalizePunctuation(expandAcronyms(text));
+   const processedText = markEmphasisWords(
+     handleParentheticals(
+       handleLists(
+         addBreathPauses(
+           addCognitivePauses(
+             normalizePunctuation(
+               fixRunOnSentences(
+                 humanizeNumbers(
+                   expandAcronyms(text)
+                 )
+               )
+             )
+           )
+         )
+       )
+     )
+   );
 
-  // Split text into segments, keeping delimiters
+  // Split text into segments with enhanced pause detection
   const segments = [];
-  let regex = /([^.,]+)([.,]?)/g;
+  let regex = /([^.,?!]+)([.,?!]?)/g;
   let match;
+  let sentenceWordCount = 0;
+  
   while ((match = regex.exec(processedText)) !== null) {
     const phrase = match[1].trim();
     const delim = match[2];
-    if (phrase) segments.push({ text: phrase + (delim || ""), pause: delim === '.' ? 500 : delim === ',' ? 250 : 0 });
+    
+    if (!phrase) continue;
+    
+    // Count words in this phrase
+    const wordCount = phrase.split(/\s+/).length;
+    sentenceWordCount += wordCount;
+    
+    // Determine pause duration based on context
+    let pause = 0;
+    
+    if (delim === '.') {
+      // Longer pause after complex sentences (15+ words)
+      pause = sentenceWordCount > 15 ? 900 : 700;
+      sentenceWordCount = 0; // Reset for next sentence
+    } else if (delim === '?') {
+      // Questions get a thoughtful pause
+      pause = 800;
+      sentenceWordCount = 0;
+    } else if (delim === '!') {
+      pause = 750;
+      sentenceWordCount = 0;
+    } else if (delim === ',') {
+      pause = 350;
+    }
+    
+    // Add special pauses for markers
+    let processedPhrase = phrase + (delim || "");
+    let rateMultiplier = 1.0;
+    let pitchShift = 0;
+    
+    // Breath pause
+    if (processedPhrase.includes("___BREATH___")) {
+      processedPhrase = processedPhrase.replace(/___BREATH___/g, "");
+      pause = Math.max(pause, 400);
+    }
+    
+    // List pauses
+    if (processedPhrase.includes("___LISTITEM___")) {
+      processedPhrase = processedPhrase.replace(/___LISTITEM___/g, "");
+      pause = Math.max(pause, 500);
+    }
+    
+    if (processedPhrase.includes("___LISTPAUSE___")) {
+      processedPhrase = processedPhrase.replace(/___LISTPAUSE___/g, "");
+      pause = Math.max(pause, 300);
+    }
+    
+    // Parenthetical pause
+    if (processedPhrase.includes("___PARENTHETICAL___")) {
+      processedPhrase = processedPhrase.replace(/___PARENTHETICAL___/g, "");
+      pause = Math.max(pause, 450);
+    }
+    
+    // Emphasis (slow down slightly)
+    if (processedPhrase.includes("___EMPHASIS___")) {
+      processedPhrase = processedPhrase.replace(/___EMPHASIS___/g, "");
+      processedPhrase = processedPhrase.replace(/___\/EMPHASIS___/g, "");
+      rateMultiplier = 0.85; // Speak 15% slower for emphasis
+    }
+    
+    // Question intonation (raise pitch slightly)
+    if (delim === '?') {
+      pitchShift = 0.1;
+    }
+    
+    segments.push({
+      text: processedPhrase,
+      pause: pause,
+      rateMultiplier: rateMultiplier,
+      pitchShift: pitchShift
+    });
   }
+
+function addCognitivePauses(str) {
+  if (!str) return str;
+
+  // Words that should get a pause BEFORE they are spoken
+  // Focus on strong transition words that signal a shift in thought
+  const pauseWords = [
+    "so", "but", "since", "although", "while", "after", "before", "because",
+    "until", "nor", "yet", "either", "though", "unless"
+  ];
+
+  // 1) Pause BEFORE conjunctions / transition words
+  // We insert a comma before the word if it is a standalone word
+  pauseWords.forEach(word => {
+    const re = new RegExp(`\\s+\\b(${word})\\b`, "gi");
+    str = str.replace(re, ", $1");
+  });
+
+  // 2) Pause BEFORE quoted text
+  // "something" or "something"
+  str = str
+    .replace(/\s+(")/g, ", $1")
+    .replace(/\s+(")/g, ", $1");
+  
+  // 3) Pause after hesitation markers (if present in flashcards)
+  const hesitations = ["um", "uh", "well", "you know", "I mean"];
+  hesitations.forEach(h => {
+    const re = new RegExp(`\\b(${h})\\b`, "gi");
+    str = str.replace(re, "$1,");
+  });
+  
+  // 4) Small pause at sentence beginnings after conjunctions
+  str = str.replace(/\.\s+(And|But|So|Or|Yet)\s+/gi, ". , $1 ");
+
+  return str;
+}
+
 
   function getPreferredVoice() {
   const voices = window.speechSynthesis.getVoices();
@@ -3562,8 +4169,13 @@ function speakWithWebTts(text, onEnd, opts = {}) {
       if (preferredVoice) {
         utt.voice = preferredVoice;
       }
-      utt.rate = typeof ttsRate === "number" ? ttsRate : 0.8;
-      utt.pitch = 1.0;
+      // Apply base rate, then adjust for emphasis
+      const baseRate = typeof ttsRate === "number" ? ttsRate : 0.75;
+      utt.rate = baseRate * (seg.rateMultiplier || 1.0);
+      
+      // Apply pitch shift for questions
+      utt.pitch = 1.0 + (seg.pitchShift || 0);
+      
       utt.volume = typeof ttsVolume === "number" ? ttsVolume : 1.0;
       utt.onstart = () => {
         if (myGeneration !== speakGeneration) return;
@@ -3779,21 +4391,23 @@ function getStudyPrefs() {
 
   // Defaults (match your current defaults)
   if (typeof p.skipInstructionsAfterFirst !== "boolean") p.skipInstructionsAfterFirst = true;
+  if (typeof p.disableOpeningPrompt !== "boolean") p.disableOpeningPrompt = false;
   if (typeof p.answerMode !== "string") p.answerMode = "voice"; // "delay" | "voice"
-  if (typeof p.answerDelaySec !== "number") p.answerDelaySec = 4;
-  if (typeof p.answerToRatingDelaySec !== "number") p.answerToRatingDelaySec = 4;
+  if (typeof p.answerDelaySec !== "number") p.answerDelaySec = 10;
+  if (typeof p.answerToRatingDelaySec !== "number") p.answerToRatingDelaySec = 5;
   if (typeof p.autoGoodMode !== "boolean") p.autoGoodMode = false;
   if (typeof p.autoModeBehavior !== "string") p.autoModeBehavior = "good"; // again|hard|good|easy|tomorrow
-  if (typeof p.handsFreeNextDelaySec !== "number") p.handsFreeNextDelaySec = 4;
-  if (typeof p.studyAheadGapSec !== "number") p.studyAheadGapSec = 4;
+  if (typeof p.handsFreeNextDelaySec !== "number") p.handsFreeNextDelaySec = 3;
+  if (typeof p.studyAheadGapSec !== "number") p.studyAheadGapSec = 6;
   if (typeof p.autoEnterStudyAhead !== "boolean") p.autoEnterStudyAhead = true;
   if (typeof p.loopStudyAhead !== "boolean") p.loopStudyAhead = true;
+  if (typeof p.restateQuestionInAnswer !== "boolean") p.restateQuestionInAnswer = true; // default enabled
 
   // Clamp numeric values
-  p.answerDelaySec = Math.max(1, Math.min(60, Math.floor(p.answerDelaySec)));
-  p.answerToRatingDelaySec = Math.max(0, Math.min(30, Math.floor(p.answerToRatingDelaySec)));
-  p.handsFreeNextDelaySec = Math.max(0, Math.min(30, Math.floor(p.handsFreeNextDelaySec)));
-  p.studyAheadGapSec = Math.max(1, Math.min(60, Math.floor(p.studyAheadGapSec)));
+  p.answerDelaySec = Math.max(3, Math.min(60, Math.floor(p.answerDelaySec)));
+  p.answerToRatingDelaySec = Math.max(3, Math.min(30, Math.floor(p.answerToRatingDelaySec)));
+  p.handsFreeNextDelaySec = Math.max(3, Math.min(30, Math.floor(p.handsFreeNextDelaySec)));
+  p.studyAheadGapSec = Math.max(3, Math.min(60, Math.floor(p.studyAheadGapSec)));
 
   return p;
 }
@@ -3816,6 +4430,7 @@ function saveStudyPrefs(patch = {}) {
     const studyInstructionsBtn = document.getElementById("studyInstructionsBtn");
 
     const skipInstructionsAfterFirstCheckbox = document.getElementById("skipInstructionsAfterFirst");
+    const disableOpeningPromptCheckbox = document.getElementById("disableOpeningPrompt");
     const autoGoodToggle = document.getElementById("autoGoodToggle");
     const autoRatingSelect = document.getElementById("autoRatingSelect");
     const answerModeDelayRadio = document.getElementById("answerModeDelay");
@@ -3826,6 +4441,7 @@ function saveStudyPrefs(patch = {}) {
     const studyAheadGapSecondsInput = document.getElementById("studyAheadGapSeconds");
 const autoEnterStudyAheadCheckbox = document.getElementById("autoEnterStudyAhead");
 const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
+    const restateQuestionInAnswerCheckbox = document.getElementById("restateQuestionInAnswer");
     const startVoiceBtn = document.getElementById("startVoiceBtn");
 
     const startSilentBtn = document.getElementById("startSilentBtn");
@@ -3843,6 +4459,11 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
     const hintHard = document.getElementById("hint-hard");
     const hintGood = document.getElementById("hint-good");
     const hintEasy = document.getElementById("hint-easy");
+
+    const voiceHintAgain = document.getElementById("voice-hint-again");
+    const voiceHintHard = document.getElementById("voice-hint-hard");
+    const voiceHintGood = document.getElementById("voice-hint-good");
+    const voiceHintEasy = document.getElementById("voice-hint-easy");
 
     const voiceUI = document.getElementById("voiceUI");
     const voiceQuestion = document.getElementById("voiceQuestion");
@@ -3871,9 +4492,23 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
   if (!voiceSkipToAnswerBtn) return;
   voiceSkipToAnswerBtn.disabled = !enabled;
 }
+        function setPauseResumeEnabled(enabled) {
+  if (!pauseBtn || !resumeBtn) return;
+  // Only enable pause if not currently paused, only enable resume if paused
+  if (enabled) {
+    pauseBtn.disabled = isPaused;
+    resumeBtn.disabled = !isPaused;
+  } else {
+    pauseBtn.disabled = true;
+    resumeBtn.disabled = true;
+  }
+}
         function setRepeatQuestionEnabled(enabled) {
   if (voiceRepeatQuestionBtn) voiceRepeatQuestionBtn.disabled = !enabled;
   if (silentRepeatQuestionBtn) silentRepeatQuestionBtn.disabled = !enabled;
+}
+        function setAddCardEnabled(enabled) {
+  if (studyAddCardBtn) studyAddCardBtn.disabled = !enabled;
 }
 
     const silentNextCardBtn = document.getElementById("silentNextCardBtn");
@@ -3908,6 +4543,7 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
 
   // UI controls
   if (skipInstructionsAfterFirstCheckbox) skipInstructionsAfterFirstCheckbox.checked = !!p.skipInstructionsAfterFirst;
+  if (disableOpeningPromptCheckbox) disableOpeningPromptCheckbox.checked = !!p.disableOpeningPrompt;
 
   if (answerModeVoiceRadio && answerModeDelayRadio) {
     answerModeVoiceRadio.checked = (p.answerMode === "voice");
@@ -3928,6 +4564,10 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
   if (autoEnterStudyAheadCheckbox) autoEnterStudyAheadCheckbox.checked = !!p.autoEnterStudyAhead;
   if (loopStudyAheadCheckbox) loopStudyAheadCheckbox.checked = !!p.loopStudyAhead;
 
+  if (restateQuestionInAnswerCheckbox) {
+    restateQuestionInAnswerCheckbox.checked = (p.restateQuestionInAnswer !== false); // default true
+  }
+
   // Make auto rating select enabled/disabled correctly
   if (autoRatingSelect && autoGoodToggle) {
     autoRatingSelect.disabled = !autoGoodToggle.checked;
@@ -3940,6 +4580,7 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
 
   // State variables (these are what your runtime uses)
   skipInstructionsAfterFirst = !!p.skipInstructionsAfterFirst;
+  disableOpeningPrompt = !!p.disableOpeningPrompt;
   answerMode = p.answerMode === "voice" ? "voice" : "delay";
   answerDelayMs = p.answerDelaySec * 1000;
   answerToRatingDelayMs = p.answerToRatingDelaySec * 1000;
@@ -3952,11 +4593,20 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
 
   autoEnterStudyAhead = !!p.autoEnterStudyAhead;
   loopStudyAhead = !!p.loopStudyAhead;
+
+  restateQuestionEnabled = (p.restateQuestionInAnswer !== false); // default true
 }
 function wireStudyPrefsListeners() {
   if (skipInstructionsAfterFirstCheckbox) {
     skipInstructionsAfterFirstCheckbox.addEventListener("change", () => {
       const next = saveStudyPrefs({ skipInstructionsAfterFirst: !!skipInstructionsAfterFirstCheckbox.checked });
+      applyStudyPrefsToUIAndState();
+    });
+  }
+
+  if (disableOpeningPromptCheckbox) {
+    disableOpeningPromptCheckbox.addEventListener("change", () => {
+      const next = saveStudyPrefs({ disableOpeningPrompt: !!disableOpeningPromptCheckbox.checked });
       applyStudyPrefsToUIAndState();
     });
   }
@@ -4042,6 +4692,13 @@ function wireStudyPrefsListeners() {
       applyStudyPrefsToUIAndState();
     });
   }
+
+  if (restateQuestionInAnswerCheckbox) {
+    restateQuestionInAnswerCheckbox.addEventListener("change", () => {
+      saveStudyPrefs({ restateQuestionInAnswer: !!restateQuestionInAnswerCheckbox.checked });
+      applyStudyPrefsToUIAndState();
+    });
+  }
 }
 
 
@@ -4059,8 +4716,6 @@ function wireStudyPrefsListeners() {
 
     function setStudyState(newState) {
       studyState = newState;
-      // You can comment this out later if you don't want console noise:
-      console.log("Study state:", newState);
     }
     // ***** END STATE MACHINE DEFINITIONS *****
 
@@ -4070,6 +4725,7 @@ function wireStudyPrefsListeners() {
     let autoEnterStudyAhead = false;  // from Study Options
 let loopStudyAhead = false;       // from Study Options
     let skipInstructionsAfterFirst = true;
+    let disableOpeningPrompt = false;
     let hasSpokenInstructionsOnce = false;
     let answerMode = "delay";
     let answerDelayMs = 4000;
@@ -4090,6 +4746,7 @@ let loopStudyAhead = false;       // from Study Options
       handsFreeNextDelayMs = Math.max(0, Math.min(30, Number(handsFreeNextDelaySecondsInput.value))) * 1000;
     }
     let autoModeBehavior = "good"; // again | hard | good | easy | tomorrow
+    let restateQuestionEnabled = true; // Whether to prepend question-as-statement to answers
 
     function runVoiceLoopAfterRating() {
       setStudyState(StudyState.IDLE);
@@ -4112,6 +4769,8 @@ let loopStudyAhead = false;       // from Study Options
     let studyAheadGapMs = 4000;
     const difficultyPromptGraceMs = 1200;
     let lastDifficultyPromptAt = 0;
+    let cardSuspendedForAddCard = null;
+    let cardSuspendedFlippedState = false;
 
     function startDifficultyListening() {
       lastDifficultyPromptAt = Date.now();
@@ -4192,48 +4851,57 @@ const timerAfterRatingEl = document.getElementById("timerAfterRating");
 
     // NEW: track delay window between question and answer in delay mode
     let questionDelayTimerId = null;
+     let autoGoodNextCardTimerId = null;
     let answerToRatingDelayTimerId = null;
 
-    function clearAnswerToRatingDelayTimer() {
-      if (answerToRatingDelayTimerId !== null) {
-        clearTimeout(answerToRatingDelayTimerId);
-        answerToRatingDelayTimerId = null;
-      }
-      answerToRatingDueMs = 0;
-    }
+function clearAnswerToRatingDelayTimer() {
+  if (answerToRatingDelayTimerId !== null) {
+    clearTimeout(answerToRatingDelayTimerId);
+    answerToRatingDelayTimerId = null;
+  }
+  answerToRatingDueMs = 0;
+}
 
-    let afterRatingTimerId = null;
-    function clearAfterRatingDelayTimer() {
-      if (afterRatingTimerId !== null) {
-        clearTimeout(afterRatingTimerId);
-        afterRatingTimerId = null;
-      }
-      afterRatingDueMs = 0;
-    }
+let afterRatingTimerId = null;
+function clearAfterRatingDelayTimer() {
+  if (afterRatingTimerId !== null) {
+    clearTimeout(afterRatingTimerId);
+    afterRatingTimerId = null;
+  }
+  afterRatingDueMs = 0;
+}
 
-    function updateVoiceTimers() {
-      if (!voiceTimersEl || currentMode !== "voice") return;
-      const now = Date.now();
-      const answerRemaining = Math.max(0, Math.ceil((answerAfterSpeechDueMs - now) / 1000));
-      const ratingRemaining = Math.max(0, Math.ceil((answerToRatingDueMs - now) / 1000));
-      const nextRemaining = Math.max(0, Math.ceil((afterRatingDueMs - now) / 1000));
+function updateVoiceTimers() {
+  if (!voiceTimersEl || currentMode !== "voice") return;
+  const now = Date.now();
+  const answerRemaining = Math.max(0, Math.ceil((answerAfterSpeechDueMs - now) / 1000));
+  const ratingRemaining = Math.max(0, Math.ceil((answerToRatingDueMs - now) / 1000));
+  const nextRemaining = Math.max(0, Math.ceil((afterRatingDueMs - now) / 1000));
 
-      const showAnswer = answerAfterSpeechDueMs > now;
-      const showRating = answerToRatingDueMs > now;
-      const showNext = afterRatingDueMs > now;
+  const showAnswer = answerAfterSpeechDueMs > now;
+  const showRating = answerToRatingDueMs > now;
+  const showNext = afterRatingDueMs > now;
 
-      if (!showAnswer && !showRating && !showNext) {
-        voiceTimersEl.classList.add("hidden");
-        return;
-      }
+  if (!showAnswer && !showRating && !showNext) {
+    voiceTimersEl.classList.add("hidden");
+    return;
+  }
 
-      voiceTimersEl.classList.remove("hidden");
-      if (timerAnswerAfterSpeechEl) timerAnswerAfterSpeechEl.textContent = String(answerRemaining);
-      if (timerAnswerToRatingEl) timerAnswerToRatingEl.textContent = String(ratingRemaining);
-      if (timerAfterRatingEl) timerAfterRatingEl.textContent = String(nextRemaining);
-    }
+  voiceTimersEl.classList.remove("hidden");
+  if (timerAnswerAfterSpeechEl) timerAnswerAfterSpeechEl.textContent = String(answerRemaining);
+  if (timerAnswerToRatingEl) timerAnswerToRatingEl.textContent = String(ratingRemaining);
+  if (timerAfterRatingEl) timerAfterRatingEl.textContent = String(nextRemaining);
+}
 
-    setInterval(updateVoiceTimers, 250);
+setInterval(updateVoiceTimers, 250);
+
+function clearAutoGoodNextCardTimer() {
+  if (autoGoodNextCardTimerId !== null) {
+    clearTimeout(autoGoodNextCardTimerId);
+    autoGoodNextCardTimerId = null;
+  }
+}
+
 
     function clearStudyAheadGapTimer() {
       if (studyAheadGapTimerId !== null) {
@@ -4261,20 +4929,6 @@ const timerAfterRatingEl = document.getElementById("timerAfterRating");
       questionDelayTimerId = setTimeout(() => {
         questionDelayTimerId = null;
         questionDelayDueMs = 0;
-        if (!isPaused) {
-          speakAnswerThenAskDifficulty();
-        }
-      }, delay * 1000);
-    }
-
-    function startOrResetQuestionDelayTimer() {
-      clearQuestionDelayTimer();
-      const delay = Math.max(
-        1,
-        Math.min(60, Math.floor(answerDelayMs / 1000))
-      );
-      setStudyState(StudyState.WAITING_FOR_ANSWER);
-      questionDelayTimerId = setTimeout(() => {
         if (!isPaused) {
           speakAnswerThenAskDifficulty();
         }
@@ -4386,6 +5040,10 @@ function updateDeckBadge() {
 }
 
 async function openAddCardModal() {
+  // Store the current card so we can resume it after closing the modal
+  cardSuspendedForAddCard = currentCard;
+  cardSuspendedFlippedState = isFlashcardFlipped(currentMode);
+  
   // Stop audio/listening so the modal is calm in hands-free mode
   await stopAllAudio();
   clearStudyAheadGapTimer();
@@ -4406,13 +5064,58 @@ function closeAddCardModal() {
   addCardModal.classList.add("hidden");
   addCardModal.setAttribute("aria-hidden", "true");
 
-  // Always restart the current card, do not advance
-  if (currentMode === "voice" && typeof runVoiceLoop === "function") {
-    runVoiceLoop();
+  // If we had a suspended card, restore it instead of advancing to next card
+  if (cardSuspendedForAddCard && !isPaused) {
+    currentCard = cardSuspendedForAddCard;
+    const wasFlipped = cardSuspendedFlippedState;
+    cardSuspendedForAddCard = null;
+    cardSuspendedFlippedState = false;
+    
+    if (currentMode === "voice") {
+      // Re-show the card content
+      setCardContent(voiceQuestionText, currentCard.question);
+      setCardContent(voiceAnswerText, currentCard.answer);
+      setFlashcardFlipped("voice", wasFlipped);
+      
+      // Replay the answer and continue to rating prompt
+      speakAnswerThenAskDifficulty();
+      return;
+    }
+    
+    if (currentMode === "silent") {
+      // Restore the same card and side in silent mode
+      setCardContent(silentQuestionText, currentCard.question);
+      setCardContent(silentAnswerText, currentCard.answer);
+      setFlashcardFlipped("silent", wasFlipped);
+      
+      // Restore UI state based on which side was showing
+      if (wasFlipped) {
+        // Answer was showing - show rating buttons
+        if (showAnswerBtn) showAnswerBtn.classList.add("hidden");
+        if (silentRatingButtons && !noScheduleChanges) {
+          silentRatingButtons.classList.remove("hidden");
+          updateSilentDueHints();
+        }
+        if (noScheduleChanges && silentNextCardBtn) {
+          silentNextCardBtn.classList.remove("hidden");
+        }
+      } else {
+        // Question was showing - show "Show Answer" button
+        if (showAnswerBtn) showAnswerBtn.classList.remove("hidden");
+        if (silentRatingButtons) silentRatingButtons.classList.add("hidden");
+        if (silentNextCardBtn) silentNextCardBtn.classList.add("hidden");
+      }
+      return;
+    }
   }
-  if (currentMode === "silent" && typeof runSilentLoop === "function") {
-    runSilentLoop();
-  }
+  
+  // Clear the suspended card flag
+  cardSuspendedForAddCard = null;
+  cardSuspendedFlippedState = false;
+  
+  // Normal flow: advance to next card (only if no suspended card)
+  if (currentMode === "voice" && !isPaused) runVoiceLoop();
+  if (currentMode === "silent" && !isPaused) runSilentLoop();
 }
 async function openInstructionsModal() {
   // pause audio/listening so the modal isn’t chaotic in hands-free mode
@@ -4500,6 +5203,7 @@ document.addEventListener("keydown", (e) => {
 await stopAllAudio(); 
   clearStudyAheadGapTimer();
   clearQuestionDelayTimer();
+    clearAutoGoodNextCardTimer();
 
   pauseBtn.disabled = true;
   resumeBtn.disabled = false;
@@ -4539,10 +5243,7 @@ if (studyAddCardBtn) {
   studyAddCardBtn.addEventListener("click", () => {
     if (!currentDeckId) return;
     openAddCardModal();
-    // After closing the modal, restart the current card (re-read question)
-    if (currentMode === "voice" && typeof runVoiceLoop === "function") {
-      setTimeout(() => runVoiceLoop(), 250);
-    }
+    // closeAddCardModal() will handle resuming the suspended card
   });
 }
 
@@ -4605,6 +5306,8 @@ document.addEventListener("keydown", (e) => {
   if (voiceRatingButtons) {
     voiceRatingButtons.classList.add("hidden");
   }
+  // Show instructions button when returning to main menu
+  if (openInstructionsBtn) openInstructionsBtn.style.display = "";
   showMainMenu();
   setStatus("Study session ended.");
 }
@@ -4679,13 +5382,13 @@ setCardContent(voiceAnswerText, currentCard.answer);
         setFlashcardFlipped("silent", false);
         setStudyState(StudyState.SHOWING_QUESTION);
         if (showAnswerBtn) showAnswerBtn.classList.remove("hidden");
-        if (silentRatingButtons) silentRatingButtons.classList.add("hidden");
+        // Keep rating buttons visible during question
         if (noScheduleChanges) {
           silentNextCardBtn.classList.remove("hidden");
         } else {
           silentNextCardBtn.classList.add("hidden");
         }
-        clearSilentHints();
+        // Don't clear hints - keep them visible
       });
     }
 
@@ -4701,6 +5404,7 @@ setCardContent(voiceAnswerText, currentCard.answer);
         clearAnswerAfterSpeechDelay();
         clearAnswerToRatingDelayTimer();
         clearAfterRatingDelayTimer();
+        clearAutoGoodNextCardTimer();
         clearMicMuteTimer();
 
         awaitingAnswerSignal = false;
@@ -4776,10 +5480,15 @@ async function speakAndGoToMainMenu() {
 
       // Hide answer again and reset flags
       setFlashcardFlipped("voice", false);
-      if (voiceRatingButtons) voiceRatingButtons.classList.add("hidden");
+      // Keep rating buttons visible during question
       setVoiceSkipToAnswerEnabled(false);
       hasSpokenCurrentAnswer = false;
       hasSpokenCurrentQuestion = false;
+
+      // 🚫 Disable pause/resume during repeat question
+      setPauseResumeEnabled(false);
+      // 🚫 Disable Add Card button during repeat question
+      setAddCardEnabled(false);
 
       setStatus("Repeating card...");
       setStudyState(StudyState.SHOWING_QUESTION);
@@ -4787,7 +5496,10 @@ async function speakAndGoToMainMenu() {
       hasSpokenCurrentQuestion = true;
     speakWithWebTts(getPlainTextFromCard(currentCard.question), () => {
       if (isPaused) return;
+      // ✅ Re-enable pause/resume after repeat question finishes
+      setPauseResumeEnabled(true);
       setVoiceSkipToAnswerEnabled(true);
+      // 🚫 Add Card stays disabled during answer window
 
   if (answerMode === "delay") {
     startOrResetQuestionDelayTimer();
@@ -4926,7 +5638,7 @@ function parseRatingFromText(text) {
   // “Good” synonyms / common mishears
   // (Web Speech often returns could/hood/gud/go when you say "good")
   const goodLike = new Set([
-    "good", "fine", "okay", "ok", "k",
+    "good", "fine", 
     "could", "hood", "gud", "go", "goo", "gould"
   ]);
   if (goodLike.has(first) || t.includes(" good ") || t.endsWith(" good")) return "good";
@@ -4991,48 +5703,45 @@ async function handleGlobalVoiceCommands(text) {
       pendingStudyAheadAdvance = false;
       stopListeningForCommand();
     }
-    const plainAnswer = getPlainTextFromCard(currentCard.answer);
-    speakSafe("Answer: " + plainAnswer, () => {
-      if (isPaused) return;
+    // 🚫 Disable Add Card button during repeat answer
+    setAddCardEnabled(false);
+    // ✅ Pause/resume stays enabled during repeat answer (already enabled)
+     speakPlainAnswerWithCardLang("", () => {
+    if (isPaused) return;
 
-      // If we're in study-ahead, stay on this card after repeating
-      if (noScheduleChanges && studyAheadSession) {
-        studyAheadRepeatAnswerActive = false;
-        pendingStudyAheadAdvance = false;
-        startStudyAheadAnswerWindow(true);
-        return;
-      }
+         if (noScheduleChanges && studyAheadSession) {
+      studyAheadRepeatAnswerActive = false;
+      pendingStudyAheadAdvance = false;
+      startStudyAheadAnswerWindow(true);
+      return;
+    }
 
-      // If we are waiting for difficulty in normal mode, just re-prompt
-      if (awaitingDifficulty && !noScheduleChanges) {
-        const detailed =
-          !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
-        hasSpokenInstructionsOnce = true;
-          const promptText = detailed
-            ? "How was that. Say again, hard, good, or easy."
-            : "How was that.";
-          stopListeningForCommand();
-          speak(promptText, () => {
-            startDifficultyListening();
-          });
-        return;
-      }
+         if (awaitingDifficulty && !noScheduleChanges) {
+      const detailed = !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
+      hasSpokenInstructionsOnce = true;
+      const promptText = detailed
+        ? "How was that. Say again, hard, good, or easy."
+        : "How was that.";
+      // ✅ Re-enable Add Card button after repeat answer finishes (back to rating window)
+      setAddCardEnabled(true);
+      stopListeningForCommand();
+      speak(promptText, () => startDifficultyListening());
+      return;
+    }
 
-      // If we're at post-completion choice, re-prompt main menu
       if (awaitingPostCompletionChoice) {
-        speakSafe("Say main menu to go back.", () => {
-          listenForCommand(handleVoiceTranscript);
-        });
-        return;
-      }
-
-      // Otherwise, just keep listening for the next command
-      if (currentMode === "voice") {
+      speakSafe("Say main menu to go back.", () => {
         listenForCommand(handleVoiceTranscript);
-      }
-    });
-    return true;
-  }
+      });
+      return;
+    }
+
+    if (currentMode === "voice") {
+      listenForCommand(handleVoiceTranscript);
+    }
+  });
+  return true;
+}
 
   // 🧊 Pause study session – pause IMMEDIATELY (before speaking)
 if (
@@ -5153,7 +5862,7 @@ if (
   // If we are waiting to play the answer after a delay, reset the timer on any speech
   if (currentMode === "voice" && answerMode === "delay" && questionDelayTimerId !== null) {
     if (normalizeCmdText(text).length > 0) {
-      setStatus("Delay reset — waiting for your answer...");
+      setStatus("Wait until after answer to give voice commands in this answer behavior mode...");
       startOrResetQuestionDelayTimer();
       return;
     }
@@ -5244,15 +5953,22 @@ if (awaitingAnswerSignal && currentMode === "voice") {
   // If we're choosing what to do after finishing all due cards
   if (awaitingPostCompletionChoice) {
     const wantsMainMenu = isMainMenuCommand(text);
-
-    awaitingPostCompletionChoice = false;
+    const wantsStudyAhead = text.includes("study ahead") || text.includes("study-ahead");
 
     if (wantsMainMenu) {
+      awaitingPostCompletionChoice = false;
       speakAndGoToMainMenu();
       return;
     }
 
-    // Otherwise: enter study-ahead mode (no schedule changes)
+    if (!wantsStudyAhead) {
+      // User said something else - silently ignore and keep listening
+      listenForCommand(handleVoiceTranscript);
+      return;
+    }
+
+    // Enter study-ahead mode (no schedule changes)
+    awaitingPostCompletionChoice = false;
     studyAheadSession = true;
     noScheduleChanges = true;
     studyAheadPromptedOnceVoice = false;
@@ -5260,6 +5976,7 @@ if (awaitingAnswerSignal && currentMode === "voice") {
     aheadQueue = shuffleArray(getDueCardsForDeck(currentDeckId, true, false));
     aheadQueueIndex = 0;
 
+    setVoiceSkipToAnswerEnabled(false);
     speak(
       "Okay, entering study ahead mode. These reviews will not change your future schedule.",
       () => {
@@ -5307,16 +6024,8 @@ if (awaitingAnswerSignal && currentMode === "voice") {
         return;
       }
     } else {
-      if (!trimmed || promptEcho || tooSoon) {
-        startDifficultyListening();
-        return;
-      }
-      speak(
-        "I didn't catch that. Please say again, hard, good, or easy.",
-        () => {
-          startDifficultyListening();
-        }
-      );
+      // User said something that's not a valid rating - silently keep listening
+      startDifficultyListening();
       return;
     }
 
@@ -5330,6 +6039,7 @@ if (nextState && nextState.intervalMinutes <= SHORT_REVIEW_THRESHOLD_MINUTES) {
 awaitingDifficulty = false;
 if (voiceRatingButtons) {
   voiceRatingButtons.classList.add("hidden");
+  clearVoiceHints();
 }
 
 // ✅ NEW: echo the rating word with mic OFF, then continue
@@ -5390,6 +6100,11 @@ function echoRatingThenContinue(ratingKey, next) {
   const prevMicMuted = isMicMuted;
   isMicMuted = true;
 
+  // 🚫 Disable pause/resume during rating confirmation
+  setPauseResumeEnabled(false);
+  // 🚫 Disable Add Card button during rating echo and next card transition
+  setAddCardEnabled(false);
+
   // Optional: disable onscreen rating buttons during echo (prevents accidental taps)
   setVoiceRatingButtonsEnabled(false);
 
@@ -5400,6 +6115,7 @@ function echoRatingThenContinue(ratingKey, next) {
 
     // Re-enable rating buttons (though you usually hide them right after)
     setVoiceRatingButtonsEnabled(true);
+    // ✅ Pause/resume stays disabled until next card's question finishes
 
     next && next();
   }, { lang: "en-US" });
@@ -5416,16 +6132,30 @@ function speakAnswerThenAskDifficulty() {
   setFlashcardFlipped("voice", true);
   setCardContent(voiceAnswerText, currentCard.answer);
 
+  // ✅ Pause/resume stays enabled during answer window and answer audio
+  // (already enabled after question finished)
+
   // ✅ get language for the ANSWER
   const deck = getDeckById(currentDeckId);
   const { aLang } = getCardLangs(deck, currentCard);
 
+  // Prepare answer text with optional question restatement
+  let answerText = getPlainTextFromCard(currentCard.answer);
+  if (restateQuestionEnabled && currentCard.question) {
+    const questionText = getPlainTextFromCard(currentCard.question);
+    const statementPrefix = questionToStatement(questionText);
+    if (statementPrefix) {
+      answerText = statementPrefix + ' ' + answerText;
+    }
+  }
+
   // 🔊 Speak the answer in its language
   stopListeningForCommand();
   speakWithWebTts(
-    getPlainTextFromCard(currentCard.answer),
+    answerText,
     async () => {
       if (isPaused) return;
+      // ✅ Pause/resume stays enabled during rating prompt
 
       // ===== STUDY-AHEAD HANDS-FREE: always respect the study-ahead gap and never ask for rating =====
       if (noScheduleChanges && studyAheadSession) {
@@ -5452,10 +6182,16 @@ function speakAnswerThenAskDifficulty() {
           }
         }
 
-        // Just advance to the next card
-        setStudyState(StudyState.IDLE);
-        runVoiceLoop();
-        return;
+                 // ✅ Auto-good mode: wait 5 seconds before the next question
+  setStudyState(StudyState.IDLE);
+
+  clearAutoGoodNextCardTimer();
+  autoGoodNextCardTimerId = setTimeout(() => {
+    autoGoodNextCardTimerId = null;
+    if (!isPaused) runVoiceLoop();
+  }, 5000);
+
+  return;
       }
 
       // ===== Normal hands-free flow: show rating buttons, prompt again/hard/good/easy, then listen =====
@@ -5463,8 +6199,11 @@ function speakAnswerThenAskDifficulty() {
         awaitingDifficulty = true;
         if (voiceRatingButtons) {
           voiceRatingButtons.classList.remove("hidden");
+          if (!noScheduleChanges) updateVoiceDueHints();
         }
         setVoiceSkipToAnswerEnabled(true);
+        // ✅ Enable Add Card button during rating window
+        setAddCardEnabled(true);
 
         const detailed = !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
         hasSpokenInstructionsOnce = true;
@@ -5530,6 +6269,7 @@ function speakAnswerThenAskDifficulty() {
 
       if (!restartOnly && !studyAheadPromptedOnceVoice) {
         studyAheadPromptedOnceVoice = true;
+        setVoiceSkipToAnswerEnabled(false);
         speakSafe("You are in study ahead mode. You can say repeat answer, repeat question, pause study session, resume study session, or main menu before the next card.", () => {
           if (isPaused) return;
           startListeningAndTimer();
@@ -5638,6 +6378,12 @@ function speakAnswerThenAskDifficulty() {
         setStatus("Paused.");
         return;
       }
+
+      // 🚫 Disable pause/resume buttons at start of new card
+      setPauseResumeEnabled(false);
+
+        stopListeningForCommand(); // ✅ ensure nothing is listening from study-ahead gap
+
       clearStudyAheadGapTimer();
       clearQuestionDelayTimer();
       clearAnswerAfterSpeechDelay();
@@ -5700,6 +6446,7 @@ function speakAnswerThenAskDifficulty() {
     aheadQueueIndex = 0;
 
     setStudyState(StudyState.IDLE);
+    setVoiceSkipToAnswerEnabled(false);
     speak(
       "Congratulations, you are all caught up, no more cards are due today. Entering study ahead mode.",
       () => {
@@ -5712,6 +6459,7 @@ function speakAnswerThenAskDifficulty() {
   // Old behavior: ask if they want study-ahead
   setStudyState(StudyState.IDLE);
   awaitingPostCompletionChoice = true;
+  setVoiceSkipToAnswerEnabled(false);
   speak(
     "Congratulations, you are all caught up, no more cards are due today.",
     () => {
@@ -5741,6 +6489,7 @@ function speakAnswerThenAskDifficulty() {
 
   setStudyState(StudyState.IDLE);
   awaitingPostCompletionChoice = true;
+  setVoiceSkipToAnswerEnabled(false);
   speak(
     "There are no more cards available to study in this deck right now.",
     () => {
@@ -5766,14 +6515,16 @@ setCardContent(voiceAnswerText, currentCard.answer);
 
       // 🚨 Enable edit button now that we have a card to edit
       if (voiceEditToggleBtn) voiceEditToggleBtn.disabled = false;
-      if (studyAddCardBtn) studyAddCardBtn.disabled = false;
+      // ⚠️ Add Card button controlled by setAddCardEnabled() throughout the flow
       if (studyInstructionsBtn) studyInstructionsBtn.disabled = false;
    // Show rating buttons immediately AND make them clickable right away
 if (!noScheduleChanges && !autoGoodMode && voiceRatingButtons) {
   voiceRatingButtons.classList.remove("hidden");
   setVoiceRatingButtonsEnabled(true);
+  updateVoiceDueHints();
 } else if (voiceRatingButtons) {
   voiceRatingButtons.classList.add("hidden");
+  clearVoiceHints();
 }
 
       hasSpokenCurrentQuestion = true;
@@ -5786,14 +6537,16 @@ speakWithWebTts(
   getPlainTextFromCard(currentCard.question),
   () => {
     if (isPaused) return;
+    // ✅ Enable pause/resume after question audio finishes
+    setPauseResumeEnabled(true);
     setVoiceSkipToAnswerEnabled(true);
+    // 🚫 Add Card stays disabled during answer window
 
-    if (answerMode === "delay") {
-      if (!autoGoodMode) {
+      if (answerMode === "delay") {
+        // Always listen for voice commands during the delay period
         listenForCommand(handleVoiceTranscript);
-      }
-      startOrResetQuestionDelayTimer();
-    } else {
+        startOrResetQuestionDelayTimer();
+      } else {
       awaitingAnswerSignal = true;
       setStudyState(StudyState.WAITING_FOR_ANSWER);
       setStatus("Listening for your answer...");
@@ -5810,6 +6563,13 @@ speakWithWebTts(
       hintHard.textContent = "";
       hintGood.textContent = "";
       hintEasy.textContent = "";
+    }
+
+    function clearVoiceHints() {
+      voiceHintAgain.textContent = "";
+      voiceHintHard.textContent = "";
+      voiceHintGood.textContent = "";
+      voiceHintEasy.textContent = "";
     }
 
     function updateSilentDueHints() {
@@ -5850,6 +6610,46 @@ speakWithWebTts(
       hintHard.textContent = "Next in " + formatInterval(hardMinutes);
       hintGood.textContent = "Next in " + formatInterval(goodMinutes);
       hintEasy.textContent = "Next in " + formatInterval(easyMinutes);
+    }
+
+    function updateVoiceDueHints() {
+      if (!currentCard || noScheduleChanges) {
+        clearVoiceHints();
+        return;
+      }
+      const deckId = currentDeckId;
+      const cardId = currentCard.id;
+
+      // "Again" always means ~5 minutes (back to ladder level 1)
+      voiceHintAgain.textContent = "5 min >";
+
+      const hardMinutes = previewIntervalMinutes(deckId, cardId, "hard");
+      const goodMinutes = previewIntervalMinutes(deckId, cardId, "good");
+      const easyMinutes = previewIntervalMinutes(deckId, cardId, "easy");
+
+      function formatInterval(minutes) {
+        if (minutes < 60) {
+          const m = Math.max(1, Math.round(minutes));
+          return m + " min";
+        }
+        const hours = minutes / 60;
+        if (hours < 24) {
+          const h = Math.max(1, Math.round(hours));
+          return h + " hr" + (h === 1 ? "" : "s");
+        }
+        const days = minutes / MINUTES_PER_DAY;
+        if (days < 14) {
+          const d = Math.max(1, Math.round(days));
+          return d + " day" + (d === 1 ? "" : "s");
+        }
+        const weeks = days / 7;
+        const w = Math.max(1, Math.round(weeks));
+        return w + " wk" + (w === 1 ? "" : "s");
+      }
+
+      voiceHintHard.textContent = "Next in " + formatInterval(hardMinutes);
+      voiceHintGood.textContent = "Next in " + formatInterval(goodMinutes);
+      voiceHintEasy.textContent = "Next in " + formatInterval(easyMinutes);
     }
 
     function runSilentLoop() {
@@ -5974,7 +6774,12 @@ if (overdue.length > 0) {
       setCardContent(silentQuestionText, currentCard.question);
     setCardContent(silentAnswerText, currentCard.answer);
       setFlashcardFlipped("silent", false);
-      silentRatingButtons.classList.add("hidden");
+      if (noScheduleChanges) {
+        silentRatingButtons.classList.add("hidden");
+      } else {
+        silentRatingButtons.classList.remove("hidden");
+        updateSilentDueHints();
+      }
       clearSilentHints();
       silentEditPanel.classList.add("hidden");
 
@@ -6050,6 +6855,9 @@ if (overdue.length > 0) {
     awaitingAnswerSignal = false;
     awaitingDifficulty = false;
 
+    // 🚫 Disable Add Card button when rating button is clicked
+    setAddCardEnabled(false);
+
     await stopAllAudio();
 
     if (!noScheduleChanges) {
@@ -6060,6 +6868,7 @@ if (overdue.length > 0) {
     }
 
     voiceRatingButtons.classList.add("hidden");
+    clearVoiceHints();
     runVoiceLoopAfterRating();
   });
 }
@@ -6107,6 +6916,12 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
       silentUI.classList.remove("hidden");
       voiceUI.classList.add("hidden");
 
+      // ✅ Enable Add Card button for silent study mode (always available)
+      if (studyAddCardBtn) studyAddCardBtn.disabled = false;
+
+      // Hide instructions button during study
+      if (openInstructionsBtn) openInstructionsBtn.style.display = "none";
+
       showStudySection("silent");
       runSilentLoop();
     });
@@ -6119,11 +6934,38 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
     });
 
     function describeAutoIntro() {
-      const desc = describeAutoModeBehavior();
-      if (autoModeBehavior === "tomorrow") {
-        return "Starting automatic hands free study session. I will read the question, then the answer, and " + desc + ".";
+      const behaviorRating = autoModeBehavior || "good";
+      let ratingText;
+      
+      switch (behaviorRating) {
+        case "again":
+          ratingText = "again";
+          break;
+        case "hard":
+          ratingText = "hard";
+          break;
+        case "easy":
+          ratingText = "easy";
+          break;
+        case "tomorrow":
+          ratingText = "to show again tomorrow";
+          break;
+        case "good":
+        default:
+          ratingText = "good";
+          break;
       }
-      return "Starting automatic hands free study session. I will read the question, then the answer, and " + desc + ".";
+      
+      if (answerMode === "voice") {
+        // Play answer after speaking mode
+        return "Entering study session. I will read the question, then you will say answer to play the answer, or you may say any other voice command. I will say the answer, then I will rate each card as " + ratingText + ".";
+      } else {
+        // Delay mode
+        if (behaviorRating === "tomorrow") {
+          return "Entering automatic study session. I will read a question, then you may say any voice command before I read the answer. I will then rate each card to show again tomorrow.";
+        }
+        return "Entering automatic study session. I will read a question, then you may say any voice command before I read the answer. I will then rate each card as " + ratingText + ".";
+      }
     }
 
     // >>> MODIFIED: add async + inline mic permission request here <<<
@@ -6189,6 +7031,7 @@ startVoiceBtn.addEventListener("click", async () => {
   clearAnswerAfterSpeechDelay();
 
   skipInstructionsAfterFirst = !!skipInstructionsAfterFirstCheckbox.checked;
+  disableOpeningPrompt = !!disableOpeningPromptCheckbox.checked;
   hasSpokenInstructionsOnce = false;
 
   // Start in normal “due today” mode; study-ahead only after completion
@@ -6222,14 +7065,38 @@ startVoiceBtn.addEventListener("click", async () => {
   showStudySection("voice");
   setStudyState(StudyState.IDLE);
 
-  const intro = autoGoodMode
-    ? describeAutoIntro()
-    : "Starting hands free study session. I will read a question, then the answer, then ask how hard it was.";
+  // Hide instructions button during study
+  if (openInstructionsBtn) openInstructionsBtn.style.display = "none";
 
-  // ✅ Don’t pre-check cards here; let runVoiceLoop be the single source of truth
-  speak(intro, () => {
+  // Check if we should skip opening prompt
+  if (disableOpeningPrompt) {
+    // Skip intro, go straight to first question
     runVoiceLoop();
-  });
+  } else {
+    // 🚫 Disable pause/resume during opening prompt
+    setPauseResumeEnabled(false);
+    // 🚫 Disable skip-to-answer during opening prompt
+    setVoiceSkipToAnswerEnabled(false);
+    // 🚫 Disable Add Card button during opening prompt
+    setAddCardEnabled(false);
+
+    let intro;
+    if (autoGoodMode) {
+      intro = describeAutoIntro();
+    } else if (answerMode === "voice") {
+      // Play answer after speaking mode
+      intro = "Starting study session. I will read a question, then you will say \"answer\" to play the answer or you may say any other voice command. I will play the answer, then I will ask you for your rating. You may then give your rating, or any other voice command. Voice commands only work after I ask you a question or after I ask you for your rating. You may disable these instructions in study options for future study sessions.";
+    } else {
+      // Delay mode (play answer after X seconds)
+      const delaySecs = Math.round(answerDelayMs / 1000);
+      intro = "Starting study session. I will read a question, then after " + delaySecs + " seconds, I will say the answer. I will ask you for your rating. You may then give your rating or any other voice command. Voice commands only work after I ask you for your rating. You may disable these instructions in study options for future study sessions.";
+    }
+
+    // ✅ Don't pre-check cards here; let runVoiceLoop be the single source of truth
+    speak(intro, () => {
+      runVoiceLoop();
+    });
+  }
 });
 
     // <<< END MODIFIED HANDLER <<<
