@@ -3770,6 +3770,9 @@ function speakWithWebTts(text, onEnd, opts = {}) {
 
   // Humanize numbers for better TTS pronunciation
   function humanizeNumbers(str) {
+    // Convert decimals: "2.5" → "2 point 5"
+    str = str.replace(/(\d+)\.(\d+)/g, "$1 point $2");
+    
     // Convert percentages: "95%" → "95 percent"
     str = str.replace(/(\d+)%/g, "$1 percent");
     
