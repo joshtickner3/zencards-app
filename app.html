@@ -6787,6 +6787,9 @@ if (overdue.length > 0) {
     awaitingAnswerSignal = false;
     awaitingDifficulty = false;
 
+    // 🚫 Disable Add Card button when rating button is clicked
+    setAddCardEnabled(false);
+
     await stopAllAudio();
 
     if (!noScheduleChanges) {
