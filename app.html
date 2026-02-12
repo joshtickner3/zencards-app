@@ -1005,6 +1005,13 @@ input[type="number"]:focus-visible{
               <span class="badge">New</span>
             </label>
           </div>
+          <!-- NEW: Disable opening prompt -->
+          <div style="margin-top:0.5rem;">
+            <label class="inline">
+              <input type="checkbox" id="disableOpeningPrompt" />
+              Disable opening prompt (skip intro, start with first question)
+            </label>
+          </div>
         </div>
       </div>
 
@@ -4377,6 +4384,7 @@ function getStudyPrefs() {
 
   // Defaults (match your current defaults)
   if (typeof p.skipInstructionsAfterFirst !== "boolean") p.skipInstructionsAfterFirst = true;
+  if (typeof p.disableOpeningPrompt !== "boolean") p.disableOpeningPrompt = false;
   if (typeof p.answerMode !== "string") p.answerMode = "voice"; // "delay" | "voice"
   if (typeof p.answerDelaySec !== "number") p.answerDelaySec = 10;
   if (typeof p.answerToRatingDelaySec !== "number") p.answerToRatingDelaySec = 5;
@@ -4415,6 +4423,7 @@ function saveStudyPrefs(patch = {}) {
     const studyInstructionsBtn = document.getElementById("studyInstructionsBtn");
 
     const skipInstructionsAfterFirstCheckbox = document.getElementById("skipInstructionsAfterFirst");
+    const disableOpeningPromptCheckbox = document.getElementById("disableOpeningPrompt");
     const autoGoodToggle = document.getElementById("autoGoodToggle");
     const autoRatingSelect = document.getElementById("autoRatingSelect");
     const answerModeDelayRadio = document.getElementById("answerModeDelay");
@@ -4527,6 +4536,7 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
 
   // UI controls
   if (skipInstructionsAfterFirstCheckbox) skipInstructionsAfterFirstCheckbox.checked = !!p.skipInstructionsAfterFirst;
+  if (disableOpeningPromptCheckbox) disableOpeningPromptCheckbox.checked = !!p.disableOpeningPrompt;
 
   if (answerModeVoiceRadio && answerModeDelayRadio) {
     answerModeVoiceRadio.checked = (p.answerMode === "voice");
@@ -4563,6 +4573,7 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
 
   // State variables (these are what your runtime uses)
   skipInstructionsAfterFirst = !!p.skipInstructionsAfterFirst;
+  disableOpeningPrompt = !!p.disableOpeningPrompt;
   answerMode = p.answerMode === "voice" ? "voice" : "delay";
   answerDelayMs = p.answerDelaySec * 1000;
   answerToRatingDelayMs = p.answerToRatingDelaySec * 1000;
@@ -4582,6 +4593,13 @@ function wireStudyPrefsListeners() {
   if (skipInstructionsAfterFirstCheckbox) {
     skipInstructionsAfterFirstCheckbox.addEventListener("change", () => {
       const next = saveStudyPrefs({ skipInstructionsAfterFirst: !!skipInstructionsAfterFirstCheckbox.checked });
+      applyStudyPrefsToUIAndState();
+    });
+  }
+
+  if (disableOpeningPromptCheckbox) {
+    disableOpeningPromptCheckbox.addEventListener("change", () => {
+      const next = saveStudyPrefs({ disableOpeningPrompt: !!disableOpeningPromptCheckbox.checked });
       applyStudyPrefsToUIAndState();
     });
   }
@@ -4700,6 +4718,7 @@ function wireStudyPrefsListeners() {
     let autoEnterStudyAhead = false;  // from Study Options
 let loopStudyAhead = false;       // from Study Options
     let skipInstructionsAfterFirst = true;
+    let disableOpeningPrompt = false;
     let hasSpokenInstructionsOnce = false;
     let answerMode = "delay";
     let answerDelayMs = 4000;
@@ -7042,28 +7061,34 @@ startVoiceBtn.addEventListener("click", async () => {
   // Hide instructions button during study
   if (openInstructionsBtn) openInstructionsBtn.style.display = "none";
 
-  // 🚫 Disable pause/resume during opening prompt
-  setPauseResumeEnabled(false);
-  // 🚫 Disable skip-to-answer during opening prompt
-  setVoiceSkipToAnswerEnabled(false);
-  // 🚫 Disable Add Card button during opening prompt
-  setAddCardEnabled(false);
-
-  let intro;
-  if (autoGoodMode) {
-    intro = describeAutoIntro();
-  } else if (answerMode === "voice") {
-    // Play answer after speaking mode
-    intro = "Starting hands free study session. I will read a question, then you will say \"answer\" to play the answer or you may say any other voice command. I will play the answer, then I will ask you for your rating. You may then give your rating, or any other voice command. Voice commands only work after I ask you a question or after I ask you for your rating. You may disable these instructions in study options for future study sessions.";
-  } else {
-    // Delay mode (play answer after X seconds)
-    intro = "Starting hands free study session. I will read a question, then you may give any voice command. I will say the answer, then I will ask you for your rating. You may then give your rating or any other voice command. Voice commands only work after I ask you a question or after I ask you for your rating. You may disable these instructions in study options for future study sessions.";
-  }
-
-  // ✅ Don't pre-check cards here; let runVoiceLoop be the single source of truth
-  speak(intro, () => {
+  // Check if we should skip opening prompt
+  if (disableOpeningPrompt) {
+    // Skip intro, go straight to first question
     runVoiceLoop();
-  });
+  } else {
+    // 🚫 Disable pause/resume during opening prompt
+    setPauseResumeEnabled(false);
+    // 🚫 Disable skip-to-answer during opening prompt
+    setVoiceSkipToAnswerEnabled(false);
+    // 🚫 Disable Add Card button during opening prompt
+    setAddCardEnabled(false);
+
+    let intro;
+    if (autoGoodMode) {
+      intro = describeAutoIntro();
+    } else if (answerMode === "voice") {
+      // Play answer after speaking mode
+      intro = "Starting hands free study session. I will read a question, then you will say \"answer\" to play the answer or you may say any other voice command. I will play the answer, then I will ask you for your rating. You may then give your rating, or any other voice command. Voice commands only work after I ask you a question or after I ask you for your rating. You may disable these instructions in study options for future study sessions.";
+    } else {
+      // Delay mode (play answer after X seconds)
+      intro = "Starting hands free study session. I will read a question, then you may give any voice command. I will say the answer, then I will ask you for your rating. You may then give your rating or any other voice command. Voice commands only work after I ask you a question or after I ask you for your rating. You may disable these instructions in study options for future study sessions.";
+    }
+
+    // ✅ Don't pre-check cards here; let runVoiceLoop be the single source of truth
+    speak(intro, () => {
+      runVoiceLoop();
+    });
+  }
 });
 
     // <<< END MODIFIED HANDLER <<<
