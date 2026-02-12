@@ -5639,6 +5639,8 @@ async function handleGlobalVoiceCommands(text) {
       pendingStudyAheadAdvance = false;
       stopListeningForCommand();
     }
+    // 🚫 Disable Add Card button during repeat answer
+    setAddCardEnabled(false);
     // ✅ Pause/resume stays enabled during repeat answer (already enabled)
      speakPlainAnswerWithCardLang("", () => {
     if (isPaused) return;
@@ -5656,6 +5658,8 @@ async function handleGlobalVoiceCommands(text) {
       const promptText = detailed
         ? "How was that. Say again, hard, good, or easy."
         : "How was that.";
+      // ✅ Re-enable Add Card button after repeat answer finishes (back to rating window)
+      setAddCardEnabled(true);
       stopListeningForCommand();
       speak(promptText, () => startDifficultyListening());
       return;
