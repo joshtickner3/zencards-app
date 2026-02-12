@@ -4884,6 +4884,7 @@ const timerAfterRatingEl = document.getElementById("timerAfterRating");
 
     // NEW: track delay window between question and answer in delay mode
     let questionDelayTimerId = null;
+    let questionDelayCountdownInterval = null;
      let autoGoodNextCardTimerId = null;
     let answerToRatingDelayTimerId = null;
 
@@ -4953,6 +4954,10 @@ function clearAutoGoodNextCardTimer() {
         clearTimeout(questionDelayTimerId);
         questionDelayTimerId = null;
       }
+      if (questionDelayCountdownInterval !== null) {
+        clearInterval(questionDelayCountdownInterval);
+        questionDelayCountdownInterval = null;
+      }
       questionDelayDueMs = 0;
     }
 
@@ -4963,9 +4968,29 @@ function clearAutoGoodNextCardTimer() {
         Math.min(60, Math.floor(answerDelayMs / 1000))
       );
       setStudyState(StudyState.WAITING_FOR_ANSWER);
+      
+      // Start countdown display
+      const startTime = Date.now();
+      const updateCountdown = () => {
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, Math.ceil((delay * 1000 - elapsed) / 1000));
+        if (remaining > 0) {
+          setStatus(`Answer in ${remaining} second${remaining !== 1 ? 's' : ''}...`);
+        } else {
+          setStatus('');
+        }
+      };
+      updateCountdown(); // Show immediately
+      questionDelayCountdownInterval = setInterval(updateCountdown, 1000);
+      
       questionDelayTimerId = setTimeout(() => {
         questionDelayTimerId = null;
         questionDelayDueMs = 0;
+        if (questionDelayCountdownInterval !== null) {
+          clearInterval(questionDelayCountdownInterval);
+          questionDelayCountdownInterval = null;
+        }
+        setStatus('');
         if (!isPaused) {
           speakAnswerThenAskDifficulty();
         }
