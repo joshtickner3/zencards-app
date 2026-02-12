@@ -6426,7 +6426,7 @@ setCardContent(voiceAnswerText, currentCard.answer);
 
       // 🚨 Enable edit button now that we have a card to edit
       if (voiceEditToggleBtn) voiceEditToggleBtn.disabled = false;
-      if (studyAddCardBtn) studyAddCardBtn.disabled = false;
+      // ⚠️ Add Card button controlled by setAddCardEnabled() throughout the flow
       if (studyInstructionsBtn) studyInstructionsBtn.disabled = false;
    // Show rating buttons immediately AND make them clickable right away
 if (!noScheduleChanges && !autoGoodMode && voiceRatingButtons) {
