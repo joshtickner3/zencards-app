@@ -6848,6 +6848,9 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
       silentUI.classList.remove("hidden");
       voiceUI.classList.add("hidden");
 
+      // ✅ Enable Add Card button for silent study mode (always available)
+      if (studyAddCardBtn) studyAddCardBtn.disabled = false;
+
       showStudySection("silent");
       runSilentLoop();
     });
