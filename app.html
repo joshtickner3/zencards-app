@@ -4741,6 +4741,7 @@ let loopStudyAhead = false;       // from Study Options
     const difficultyPromptGraceMs = 1200;
     let lastDifficultyPromptAt = 0;
     let cardSuspendedForAddCard = null;
+    let cardSuspendedFlippedState = false;
 
     function startDifficultyListening() {
       lastDifficultyPromptAt = Date.now();
@@ -5012,6 +5013,7 @@ function updateDeckBadge() {
 async function openAddCardModal() {
   // Store the current card so we can resume it after closing the modal
   cardSuspendedForAddCard = currentCard;
+  cardSuspendedFlippedState = isFlashcardFlipped(currentMode);
   
   // Stop audio/listening so the modal is calm in hands-free mode
   await stopAllAudio();
@@ -5033,25 +5035,56 @@ function closeAddCardModal() {
   addCardModal.classList.add("hidden");
   addCardModal.setAttribute("aria-hidden", "true");
 
-  // If we had a suspended card from Add Card button, replay its answer
-  if (cardSuspendedForAddCard && currentMode === "voice" && !isPaused) {
+  // If we had a suspended card, restore it instead of advancing to next card
+  if (cardSuspendedForAddCard && !isPaused) {
     currentCard = cardSuspendedForAddCard;
+    const wasFlipped = cardSuspendedFlippedState;
     cardSuspendedForAddCard = null;
+    cardSuspendedFlippedState = false;
     
-    // Re-show the card content
-    setCardContent(voiceQuestionText, currentCard.question);
-    setCardContent(voiceAnswerText, currentCard.answer);
-    setFlashcardFlipped("voice", true);
+    if (currentMode === "voice") {
+      // Re-show the card content
+      setCardContent(voiceQuestionText, currentCard.question);
+      setCardContent(voiceAnswerText, currentCard.answer);
+      setFlashcardFlipped("voice", wasFlipped);
+      
+      // Replay the answer and continue to rating prompt
+      speakAnswerThenAskDifficulty();
+      return;
+    }
     
-    // Replay the answer and continue to rating prompt
-    speakAnswerThenAskDifficulty();
-    return;
+    if (currentMode === "silent") {
+      // Restore the same card and side in silent mode
+      setCardContent(silentQuestionText, currentCard.question);
+      setCardContent(silentAnswerText, currentCard.answer);
+      setFlashcardFlipped("silent", wasFlipped);
+      
+      // Restore UI state based on which side was showing
+      if (wasFlipped) {
+        // Answer was showing - show rating buttons
+        if (showAnswerBtn) showAnswerBtn.classList.add("hidden");
+        if (silentRatingButtons && !noScheduleChanges) {
+          silentRatingButtons.classList.remove("hidden");
+          updateSilentDueHints();
+        }
+        if (noScheduleChanges && silentNextCardBtn) {
+          silentNextCardBtn.classList.remove("hidden");
+        }
+      } else {
+        // Question was showing - show "Show Answer" button
+        if (showAnswerBtn) showAnswerBtn.classList.remove("hidden");
+        if (silentRatingButtons) silentRatingButtons.classList.add("hidden");
+        if (silentNextCardBtn) silentNextCardBtn.classList.add("hidden");
+      }
+      return;
+    }
   }
   
   // Clear the suspended card flag
   cardSuspendedForAddCard = null;
+  cardSuspendedFlippedState = false;
   
-  // Normal flow: advance to next card
+  // Normal flow: advance to next card (only if no suspended card)
   if (currentMode === "voice" && !isPaused) runVoiceLoop();
   if (currentMode === "silent" && !isPaused) runSilentLoop();
 }
