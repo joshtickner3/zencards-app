@@ -4852,6 +4852,7 @@ function startOrResetAnswerAfterSpeechDelay() {
 }
 
     let studyAheadGapTimerId = null;
+    let studyAheadCountdownInterval = null;
 
     let isPaused = false;
     let restartCardOnResumeVoice = false; // NEW: when resuming voice mode, replay current card
@@ -4939,6 +4940,10 @@ function clearAutoGoodNextCardTimer() {
       if (studyAheadGapTimerId !== null) {
         clearTimeout(studyAheadGapTimerId);
         studyAheadGapTimerId = null;
+      }
+      if (studyAheadCountdownInterval !== null) {
+        clearInterval(studyAheadCountdownInterval);
+        studyAheadCountdownInterval = null;
       }
       inStudyAheadAnswerGap = false;
     }
@@ -6290,9 +6295,29 @@ function speakAnswerThenAskDifficulty() {
         if (!isPaused && currentMode === "voice") {
           listenForCommand(handleVoiceTranscript);
         }
+        
+        // Start countdown display
+        const startTime = Date.now();
+        const updateCountdown = () => {
+          const elapsed = Date.now() - startTime;
+          const remaining = Math.max(0, Math.ceil((studyAheadGapMs - elapsed) / 1000));
+          if (remaining > 0) {
+            setStatus(`Next question in ${remaining} second${remaining !== 1 ? 's' : ''}...`);
+          } else {
+            setStatus('');
+          }
+        };
+        updateCountdown(); // Show immediately
+        studyAheadCountdownInterval = setInterval(updateCountdown, 1000);
+        
         studyAheadGapTimerId = setTimeout(() => {
           inStudyAheadAnswerGap = false;
           studyAheadGapTimerId = null;
+          if (studyAheadCountdownInterval !== null) {
+            clearInterval(studyAheadCountdownInterval);
+            studyAheadCountdownInterval = null;
+          }
+          setStatus('');
           if (studyAheadRepeatAnswerActive) {
             pendingStudyAheadAdvance = true;
             return;
