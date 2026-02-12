@@ -6909,11 +6909,38 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
     });
 
     function describeAutoIntro() {
-      const desc = describeAutoModeBehavior();
-      if (autoModeBehavior === "tomorrow") {
-        return "Starting automatic hands free study session. I will read the question, then the answer, and " + desc + ".";
+      const behaviorRating = autoModeBehavior || "good";
+      let ratingText;
+      
+      switch (behaviorRating) {
+        case "again":
+          ratingText = "again";
+          break;
+        case "hard":
+          ratingText = "hard";
+          break;
+        case "easy":
+          ratingText = "easy";
+          break;
+        case "tomorrow":
+          ratingText = "to show again tomorrow";
+          break;
+        case "good":
+        default:
+          ratingText = "good";
+          break;
       }
-      return "Starting automatic hands free study session. I will read the question, then the answer, and " + desc + ".";
+      
+      if (answerMode === "voice") {
+        // Play answer after speaking mode
+        return "Entering study session. I will read the question, then you will say answer to play the answer, or you may say any other voice command. I will say the answer, then I will rate each card as " + ratingText + ".";
+      } else {
+        // Delay mode
+        if (behaviorRating === "tomorrow") {
+          return "Starting automatic hands free study session. I will read the question, then the answer, and push each card to show again tomorrow.";
+        }
+        return "Starting automatic hands free study session. I will read the question, then the answer, and mark each card as " + ratingText + ".";
+      }
     }
 
     // >>> MODIFIED: add async + inline mic permission request here <<<
