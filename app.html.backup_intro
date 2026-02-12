@@ -7022,18 +7022,11 @@ startVoiceBtn.addEventListener("click", async () => {
   // 🚫 Disable Add Card button during opening prompt
   setAddCardEnabled(false);
 
-  let intro;
-  if (autoGoodMode) {
-    intro = describeAutoIntro();
-  } else if (answerMode === "voice") {
-    // Play answer after speaking mode
-    intro = "Starting hands free study session. I will read a question, then you will say answer to play the answer after I read the question, or you may give any other voice command before I say the answer. I will say the answer, then I will ask you how was that. You may give your rating after I ask that, or any other voice command from the list in the instructions on the main page. I will confirm your rating, then play the next question afterwards. Voice commands only work after I ask you a question or after I ask you how was that. You may disable these instructions in study options for future study sessions.";
-  } else {
-    // Delay mode (play answer after X seconds)
-    intro = "Starting hands free study session. I will read a question, then the answer, then ask how hard it was.";
-  }
+  const intro = autoGoodMode
+    ? describeAutoIntro()
+    : "Starting hands free study session. I will read a question, then the answer, then ask how hard it was.";
 
-  // ✅ Don't pre-check cards here; let runVoiceLoop be the single source of truth
+  // ✅ Don’t pre-check cards here; let runVoiceLoop be the single source of truth
   speak(intro, () => {
     runVoiceLoop();
   });
