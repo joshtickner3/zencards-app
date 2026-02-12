@@ -5965,16 +5965,8 @@ if (awaitingAnswerSignal && currentMode === "voice") {
         return;
       }
     } else {
-      if (!trimmed || promptEcho || tooSoon) {
-        startDifficultyListening();
-        return;
-      }
-      speak(
-        "I didn't catch that. Please say again, hard, good, or easy.",
-        () => {
-          startDifficultyListening();
-        }
-      );
+      // User said something that's not a valid rating - silently keep listening
+      startDifficultyListening();
       return;
     }
 
