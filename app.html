@@ -4488,6 +4488,9 @@ const loopStudyAheadCheckbox = document.getElementById("loopStudyAhead");
   if (voiceRepeatQuestionBtn) voiceRepeatQuestionBtn.disabled = !enabled;
   if (silentRepeatQuestionBtn) silentRepeatQuestionBtn.disabled = !enabled;
 }
+        function setAddCardEnabled(enabled) {
+  if (studyAddCardBtn) studyAddCardBtn.disabled = !enabled;
+}
 
     const silentNextCardBtn = document.getElementById("silentNextCardBtn");
 
@@ -5411,6 +5414,7 @@ async function speakAndGoToMainMenu() {
       // ✅ Re-enable pause/resume after repeat question finishes
       setPauseResumeEnabled(true);
       setVoiceSkipToAnswerEnabled(true);
+      // 🚫 Add Card stays disabled during answer window
 
   if (answerMode === "delay") {
     startOrResetQuestionDelayTimer();
@@ -6009,6 +6013,8 @@ function echoRatingThenContinue(ratingKey, next) {
 
   // 🚫 Disable pause/resume during rating confirmation
   setPauseResumeEnabled(false);
+  // 🚫 Disable Add Card button during rating echo and next card transition
+  setAddCardEnabled(false);
 
   // Optional: disable onscreen rating buttons during echo (prevents accidental taps)
   setVoiceRatingButtonsEnabled(false);
@@ -6107,6 +6113,8 @@ function speakAnswerThenAskDifficulty() {
           if (!noScheduleChanges) updateVoiceDueHints();
         }
         setVoiceSkipToAnswerEnabled(true);
+        // ✅ Enable Add Card button during rating window
+        setAddCardEnabled(true);
 
         const detailed = !hasSpokenInstructionsOnce || !skipInstructionsAfterFirst;
         hasSpokenInstructionsOnce = true;
@@ -6443,6 +6451,7 @@ speakWithWebTts(
     // ✅ Enable pause/resume after question audio finishes
     setPauseResumeEnabled(true);
     setVoiceSkipToAnswerEnabled(true);
+    // 🚫 Add Card stays disabled during answer window
 
       if (answerMode === "delay") {
         if (!autoGoodMode) {
@@ -6930,6 +6939,8 @@ startVoiceBtn.addEventListener("click", async () => {
   setPauseResumeEnabled(false);
   // 🚫 Disable skip-to-answer during opening prompt
   setVoiceSkipToAnswerEnabled(false);
+  // 🚫 Disable Add Card button during opening prompt
+  setAddCardEnabled(false);
 
   const intro = autoGoodMode
     ? describeAutoIntro()
