@@ -7054,10 +7054,10 @@ startVoiceBtn.addEventListener("click", async () => {
     intro = describeAutoIntro();
   } else if (answerMode === "voice") {
     // Play answer after speaking mode
-    intro = "Starting hands free study session. I will read a question, then you will say \"answer\" to play the answer or you may say any other voice command. I will say the answer, then I will ask you \"how was that\". You may then give your rating, or any other voice command. Voice commands only work after I ask you a question or after I ask you for your rating. You may disable these instructions in study options for future study sessions.";
+    intro = "Starting hands free study session. I will read a question, then you will say \"answer\" to play the answer or you may say any other voice command. I will say the answer, then I will ask you for your rating. You may then give your rating, or any other voice command. Voice commands only work after I ask you a question or after I ask you for your rating. You may disable these instructions in study options for future study sessions.";
   } else {
     // Delay mode (play answer after X seconds)
-    intro = "Starting hands free study session. I will read a question, then you may give any voice command. I will say the answer after a short delay, then I will ask you \"how was that\", and you may then give your rating or any other voice command. Voice commands only work after I ask you a question or after I ask you for your rating. You may disable these instructions in study options for future study sessions.";
+    intro = "Starting hands free study session. I will read a question, then you may give any voice command. I will say the answer after a short delay, then I will ask you for your rating. You may then give your rating or any other voice command. Voice commands only work after I ask you a question or after I ask you for your rating. You may disable these instructions in study options for future study sessions.";
   }
 
   // ✅ Don't pre-check cards here; let runVoiceLoop be the single source of truth
