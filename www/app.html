@@ -3770,6 +3770,9 @@ function speakWithWebTts(text, onEnd, opts = {}) {
 
   // Humanize numbers for better TTS pronunciation
   function humanizeNumbers(str) {
+    // Convert decimals: "2.5" → "2 point 5"
+    str = str.replace(/(\d+)\.(\d+)/g, "$1 point $2");
+    
     // Convert percentages: "95%" → "95 percent"
     str = str.replace(/(\d+)%/g, "$1 percent");
     
@@ -5862,7 +5865,11 @@ if (
   // If we are waiting to play the answer after a delay, reset the timer on any speech
   if (currentMode === "voice" && answerMode === "delay" && questionDelayTimerId !== null) {
     if (normalizeCmdText(text).length > 0) {
-      setStatus("Wait until after answer to give voice commands in this answer behavior mode...");
+      if (autoGoodMode) {
+        setStatus("You may not give voice commands in this mode.");
+      } else {
+        setStatus("Wait until after answer to give voice commands in this answer behavior mode...");
+      }
       startOrResetQuestionDelayTimer();
       return;
     }
@@ -6962,9 +6969,9 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
       } else {
         // Delay mode
         if (behaviorRating === "tomorrow") {
-          return "Entering automatic study session. I will read a question, then you may say any voice command before I read the answer. I will then rate each card to show again tomorrow.";
+          return "Entering automatic study session. I will read a question, then I will read the answer. I will then rate each card to show again tomorrow.";
         }
-        return "Entering automatic study session. I will read a question, then you may say any voice command before I read the answer. I will then rate each card as " + ratingText + ".";
+        return "Entering automatic study session. I will read a question, then I will read the answer. I will then rate each card as " + ratingText + ".";
       }
     }
 
