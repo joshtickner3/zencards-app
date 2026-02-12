@@ -4740,6 +4740,7 @@ let loopStudyAhead = false;       // from Study Options
     let studyAheadGapMs = 4000;
     const difficultyPromptGraceMs = 1200;
     let lastDifficultyPromptAt = 0;
+    let cardSuspendedForAddCard = null;
 
     function startDifficultyListening() {
       lastDifficultyPromptAt = Date.now();
@@ -5009,6 +5010,9 @@ function updateDeckBadge() {
 }
 
 async function openAddCardModal() {
+  // Store the current card so we can resume it after closing the modal
+  cardSuspendedForAddCard = currentCard;
+  
   // Stop audio/listening so the modal is calm in hands-free mode
   await stopAllAudio();
   clearStudyAheadGapTimer();
@@ -5029,7 +5033,25 @@ function closeAddCardModal() {
   addCardModal.classList.add("hidden");
   addCardModal.setAttribute("aria-hidden", "true");
 
-  // If you were in voice mode, resume your normal loop
+  // If we had a suspended card from Add Card button, replay its answer
+  if (cardSuspendedForAddCard && currentMode === "voice" && !isPaused) {
+    currentCard = cardSuspendedForAddCard;
+    cardSuspendedForAddCard = null;
+    
+    // Re-show the card content
+    setCardContent(voiceQuestionText, currentCard.question);
+    setCardContent(voiceAnswerText, currentCard.answer);
+    setFlashcardFlipped("voice", true);
+    
+    // Replay the answer and continue to rating prompt
+    speakAnswerThenAskDifficulty();
+    return;
+  }
+  
+  // Clear the suspended card flag
+  cardSuspendedForAddCard = null;
+  
+  // Normal flow: advance to next card
   if (currentMode === "voice" && !isPaused) runVoiceLoop();
   if (currentMode === "silent" && !isPaused) runSilentLoop();
 }
@@ -5159,10 +5181,7 @@ if (studyAddCardBtn) {
   studyAddCardBtn.addEventListener("click", () => {
     if (!currentDeckId) return;
     openAddCardModal();
-    // After closing the modal, restart the current card (re-read question)
-    if (currentMode === "voice" && typeof runVoiceLoop === "function") {
-      setTimeout(() => runVoiceLoop(), 250); // slight delay to allow modal to close
-    }
+    // closeAddCardModal() will handle resuming the suspended card
   });
 }
 
