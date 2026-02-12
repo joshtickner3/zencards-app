@@ -1319,79 +1319,113 @@ input[type="number"]:focus-visible{
 
   <div class="modalCard" role="dialog" aria-modal="true" aria-labelledby="instructionsModalTitle">
     <div class="row" style="justify-content:space-between;align-items:center;">
-      <h3 id="instructionsModalTitle" style="margin:0;">How to Study with ZenCards</h3>
+      <h3 id="instructionsModalTitle" style="margin:0;">How ZenCards Works</h3>
       <button id="instructionsCloseBtn" class="secondary small" type="button">Close</button>
     </div>
 
     <div style="margin-top:0.75rem;max-height:70vh;overflow:auto;">
 
-      <!-- QUICK START -->
-      <div style="background:#064e3b;border:2px solid #10b981;border-radius:8px;padding:1rem;margin-bottom:1rem;">
-        <h3 style="margin:0 0 0.5rem 0;color:#10b981;">🚀 Quick Start</h3>
-        <ol style="margin:0;padding-left:1.5rem;color:#d1d5db;">
-          <li>Choose a deck and tap <strong>Start Study</strong></li>
-          <li>Turn on <strong>Hands-Free Study</strong> in Study Options</li>
-          <li>Listen to the question, then say <strong>"answer"</strong> or <strong>"skip to answer"</strong></li>
-          <li>After the answer plays, the system will prompt you — say <strong>again / hard / good / easy</strong></li>
-        </ol>
-      </div>
+       <h3>➡️ Important</h3>
+      <p style="color:#abb515;margin-top:0.25rem;">
+    Say <strong></strong> ZenCards requires exact wording for voice commands and you must follow along with the hands-free audio prompts that play during studying in order to maximize your user experience. Study options and settings are set for you already for efficiency, however you may customize them as you wish.  
+      </p>
 
-      <!-- GOLDEN RULE -->
-      <div style="background:#78350f;border:2px solid #f59e0b;border-radius:8px;padding:1rem;margin-bottom:1rem;">
-        <h3 style="margin:0 0 0.5rem 0;color:#fbbf24;">⚠️ Golden Rule</h3>
-        <p style="margin:0;color:#fde68a;font-size:1.05rem;">
-          <strong>Only speak AFTER the audio finishes.</strong> Wait for the system to finish speaking before giving voice commands. Speaking during playback won't work.
-        </p>
-      </div>
+      <h3>📊 Ratings (Again / Hard / Good / Easy)</h3>
+      <p style="color:#9ca3af;margin-top:0.25rem;">
+        Ratings decide when you’ll see the card again. “Again” brings it back soonest, “Easy” pushes it out the farthest.
+      </p>
+      <ul style="margin-top:0.5rem;">
+        <li><strong>Again</strong> — you didn’t remember it (restarts the learning ladder).</li>
+        <li><strong>Hard</strong> — you remembered, but it was tough (slower progress).</li>
+        <li><strong>Good</strong> — you remembered normally (standard progress).</li>
+        <li><strong>Easy</strong> — you remembered instantly (faster progress).</li>
+      </ul>
+         <hr style="border:0;border-top:1px solid #111827;margin:1rem 0;" />
 
-      <!-- CARD FLOW -->
-      <div style="background:#1e3a8a;border:2px solid #3b82f6;border-radius:8px;padding:1rem;margin-bottom:1rem;">
-        <h3 style="margin:0 0 0.5rem 0;color:#60a5fa;">🔄 How Each Card Works</h3>
-        <ol style="margin:0;padding-left:1.5rem;color:#bfdbfe;">
-          <li><strong>System reads the question</strong> → Wait for it to finish</li>
-          <li><strong>You say "answer"</strong> (or "skip to answer") → System plays the answer</li>
-          <li><strong>System asks for rating</strong> → Say <strong>again / hard / good / easy</strong></li>
-        </ol>
-      </div>
+      <h3>⚙️ Choosing Study Options</h3>
+      <p style="color:#9ca3af;margin-top:0.25rem;">
+        ZenCards can run fully hands-free (audio + voice commands) or silent (tap to reveal + rate). These settings let you match your study style.
+      </p>
 
-      <!-- RATINGS -->
-      <h3 style="margin-top:1.5rem;">📊 What Each Rating Means</h3>
-      <ul style="margin-top:0.5rem;color:#9ca3af;">
-        <li><strong style="color:#ef4444;">Again</strong> — Didn't remember (card comes back soonest)</li>
-        <li><strong style="color:#f97316;">Hard</strong> — Remembered but tough (slower progress)</li>
-        <li><strong style="color:#22c55e;">Good</strong> — Remembered normally (standard progress)</li>
-        <li><strong style="color:#3b82f6;">Easy</strong> — Remembered instantly (fastest progress)</li>
+      <ul style="margin-top:0.5rem;">
+        <li>
+          <strong>Hands-Free Study</strong> — best when you want audio + speaking to allow you to study on the move.
+          Use voice commands like <em>"repeat question"</em> and when prompted, rate with <em>again / hard / good / easy</em>.
+        </li>
+        <li>
+        <strong>Silent Study</strong> — Traditional flashcards.
+          Tap <em>Show Answer</em>, then rate with the buttons.
+        </li>
       </ul>
 
-      <!-- COLLAPSIBLE: VOICE COMMANDS -->
-      <details style="margin-top:1.5rem;border:1px solid #374151;border-radius:6px;padding:0.75rem;">
-        <summary style="cursor:pointer;font-weight:600;color:#60a5fa;">🗣️ All Voice Commands</summary>
-        <ul style="margin-top:0.75rem;color:#9ca3af;">
-          <li><strong>answer</strong> or <strong>skip to answer</strong> — after question plays</li>
-          <li><strong>again / hard / good / easy</strong> — rate the card when prompted</li>
-          <li><strong>repeat question</strong> — hear the question again</li>
-          <li><strong>repeat answer</strong> — hear the answer again</li>
-          <li><strong>pause study session</strong> / <strong>resume study session</strong></li>
-          <li><strong>main menu</strong> — exit to deck selection</li>
-          <li><strong>mute microphone</strong> → then say <strong>10 / 20 / 30 / 40 / 50 / 60</strong> seconds</li>
-        </ul>
-      </details>
+      <p style="color:#9ca3af;margin-top:0.75rem;margin-bottom:0.25rem;">
+           <strong>Recommended presets (these are all hands free study options):</strong>
+      </p>
+      <ul>
+        <li>
+          <strong>In a place you can speak? Navigate to study options and set to play answer after you speak, do not check off automatic rating mode.</strong>
+        </li>
+        <li>
+         <strong>Unable to speak? Play answer after X amount of seconds and set to automatic rating mode in study options.
+        </li>
+        <li>
+             <strong>Want some extra review? Enter study-ahead mode when prompted once completed your due cards for that deck. </strong>
+        </li>
+      </ul>
 
-      <!-- COLLAPSIBLE: STUDY OPTIONS -->
-      <details style="margin-top:1rem;border:1px solid #374151;border-radius:6px;padding:0.75rem;">
-        <summary style="cursor:pointer;font-weight:600;color:#60a5fa;">⚙️ Study Options & Timing</summary>
-        <div style="margin-top:0.75rem;color:#9ca3af;">
-          <p><strong>Hands-Free Study</strong> — Audio + voice commands (best for studying on the move)</p>
-          <p><strong>Silent Study</strong> — Traditional flashcards (tap to reveal, rate with buttons)</p>
-          
-          <p style="margin-top:1rem;"><strong>Timing Tips:</strong></p>
-          <ul>
-            <li><strong>Delay after rating</strong> — We recommend 5+ seconds for better retention</li>
-            <li><strong>Answer delay</strong> — Set to 0 for instant, or 5+ seconds to give yourself think time</li>
-            <li><strong>Study-ahead mode</strong> — Review extra cards after completing your due cards</li>
-          </ul>
-        </div>
-      </details>
+      <p style="color:#9ca3af;margin-top:0.75rem;margin-bottom:0.25rem;">
+        <strong>Timing controls:</strong>
+      </p>
+      <ul>
+        <li>
+          <strong>Delay after rating before next question</strong> — adds breathing room between cards in hands-free mode. We recommend 5+ seconds for maximal retention.
+        </li>
+        <li>
+     <strong>Hands-free answer behavior</strong> — either <em>wait X seconds</em> or <em>play answer after I speak</em>. If choosing to wait X amount of seconds after answers, give yourself enough time to process the question for maximal retention.
+        </li>
+        <li>
+ <strong>Answer delay after I stop speaking</strong> — set to <strong>0</strong> for instant (default), or increase it if you want a pause. We recommend 5+ seconds to give yourself time to recall and process your cards for maximal retention. 
+        </li>
+      </ul>
+
+      <p style="color:#9ca3af;margin-top:0.75rem;">
+      </p>
+
+      <hr style="border:0;border-top:1px solid #111827;margin:1rem 0;" />
+
+      <h3>🎤 When to say voice commands</h3>
+      <ul>
+   <li><strong>After the question</strong>: you can say <em>repeat question or mute microphone </em> or <em></em>.</li>
+        <li><strong>After the answer</strong>: say your rating when prompted (<em>again / hard / good / easy</em>).</li>
+        <li><strong>Any time</strong>: <em>"pause study session"</em>, <em>"resume study session"</em>, <em>"main menu"</em>.</li>
+      </ul>
+
+      <hr style="border:0;border-top:1px solid #111827;margin:1rem 0;" />
+
+      <hr style="border:0;border-top:1px solid #111827;margin:1rem 0;" />
+
+      <h3>🔇 Mute Microphone (Hands-Free mode)</h3>
+      <p style="color:#9ca3af;margin-top:0.25rem;">
+        If you need time to think or you’re in a noisy place, you can temporarily stop listening.
+      </p>
+      <ul>
+        <li>Say <strong>“mute microphone”</strong></li>
+        <li>Then say a duration: <strong>10 / 20 / 30 / 40 / 50 / 60</strong> seconds</li>
+        <li>While muted, ZenCards will not process commands until the timer ends.</li>
+      </ul>
+
+      <hr style="border:0;border-top:1px solid #111827;margin:1rem 0;" />
+
+      <h3>🗣️ Full voice command list</h3>
+      <ul>
+        <li><strong>again</strong>, <strong>hard</strong>, <strong>good</strong>, <strong>easy</strong> — rate the card</li>
+        <li><strong>repeat question</strong></li>
+        <li><strong>repeat answer</strong></li>
+        <li><strong>pause study session</strong></li>
+        <li><strong>resume study session</strong></li>
+        <li><strong>main menu</strong></li>
+        <li><strong>mute microphone</strong> (then say: 10/20/30/40/50/60)</li>
+      </ul>
 
     </div>
   </div>
