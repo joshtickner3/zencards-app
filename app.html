@@ -5280,6 +5280,8 @@ document.addEventListener("keydown", (e) => {
   if (voiceRatingButtons) {
     voiceRatingButtons.classList.add("hidden");
   }
+  // Show instructions button when returning to main menu
+  if (openInstructionsBtn) openInstructionsBtn.style.display = "";
   showMainMenu();
   setStatus("Study session ended.");
 }
@@ -6892,6 +6894,9 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
       // ✅ Enable Add Card button for silent study mode (always available)
       if (studyAddCardBtn) studyAddCardBtn.disabled = false;
 
+      // Hide instructions button during study
+      if (openInstructionsBtn) openInstructionsBtn.style.display = "none";
+
       showStudySection("silent");
       runSilentLoop();
     });
@@ -7006,6 +7011,9 @@ startVoiceBtn.addEventListener("click", async () => {
   silentUI.classList.add("hidden");
   showStudySection("voice");
   setStudyState(StudyState.IDLE);
+
+  // Hide instructions button during study
+  if (openInstructionsBtn) openInstructionsBtn.style.display = "none";
 
   // 🚫 Disable pause/resume during opening prompt
   setPauseResumeEnabled(false);
