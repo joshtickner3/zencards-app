@@ -5404,6 +5404,8 @@ async function speakAndGoToMainMenu() {
 
       // 🚫 Disable pause/resume during repeat question
       setPauseResumeEnabled(false);
+      // 🚫 Disable Add Card button during repeat question
+      setAddCardEnabled(false);
 
       setStatus("Repeating card...");
       setStudyState(StudyState.SHOWING_QUESTION);
