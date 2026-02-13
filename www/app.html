@@ -4202,13 +4202,17 @@ function addCognitivePauses(str) {
         utt.voice = preferredVoice;
       }
       // Apply base rate, then adjust for emphasis
-      const baseRate = typeof ttsRate === "number" ? ttsRate : 0.75;
+      // Slightly faster (0.85) sounds more natural than 0.75
+      const baseRate = typeof ttsRate === "number" ? ttsRate : 0.85;
       utt.rate = baseRate * (seg.rateMultiplier || 1.0);
       
-      // Apply pitch shift for questions
-      utt.pitch = 1.0 + (seg.pitchShift || 0);
+      // Apply pitch shift for questions with slight natural variation
+      // Add tiny random variation (0.98-1.02) to avoid robotic monotone
+      const pitchVariation = 0.98 + (Math.random() * 0.04);
+      utt.pitch = pitchVariation + (seg.pitchShift || 0);
       
-      utt.volume = typeof ttsVolume === "number" ? ttsVolume : 1.0;
+      // Normalize volume at 0.95 (prevents clipping while staying clear)
+      utt.volume = typeof ttsVolume === "number" ? ttsVolume : 0.95;
       utt.onstart = () => {
         if (myGeneration !== speakGeneration) return;
         isSpeaking = true;
