@@ -5,8 +5,10 @@ import Speech
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
+    
 
     var window: UIWindow?
+    
 
     // MARK: - App Launch
     func application(
@@ -34,6 +36,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return true
     }
 
+    func applicationDidBecomeActive(_ application: UIApplication) {
+        enforcePreferredRouting()
+    }
+
     // MARK: - Permissions
 
     private func requestPermissions() {
@@ -57,18 +63,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             // - you can override output to speaker when CarPlay tries to hijack
             try session.setCategory(
                 .playAndRecord,
-                mode: .spokenAudio,
+                mode: .measurement,
                 options: [
-                    .allowBluetoothHFP,       // ✅ fixes deprecated .allowBluetooth
-                    .allowBluetoothA2DP       // ✅ AirPods / high quality BT audio
-                    // ❌ NO .duckOthers (we want GPS to override us)
-                    // ❌ NO .mixWithOthers (we want GPS to be able to interrupt us cleanly)
-                    // ❌ NO .allowAirPlay (reduces weird routing / CarPlay-like handoffs)
+                    .defaultToSpeaker,
+                    .allowBluetooth,        // allows AirPods/BT mics
+                    .allowBluetoothA2DP     // high-quality BT audio (AirPods)
+                    // (no .allowAirPlay)
+                    // (no .duckOthers)
+                    // (mixWithOthers optional; leave off unless you want to mix with other apps)
                 ]
             )
 
-            try session.setActive(true, options: .notifyOthersOnDeactivation)
-            print("🔊 [AppDelegate] Audio session configured: playAndRecord + spokenAudio")
+            try session.setActive(true)
+            print("🔊 [AppDelegate] Audio session configured: playAndRecord + measurement")
+
         } catch {
             print("❌ [AppDelegate] Audio session error: \(error)")
         }
@@ -90,7 +98,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         )
 
         // Apply initial routing rule right away
-        enforceNoCarPlayOutput()
+        enforcePreferredRouting()
+
     }
     
     @objc private func handleInterruption(_ notification: Notification) {
@@ -106,6 +115,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             // Optional: post a notification to your JS/web layer to pause audio
 
         case .ended:
+            enforcePreferredRouting()
+
             let optionsValue = info[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
             let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
             print("✅ [Audio] Interruption ended. shouldResume=\(options.contains(.shouldResume))")
@@ -119,10 +130,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
 
     @objc private func handleRouteChange(_ notification: Notification) {
-        enforceNoCarPlayOutput()
+        enforcePreferredRouting()
     }
 
-    private func enforceNoCarPlayOutput() {
+    private func enforcePreferredRouting() {
         let session = AVAudioSession.sharedInstance()
         let outputs = session.currentRoute.outputs
 
@@ -130,18 +141,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
         do {
             if hasCarPlay {
-                // ✅ Hard block: never allow ZenCards to go to CarPlay
+                // Block CarPlay → force speaker
                 try session.overrideOutputAudioPort(.speaker)
-                print("🚗🔇 [Audio] CarPlay detected → forcing iPhone speaker (blocking car audio)")
+                print("🚗🔇 [Audio] CarPlay detected → forcing iPhone speaker")
             } else {
-                // ✅ Normal behavior: AirPods/headphones will be used automatically if connected
+                // Allow normal routing:
+                // - Headphones/AirPods if connected
+                // - Otherwise speaker (because of .defaultToSpeaker)
                 try session.overrideOutputAudioPort(.none)
-                print("✅ [Audio] No CarPlay → normal routing (AirPods if connected)")
+                print("✅ [Audio] No CarPlay → normal routing (headphones if present, else speaker)")
             }
         } catch {
             print("❌ [Audio] Output override failed:", error)
         }
     }
+
 
 
 
