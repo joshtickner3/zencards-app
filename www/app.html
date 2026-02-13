@@ -646,12 +646,18 @@ input[type="number"]:focus-visible{
       margin-top: 1rem;
     }
     /* Flashcard flip UI */
-    .flashcard{
-      margin: 1rem auto 0;
-      perspective: 1200px;
-      width: min(92vw, 760px);
-      height: clamp(260px, 38vh, 420px);
-    }
+   /* Flashcard flip UI */
+.flashcard{
+  margin: 1rem auto 0;
+  perspective: 1200px;
+
+  /* ✅ contain inside the Study Session card */
+  width: 100%;
+  max-width: 760px;
+
+  height: clamp(260px, 38vh, 420px);
+}
+
     .flashcard-inner{
       position: relative;
       width: 100%;
