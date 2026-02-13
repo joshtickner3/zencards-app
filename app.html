@@ -4212,8 +4212,8 @@ function addCognitivePauses(str) {
         utt.voice = preferredVoice;
       }
       // Apply base rate, then adjust for emphasis
-      // Slightly faster (0.85) sounds more natural than 0.75
-      const baseRate = typeof ttsRate === "number" ? ttsRate : 0.85;
+      // Slightly faster (0.9) sounds more natural and conversational
+      const baseRate = typeof ttsRate === "number" ? ttsRate : 0.9;
       utt.rate = baseRate * (seg.rateMultiplier || 1.0);
       
       // Apply pitch shift for questions with slight natural variation
