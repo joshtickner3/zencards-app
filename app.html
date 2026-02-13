@@ -5368,8 +5368,10 @@ document.addEventListener("keydown", (e) => {
   if (voiceRatingButtons) {
     voiceRatingButtons.classList.add("hidden");
   }
-  // Refresh the page to ensure all audio stops and clean state
-  window.location.reload();
+  // Show instructions button when returning to main menu
+  if (openInstructionsBtn) openInstructionsBtn.style.display = "";
+  showMainMenu();
+  setStatus("Study session ended.");
 }
 
     // ===================== INLINE EDIT HELPERS =====================
@@ -5737,13 +5739,11 @@ async function speakAndGoToMainMenu(withConfirmation = false) {
   if (withConfirmation) {
     speakSafe("Going to the main menu.", async () => {
       await stopAllAudio();
-      // Refresh the page to ensure all audio stops
-      window.location.reload();
+      endStudySession();
     });
     return;
   }
-  // Refresh the page immediately
-  window.location.reload();
+  endStudySession();
 }
 
 async function handleGlobalVoiceCommands(text) {
