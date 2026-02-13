@@ -4166,8 +4166,18 @@ function addCognitivePauses(str) {
 
   // 2) If user asked for English, keep your "Daniel, not Samantha" preference
   if (langPrefix === "en") {
-    let preferredVoice = matching.find(v => v.name === "Daniel")
-      || matching.find(v => v.name === "Daniel (Enhanced)");
+    let preferredVoice = 
+      // Prefer Google's neural voices (best quality)
+      matching.find(v => v.name.includes("Google") && v.name.includes("English")) ||
+      matching.find(v => v.name.includes("Google")) ||
+      // Then premium/enhanced voices
+      matching.find(v => v.name.includes("Premium")) ||
+      matching.find(v => v.name.includes("Enhanced")) ||
+      // Then specific good voices
+      matching.find(v => v.name === "Alex") ||
+      matching.find(v => v.name === "Ava") ||
+      matching.find(v => v.name === "Daniel") ||
+      matching.find(v => v.name === "Daniel (Enhanced)");
 
     // fall back to any matching English voice that isn't Samantha
     if (!preferredVoice) preferredVoice = matching.find(v => !v.name.toLowerCase().includes("samantha"));
