@@ -7,6 +7,7 @@
     "scrollEnabled": true,
     "allowsLinkPreview": true,
     "allowsBackForwardNavigationGestures": true,
-    "allowsViewportScale": true
+    "allowsViewportScale": true,
+    "webContentsDebuggingEnabled": true
   }
 }

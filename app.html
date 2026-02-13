@@ -4153,6 +4153,14 @@ function addCognitivePauses(str) {
 
   function getPreferredVoice() {
   const voices = window.speechSynthesis.getVoices();
+  
+  // Debug: log all available voices for this language
+  console.log("[TTS] All available voices for", lang, ":", voices.filter(v => {
+    if (!v || !v.lang) return false;
+    const vPrefix = v.lang.split("-")[0];
+    const langPrefix = String(lang).split("-")[0];
+    return v.lang === lang || vPrefix === langPrefix;
+  }).map(v => v.name));
 
   // 1) Prefer voices that match the requested language
   // Match either exact lang (e.g., "es-ES") or prefix (e.g., "es")
