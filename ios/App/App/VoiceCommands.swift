@@ -58,7 +58,8 @@ public class VoiceCommandsPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func stop(_ call: CAPPluginCall) {
-        stopListening(deactivateSession: true)
+        stopListening(deactivateSession: false)
+
         call.resolve()
     }
     @objc func isAvailable(_ call: CAPPluginCall) {
@@ -182,10 +183,6 @@ public class VoiceCommandsPlugin: CAPPlugin, CAPBridgedPlugin {
             audioEngine.stop()
         }
         audioEngine.inputNode.removeTap(onBus: 0)
-
-        if deactivateSession {
-            stopListening(deactivateSession: false)
-        }
     }
 
     // MARK: - TTS coordination
