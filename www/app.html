@@ -15,6 +15,15 @@
   }
 </style>
     <!-- Capacitor Preferences for robust session persistence on iOS -->
+    <style>
+      /* Hide background music controls and audio for native app only */
+      .native-app #audioSettingsPanel label[for="bgMusicMute"],
+      .native-app #bgMusicVolumeContainer,
+      .native-app #bgMusic,
+      .native-app .bg-music-credit {
+        display: none !important;
+      }
+    </style>
     <script type="module">
       import { Preferences } from '@capacitor/preferences';
       // Restore Supabase session from native storage before anything else
@@ -1135,7 +1144,8 @@ input[type="number"]:focus-visible{
       </div>
 
       <audio id="bgMusic" src="Zen-Meditation.mp3" loop preload="auto"></audio>
-      <div style="text-align:center;font-size:0.7rem;color:#64748b;margin-top:0.5rem;opacity:0.6;">
+      <audio id="bgMusic" src="Zen-Meditation.mp3" loop preload="auto"></audio>
+      <div class="bg-music-credit" style="text-align:center;font-size:0.7rem;color:#64748b;margin-top:0.5rem;opacity:0.6;">
         Music: "Zen meditation" by yura.megis
       </div>
 
@@ -2171,7 +2181,10 @@ currentUser = session.user;
 
 // If autoplay is blocked, start music on first user gesture
 document.addEventListener("click", () => {
-  ensureBgMusicPlayback();
+  // Only play music if not in native app
+  if (!document.documentElement.classList.contains("native-app")) {
+    ensureBgMusicPlayback();
+  }
 }, { once: true });
 
     function scheduleKey(deckId, cardId) {
@@ -7164,7 +7177,9 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
     // >>> MODIFIED: add async + inline mic permission request here <<<
     // >>> REPLACE your existing startVoiceBtn handler with this whole block <<<
 startVoiceBtn.addEventListener("click", async () => {
-  ensureBgMusicPlayback();
+  if (!document.documentElement.classList.contains("native-app")) {
+    ensureBgMusicPlayback();
+  }
   saveLastMode("voice");
   if (selectedDeckId) saveLastDeckId(selectedDeckId);
 
