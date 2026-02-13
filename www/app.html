@@ -3485,7 +3485,10 @@ let speakGeneration = 0;
     // NEW: TTS settings (rate & volume)
     let ttsRate = 1.0;
     let ttsVolume = 1.0;
-    let bgmVolume = 0.04;
+    // Different default volumes for web vs native app
+    // Web: 0.04, Native iOS: 0.02
+    const isNativeApp = window.Capacitor !== undefined;
+    let bgmVolume = isNativeApp ? 0.02 : 0.04;
     let bgmMuted = false;
     let bgmDucked = false;
     const TTS_SETTINGS_KEY = "srsTtsSettings";
@@ -3572,7 +3575,9 @@ if (answerDelayAfterSpeechSecInput) {
 function getEffectiveBgmVolume() {
   if (bgmMuted) return 0;
   const base = clamp(Number(bgmVolume || 0), 0, 1);
-  if (bgmDucked) return Math.min(base, 0.02);
+  // Different ducked volumes: Web: 0.02, Native iOS: 0.01
+  const duckedVolume = isNativeApp ? 0.01 : 0.02;
+  if (bgmDucked) return Math.min(base, duckedVolume);
   return base;
 }
 
