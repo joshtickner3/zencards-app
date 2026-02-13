@@ -937,11 +937,7 @@ a:hover{
 </head>
 
 <body>
-    <!-- Background Music -->
-    <audio id="bgMusic" src="Zen-Meditation.mp3" loop preload="auto"></audio>
-    <div style="text-align:center;font-size:0.7rem;color:#64748b;margin-top:0.5rem;opacity:0.6;">
-      Music: "Zen meditation" by yura.megis
-    </div>
+    <!-- Background music removed -->
     
     <!-- ===== Loading Overlay ===== -->
   <div class="loadingOverlay" id="loadingOverlay" aria-hidden="true">
@@ -2290,39 +2286,7 @@ function closeTermsModal(){
   termsModal.classList.remove("show");
 }
 
-// ===== Background Music =====
-const bgMusicEl = document.getElementById("bgMusic");
-let bgmMuted = false;
-let bgmVolume = 0.04; // Default volume
-
-function ensureBgMusicPlayback() {
-  if (!bgMusicEl) return;
-  if (bgmMuted) {
-    try { bgMusicEl.pause(); } catch (_) {}
-    return;
-  }
-  bgMusicEl.volume = bgmVolume;
-  const p = bgMusicEl.play();
-  if (p && typeof p.catch === "function") {
-    p.catch(() => {
-      // Auto-play blocked, will play on first user interaction
-    });
-  }
-}
-
-// Try to start music on page load
-if (bgMusicEl) {
-  ensureBgMusicPlayback();
-}
-
-// Ensure music plays on first user interaction
-let hasInteracted = false;
-document.addEventListener("click", () => {
-  if (!hasInteracted) {
-    hasInteracted = true;
-    ensureBgMusicPlayback();
-  }
-}, { once: true });
+// Background music logic removed
 
 // Make inline "Terms of Service" link open the modal (instead of jumping)
 document.addEventListener("click", (e) => {
