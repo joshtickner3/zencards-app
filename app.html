@@ -4170,21 +4170,16 @@ function addCognitivePauses(str) {
       // Prefer Google's neural voices (best quality on Chrome/Android)
       matching.find(v => v.name.includes("Google") && v.name.includes("English")) ||
       matching.find(v => v.name.includes("Google")) ||
-      // iOS premium voices (neural quality on Apple devices)
-      matching.find(v => v.name === "Ava (Premium)") ||
-      matching.find(v => v.name === "Nicky (Premium)") ||
-      matching.find(v => v.name === "Allison (Premium)") ||
+      // iOS: Prefer ANY Premium or Enhanced voice (neural quality on Apple devices)
+      // This catches whatever premium voices are actually installed on the device
+      matching.find(v => v.name.includes("Premium") || v.name.includes("Enhanced")) ||
+      // Fallback to Alex (always available on iOS, better than Daniel)
       matching.find(v => v.name === "Alex") ||
-      matching.find(v => v.name === "Samantha (Enhanced)") ||
-      // Then any premium/enhanced voices
-      matching.find(v => v.name.includes("Premium")) ||
-      matching.find(v => v.name.includes("Enhanced")) ||
-      // Then specific good voices
-      matching.find(v => v.name === "Ava") ||
+      // Last resort - Daniel
       matching.find(v => v.name === "Daniel") ||
       matching.find(v => v.name === "Daniel (Enhanced)");
 
-    // fall back to any matching English voice that isn't basic Samantha
+    // fall back to any matching English voice
     if (!preferredVoice) preferredVoice = matching.find(v => !v.name.toLowerCase().includes("samantha") || v.name.includes("Enhanced"));
     if (!preferredVoice) preferredVoice = matching[0] || null;
     return preferredVoice;
@@ -4200,6 +4195,8 @@ function addCognitivePauses(str) {
   function startSpeaking() {
     setBgMusicDucked(true);
     const preferredVoice = getPreferredVoice();
+    // Debug: log which voice is being used
+    console.log("[TTS] Using voice:", preferredVoice?.name || "default");
     let idx = 0;
     function speakSegment() {
       if (idx >= segments.length) {
