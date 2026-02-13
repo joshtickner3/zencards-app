@@ -3523,10 +3523,16 @@ let speakGeneration = 0;
     let ttsRate = 1.0;
     let ttsVolume = 1.0;
     // Different volumes: Web has slider (default 0.04), iOS is fixed at 0.01
-    const isNativeApp = window.Capacitor !== undefined;
-    let bgmVolume = isNativeApp ? 0.01 : 0.04;
-    let bgmMuted = false;
-    let bgmDucked = false;
+    // Different volumes: Web has slider (default 0.04), iOS is fixed at 0.01
+const isNativeApp = window.Capacitor !== undefined;
+
+// 🔇 App-only fixed background music volume (super quiet)
+const APP_BGM_VOLUME = 0.005; // try 0.003–0.01
+
+let bgmVolume = isNativeApp ? APP_BGM_VOLUME : 0.04;
+let bgmMuted = false;
+let bgmDucked = false;
+
     const TTS_SETTINGS_KEY = "srsTtsSettings";
     function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
@@ -3542,7 +3548,8 @@ function getTtsSettingsObj() {
   if (typeof s.volume !== "number") s.volume = 1.0;
   if (typeof s.answerDelayAfterSpeechSec !== "number") s.answerDelayAfterSpeechSec = 0;
   // Platform-specific default: web 0.04 (adjustable), native 0.01 (fixed)
-  if (typeof s.bgmVolume !== "number") s.bgmVolume = isNativeApp ? 0.01 : 0.04;
+ if (typeof s.bgmVolume !== "number") s.bgmVolume = isNativeApp ? APP_BGM_VOLUME : 0.04;
+
   if (typeof s.bgmMuted !== "boolean") s.bgmMuted = false;
 
   s.rate = clamp(s.rate, 0.5, 2.0);
@@ -3618,7 +3625,8 @@ if (answerDelayAfterSpeechSecInput) {
 function getEffectiveBgmVolume() {
   if (bgmMuted) return 0;
   // iOS: always 0.01 (fixed, no ducking needed)
-  if (isNativeApp) return 0.01;
+if (isNativeApp) return APP_BGM_VOLUME;
+
   // Web: variable volume with ducking
   const base = clamp(Number(bgmVolume || 0), 0, 1);
   if (bgmDucked) return Math.min(base, 0.02);
