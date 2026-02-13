@@ -6653,12 +6653,8 @@ speakWithWebTts(
     // 🚫 Add Card stays disabled during answer window
 
       if (answerMode === "delay") {
-        // In delay mode, don't listen for commands during the delay period (unless auto-good mode)
-        // Voice commands are only available after the answer plays and rating prompt is given
-        if (autoGoodMode) {
-          // In auto-good + delay mode, listen for global commands (pause, main menu, etc.)
-          listenForCommand(handleVoiceTranscript);
-        }
+        // In delay mode, don't listen for commands during the delay period
+        // Mic is disabled during countdown - use buttons for pause/main menu if needed
         startOrResetQuestionDelayTimer();
       } else {
       awaitingAnswerSignal = true;
