@@ -4167,20 +4167,25 @@ function addCognitivePauses(str) {
   // 2) If user asked for English, keep your "Daniel, not Samantha" preference
   if (langPrefix === "en") {
     let preferredVoice = 
-      // Prefer Google's neural voices (best quality)
+      // Prefer Google's neural voices (best quality on Chrome/Android)
       matching.find(v => v.name.includes("Google") && v.name.includes("English")) ||
       matching.find(v => v.name.includes("Google")) ||
-      // Then premium/enhanced voices
+      // iOS premium voices (neural quality on Apple devices)
+      matching.find(v => v.name === "Ava (Premium)") ||
+      matching.find(v => v.name === "Nicky (Premium)") ||
+      matching.find(v => v.name === "Allison (Premium)") ||
+      matching.find(v => v.name === "Alex") ||
+      matching.find(v => v.name === "Samantha (Enhanced)") ||
+      // Then any premium/enhanced voices
       matching.find(v => v.name.includes("Premium")) ||
       matching.find(v => v.name.includes("Enhanced")) ||
       // Then specific good voices
-      matching.find(v => v.name === "Alex") ||
       matching.find(v => v.name === "Ava") ||
       matching.find(v => v.name === "Daniel") ||
       matching.find(v => v.name === "Daniel (Enhanced)");
 
-    // fall back to any matching English voice that isn't Samantha
-    if (!preferredVoice) preferredVoice = matching.find(v => !v.name.toLowerCase().includes("samantha"));
+    // fall back to any matching English voice that isn't basic Samantha
+    if (!preferredVoice) preferredVoice = matching.find(v => !v.name.toLowerCase().includes("samantha") || v.name.includes("Enhanced"));
     if (!preferredVoice) preferredVoice = matching[0] || null;
     return preferredVoice;
   }
