@@ -21,6 +21,9 @@
       (async function restoreSupabaseSession() {
         // Only run in native app
         const isNative = !!window.Capacitor || !!window.cordova || !!window.webkit?.messageHandlers?.bridge;
+
+          // ✅ ADD THIS LINE (app-only CSS hook)
+    if (isNative) document.documentElement.classList.add("native-app");
         if (!isNative) return;
         try {
           const { value } = await Preferences.get({ key: 'zencards-auth' });
@@ -575,6 +578,31 @@ input[type="number"]:focus-visible{
   white-space: nowrap;
 }
 
+/* ===== APP ONLY: horizontal swipe + header sync-ready ===== */
+.native-app #cardsTableWrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Header + rows must be wider than the screen so horizontal scroll exists */
+.native-app #cardsHeader,
+.native-app .cardRow {
+  min-width: 640px; /* tweak if needed (600-800) */
+}
+
+/* Prevent nested horizontal scrollbars (wrapper does the scrolling) */
+.native-app #cardsHeader,
+.native-app #cardsList {
+  overflow-x: visible;
+}
+
+/* Keeps touch behavior nice on iOS */
+.native-app #cardsTableWrap {
+  touch-action: pan-x pan-y;
+}
+
+
+
 .cardRow .dueDateCell {
   flex: 0 0 130px;
   text-align: center;
@@ -908,12 +936,15 @@ input[type="number"]:focus-visible{
   </div>
 </div>
                 <!-- Cards table header -->
-        <div id="cardsHeader">
-          <span>Question</span>
-          <span class="dueDateCell">Due date</span>
-          <span style="flex:0 0 auto;text-align:right;">Actions</span>
-        </div>
-        <div id="cardsList"></div>
+  <div id="cardsTableWrap">
+  <div id="cardsHeader">
+    <span>Question</span>
+    <span class="dueDateCell">Due date</span>
+    <span style="flex:0 0 auto;text-align:right;">Actions</span>
+  </div>
+  <div id="cardsList"></div>
+</div>
+
 
         <!-- NEW: Import from Anki block -->
         <div style="margin-top:0.75rem;border-top:1px solid #111827;padding-top:0.5rem;">
@@ -7357,6 +7388,30 @@ function showSessionError(msg) {
 }
 
 init();
+
+// ===== APP ONLY: keep Cards header aligned with horizontal scroll =====
+document.addEventListener("DOMContentLoaded", () => {
+  const isNative =
+    !!window.Capacitor ||
+    !!window.cordova ||
+    !!window.webkit?.messageHandlers?.bridge;
+
+  if (!isNative) return;
+
+  const wrap = document.getElementById("cardsTableWrap");
+  const header = document.getElementById("cardsHeader");
+
+  if (!wrap || !header) return;
+
+  // When the wrapper scrolls horizontally, shift the header contents to match
+  wrap.addEventListener(
+    "scroll",
+    () => {
+      header.style.transform = `translateX(${-wrap.scrollLeft}px)`;
+    },
+    { passive: true }
+  );
+});
 
 
   </script>
