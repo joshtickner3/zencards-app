@@ -1120,34 +1120,13 @@ input[type="number"]:focus-visible{
           </div>
 
           <div style="margin-top:0.5rem;">
-            <label>Background music</label>
-            <div class="row" style="align-items:center;gap:0.75rem;flex-wrap:wrap;">
-              <label class="inline" for="bgMusicMute">
-                <input type="checkbox" id="bgMusicMute" />
-                Mute background music
-              </label>
-              <div class="inline" id="bgMusicVolumeContainer" style="gap:0.35rem;">
-                <label for="bgMusicVolume">Volume</label>
-                <input
-                  type="range"
-                  id="bgMusicVolume"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value="0.04"
-                />
-                <span id="bgMusicVolumeValue">0.04</span>
-              </div>
-            </div>
+            <!-- Background music controls removed for app version -->
           </div>
         </div>
       </div>
 
       <audio id="bgMusic" src="Zen-Meditation.mp3" loop preload="auto"></audio>
-      <audio id="bgMusic" src="Zen-Meditation.mp3" loop preload="auto"></audio>
-      <div class="bg-music-credit" style="text-align:center;font-size:0.7rem;color:#64748b;margin-top:0.5rem;opacity:0.6;">
-        Music: "Zen meditation" by yura.megis
-      </div>
+      <!-- Background music audio and credit removed for app version -->
 
       <!-- Study mode buttons -->
       <div class="card">
@@ -2181,10 +2160,7 @@ currentUser = session.user;
 
 // If autoplay is blocked, start music on first user gesture
 document.addEventListener("click", () => {
-  // Only play music if not in native app
-  if (!document.documentElement.classList.contains("native-app")) {
-    ensureBgMusicPlayback();
-  }
+  // Background music removed for app version
 }, { once: true });
 
     function scheduleKey(deckId, cardId) {
@@ -7177,9 +7153,7 @@ loopStudyAhead = !!loopStudyAheadCheckbox.checked;
     // >>> MODIFIED: add async + inline mic permission request here <<<
     // >>> REPLACE your existing startVoiceBtn handler with this whole block <<<
 startVoiceBtn.addEventListener("click", async () => {
-  if (!document.documentElement.classList.contains("native-app")) {
-    ensureBgMusicPlayback();
-  }
+  // Background music removed for app version
   saveLastMode("voice");
   if (selectedDeckId) saveLastDeckId(selectedDeckId);
 
