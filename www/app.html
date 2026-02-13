@@ -4178,6 +4178,8 @@ function addCognitivePauses(str) {
       // Prefer Google's neural voices (best quality on Chrome/Android)
       matching.find(v => v.name.includes("Google") && v.name.includes("English")) ||
       matching.find(v => v.name.includes("Google")) ||
+      // iOS: Samantha is actually the best quality on iOS (despite the basic name)
+      matching.find(v => v.name === "Samantha") ||
       // iOS: Prefer ANY Premium or Enhanced voice (neural quality on Apple devices)
       // This catches whatever premium voices are actually installed on the device
       matching.find(v => v.name.includes("Premium") || v.name.includes("Enhanced")) ||
@@ -4188,7 +4190,6 @@ function addCognitivePauses(str) {
       matching.find(v => v.name === "Daniel (Enhanced)");
 
     // fall back to any matching English voice
-    if (!preferredVoice) preferredVoice = matching.find(v => !v.name.toLowerCase().includes("samantha") || v.name.includes("Enhanced"));
     if (!preferredVoice) preferredVoice = matching[0] || null;
     return preferredVoice;
   }
