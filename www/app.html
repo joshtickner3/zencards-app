@@ -832,11 +832,10 @@ input[type="number"]:focus-visible{
   <p class="signedInLine">
     Signed in as <strong id="userEmailLabel"></strong>
   </p>
-  <div class="btnRow">
-    <button id="logOutBtn" class="secondary small">Log Out</button>
-    <button id="manageBillingBtn" class="small">Manage Billing</button>
-    <button class="btn danger small" id="deleteAccountBtn" type="button" style="background:#dc2626;color:#fff;">Delete Account</button>
-  </div>
+<div class="btnRow">
+  <button id="logOutBtn" class="secondary small">Log Out</button>
+  <button class="btn danger small" id="deleteAccountBtn" type="button" style="background:#dc2626;color:#fff;">Delete Account</button>
+</div>
 </div>
 
    <div class="appHeader">
@@ -1642,7 +1641,6 @@ const userEmailLabel = document.getElementById("userEmailLabel");
 const signOutBtn = document.getElementById("logOutBtn");
 
 // Optional buttons (keep if you use them)
-const manageBillingBtn = document.getElementById("manageBillingBtn");
 const studyAddCardBtn = document.getElementById("studyAddCardBtn");
 const addCardModal = document.getElementById("addCardModal");
 const addCardModalCloseBtn = document.getElementById("addCardModalCloseBtn");
@@ -1663,70 +1661,6 @@ if (signOutBtn) {
     signOutFromApp();
   });
 }
-// ===================== BILLING (STRIPE PORTAL) =====================
-
-// Helper: returns a good redirect base for GitHub Pages + local
-function getBaseUrlForSameFolder() {
-  // app.html, reset.html, etc are in the same folder
-  return new URL(".", window.location.href).href; // ends with trailing slash
-}
-
-async function openStripeCustomerPortal() {
-  try {
-    // Make sure we have a session token to authorize the edge function
-    const { data: sessionData, error: sessErr } = await supabaseClient.auth.getSession();
-    if (sessErr) throw sessErr;
-
-    const session = sessionData?.session;
-    if (!session?.access_token) {
-      alert("No active session. Please log in again.");
-      window.location.replace("index.html");
-      return;
-    }
-
-    // Call your edge function: create-portal-link
-    const fnUrl = `${SUPABASE_URL}/functions/v1/create-portal-link`;
-
-    const res = await fetch(fnUrl, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "apikey": SUPABASE_ANON_KEY,
-    Authorization: `Bearer ${session.access_token}`,
-  },
-  body: JSON.stringify({
-    return_url: getBaseUrlForSameFolder() + "app.html",
-  }),
-});
-
-    const json = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      console.error("[PORTAL] Edge function error:", json);
-      alert("Could not open billing portal. Check console.");
-      return;
-    }
-
-    const url = json?.url;
-    if (!url) {
-      console.error("[PORTAL] No url returned:", json);
-      alert("Billing portal link not returned. Check console.");
-      return;
-    }
-
-    // Redirect to Stripe portal
-    window.location.assign(url);
-  } catch (e) {
-    console.error("[PORTAL] Failed:", e);
-    alert("Could not open billing portal. Check console.");
-  }
-}
-
-// Hook up the button
-if (manageBillingBtn) {
-  manageBillingBtn.addEventListener("click", openStripeCustomerPortal);
-}
-
 
     // ===================== DATA & STORAGE =====================
     let decks = [];
