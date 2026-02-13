@@ -4816,11 +4816,16 @@ let answerAfterSpeechDueMs = 0;
   let answerToRatingDueMs = 0;
   let afterRatingDueMs = 0;
 let inAnswerAfterSpeechDelay = false;
+let answerAfterSpeechCountdownInterval = null;
 
 function clearAnswerAfterSpeechDelay() {
   if (answerAfterSpeechTimerId !== null) {
     clearTimeout(answerAfterSpeechTimerId);
     answerAfterSpeechTimerId = null;
+  }
+  if (answerAfterSpeechCountdownInterval !== null) {
+    clearInterval(answerAfterSpeechCountdownInterval);
+    answerAfterSpeechCountdownInterval = null;
   }
   inAnswerAfterSpeechDelay = false;
   answerAfterSpeechDueMs = 0;
@@ -4839,6 +4844,20 @@ function startOrResetAnswerAfterSpeechDelay() {
   inAnswerAfterSpeechDelay = true;
   answerAfterSpeechDueMs = Date.now() + sec * 1000;
 
+  // Start countdown display
+  const startTime = Date.now();
+  const updateCountdown = () => {
+    const elapsed = Date.now() - startTime;
+    const remaining = Math.max(0, Math.ceil((sec * 1000 - elapsed) / 1000));
+    if (remaining > 0) {
+      setStatus(`Answer in ${remaining} second${remaining !== 1 ? 's' : ''}...`);
+    } else {
+      setStatus('');
+    }
+  };
+  updateCountdown(); // Show immediately
+  answerAfterSpeechCountdownInterval = setInterval(updateCountdown, 1000);
+
   // ✅ keep the mic open during this window so any speech resets the timer
   if (currentMode === "voice" && !isPaused) {
     listenForCommand(handleVoiceTranscript);
@@ -4847,6 +4866,11 @@ function startOrResetAnswerAfterSpeechDelay() {
   answerAfterSpeechTimerId = setTimeout(() => {
     inAnswerAfterSpeechDelay = false;
     answerAfterSpeechTimerId = null;
+    if (answerAfterSpeechCountdownInterval !== null) {
+      clearInterval(answerAfterSpeechCountdownInterval);
+      answerAfterSpeechCountdownInterval = null;
+    }
+    setStatus('');
     speakAnswerThenAskDifficulty();
   }, sec * 1000);
 }
