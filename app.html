@@ -1080,7 +1080,7 @@ input[type="number"]:focus-visible{
                 <input type="checkbox" id="bgMusicMute" />
                 Mute background music
               </label>
-              <div class="inline" style="gap:0.35rem;">
+              <div class="inline" id="bgMusicVolumeContainer" style="gap:0.35rem;">
                 <label for="bgMusicVolume">Volume</label>
                 <input
                   type="range"
@@ -3485,10 +3485,9 @@ let speakGeneration = 0;
     // NEW: TTS settings (rate & volume)
     let ttsRate = 1.0;
     let ttsVolume = 1.0;
-    // Different default volumes for web vs native app
-    // Web: 0.04, Native iOS: 0.02
+    // Different volumes: Web has slider (default 0.04), iOS is fixed at 0.01
     const isNativeApp = window.Capacitor !== undefined;
-    let bgmVolume = isNativeApp ? 0.02 : 0.04;
+    let bgmVolume = isNativeApp ? 0.01 : 0.04;
     let bgmMuted = false;
     let bgmDucked = false;
     const TTS_SETTINGS_KEY = "srsTtsSettings";
@@ -3505,8 +3504,8 @@ function getTtsSettingsObj() {
   if (typeof s.rate !== "number") s.rate = 0.75;
   if (typeof s.volume !== "number") s.volume = 1.0;
   if (typeof s.answerDelayAfterSpeechSec !== "number") s.answerDelayAfterSpeechSec = 0;
-  // Platform-specific default: web 0.04, native 0.02
-  if (typeof s.bgmVolume !== "number") s.bgmVolume = isNativeApp ? 0.02 : 0.04;
+  // Platform-specific default: web 0.04 (adjustable), native 0.01 (fixed)
+  if (typeof s.bgmVolume !== "number") s.bgmVolume = isNativeApp ? 0.01 : 0.04;
   if (typeof s.bgmMuted !== "boolean") s.bgmMuted = false;
 
   s.rate = clamp(s.rate, 0.5, 2.0);
@@ -3569,16 +3568,23 @@ if (answerDelayAfterSpeechSecInput) {
   if (bgMusicVolumeInput) bgMusicVolumeInput.value = String(bgmVolume);
   if (bgMusicVolumeValue) bgMusicVolumeValue.textContent = String(bgmVolume);
 
+  // Hide volume slider on iOS native app (fixed at 0.01)
+  if (isNativeApp) {
+    const volumeContainer = document.getElementById("bgMusicVolumeContainer");
+    if (volumeContainer) volumeContainer.style.display = "none";
+  }
+
   const delayInput = document.getElementById("answerDelayAfterSpeechSecInput");
   if (delayInput) delayInput.value = String(s.answerDelayAfterSpeechSec ?? 0);
 })();
 
 function getEffectiveBgmVolume() {
   if (bgmMuted) return 0;
+  // iOS: always 0.01 (fixed, no ducking needed)
+  if (isNativeApp) return 0.01;
+  // Web: variable volume with ducking
   const base = clamp(Number(bgmVolume || 0), 0, 1);
-  // Different ducked volumes: Web: 0.02, Native iOS: 0.01
-  const duckedVolume = isNativeApp ? 0.01 : 0.02;
-  if (bgmDucked) return Math.min(base, duckedVolume);
+  if (bgmDucked) return Math.min(base, 0.02);
   return base;
 }
 
