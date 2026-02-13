@@ -16,7 +16,13 @@
 </style>
     <!-- Capacitor Preferences for robust session persistence on iOS -->
     <style>
-      /* (Background music CSS removed) */
+      /* Hide background music controls and audio for native app only */
+      .native-app #audioSettingsPanel label[for="bgMusicMute"],
+      .native-app #bgMusicVolumeContainer,
+      .native-app #bgMusic,
+      .native-app .bg-music-credit {
+        display: none !important;
+      }
     </style>
     <script type="module">
       import { Preferences } from '@capacitor/preferences';
@@ -59,7 +65,8 @@
         deck: document.getElementById('deckSelect')?.value || '',
         ttsRate: document.getElementById('ttsRateInput')?.value || '',
         ttsVolume: document.getElementById('ttsVolumeInput')?.value || '',
-        // (Background music settings removed)
+        bgMusicMuted: document.getElementById('bgMusicMute')?.checked || false,
+        bgMusicVolume: document.getElementById('bgMusicVolume')?.value || '',
         // Add more as needed (e.g., mode, delay)
       };
       localStorage.setItem('zencards_study_settings', JSON.stringify(settings));
@@ -76,14 +83,19 @@
       if (settings.ttsVolume && document.getElementById('ttsVolumeInput')) {
         document.getElementById('ttsVolumeInput').value = settings.ttsVolume;
       }
-      // (Background music settings restore removed)
+      if (typeof settings.bgMusicMuted === 'boolean' && document.getElementById('bgMusicMute')) {
+        document.getElementById('bgMusicMute').checked = settings.bgMusicMuted;
+      }
+      if (settings.bgMusicVolume && document.getElementById('bgMusicVolume')) {
+        document.getElementById('bgMusicVolume').value = settings.bgMusicVolume;
+      }
       // Add more as needed
     }
 
     document.addEventListener('DOMContentLoaded', () => {
       restoreStudySettings();
       // Save on change
-      ['deckSelect','ttsRateInput','ttsVolumeInput'].forEach(id => {
+      ['deckSelect','ttsRateInput','ttsVolumeInput','bgMusicMute','bgMusicVolume'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.addEventListener('change', saveStudySettings);
       });
@@ -1108,12 +1120,13 @@ input[type="number"]:focus-visible{
           </div>
 
           <div style="margin-top:0.5rem;">
-            <!-- Background music controls fully removed -->
+            <!-- Background music controls removed for app version -->
           </div>
         </div>
       </div>
 
-      <!-- Background music audio and credit fully removed -->
+      <audio id="bgMusic" src="Zen-Meditation.mp3" loop preload="auto"></audio>
+      <!-- Background music audio and credit removed for app version -->
 
       <!-- Study mode buttons -->
       <div class="card">
@@ -2128,7 +2141,8 @@ currentUser = session.user;
   refreshCardsList();
   refreshCardLanguageDropdownsForCurrentDeck(null);
 
-  // Background music logic fully removed
+  // Start background music on app load (may be blocked until user gesture)
+  ensureBgMusicPlayback();
 
 
   // 5) Load remote once (this will set hasLoadedRemote=true in finally)
@@ -2144,7 +2158,10 @@ currentUser = session.user;
   console.log("[BOOT] done", { hasLoadedRemote, userId: currentUser?.id });
 }
 
-// Background music logic fully removed
+// If autoplay is blocked, start music on first user gesture
+document.addEventListener("click", () => {
+  // Background music removed for app version
+}, { once: true });
 
     function scheduleKey(deckId, cardId) {
       return `${deckId}_${cardId}`;
@@ -3498,7 +3515,12 @@ let speakGeneration = 0;
     // Different volumes: Web has slider (default 0.04), iOS is fixed at 0.01
 const isNativeApp = window.Capacitor !== undefined;
 
-// (Background music volume logic fully removed)
+// 🔇 App-only fixed background music volume (super quiet)
+const APP_BGM_VOLUME = 0.005; // try 0.003–0.01
+
+let bgmVolume = isNativeApp ? APP_BGM_VOLUME : 0.04;
+let bgmMuted = false;
+let bgmDucked = false;
 
     const TTS_SETTINGS_KEY = "srsTtsSettings";
     function clamp(n, min, max) {
