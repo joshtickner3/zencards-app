@@ -85,6 +85,64 @@
     })();
   </script>
   <style>
+
+    /* ===== Privacy dropdown ===== */
+.privacyDrop{
+  background:#020617;
+  border:1px solid #111827;
+  border-radius:0.9rem;
+  padding: 0.25rem;           /* outer padding so summary looks good */
+}
+
+.privacyDrop > summary{
+  list-style: none;
+  cursor: pointer;
+  padding: 0.85rem 1rem;
+  border-radius: 0.75rem;
+  font-weight: 900;
+  font-size: 1.15rem;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 0.75rem;
+  user-select: none;
+  outline: none;
+}
+
+.privacyDrop > summary::-webkit-details-marker{ display:none; }
+
+.privacyDrop > summary:focus{
+  box-shadow: 0 0 0 3px rgba(34,197,94,0.18);
+  border: 1px solid rgba(34,197,94,0.35);
+}
+
+.privacyDrop .chev{
+  width: 12px;
+  height: 12px;
+  border-right: 2px solid rgba(148,163,184,0.9);
+  border-bottom: 2px solid rgba(148,163,184,0.9);
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.privacyDrop[open] .chev{
+  transform: rotate(-135deg);
+}
+
+.privacyDropContent{
+  padding: 0 1rem 1rem 1rem;
+}
+
+.privacyDropContent p,
+.privacyDropContent li{
+  color: var(--muted);
+}
+
+.privacyDropContent h3{
+  margin-top: 1rem;
+}
+
     .brandLogo{
   height: clamp(56px, 7vw, 92px);
   width: auto;
@@ -867,42 +925,52 @@ a:hover{
       </p>
     </div>
 
-     <section id="privacy-data-use" style="margin-top: 2em;">
-  <div class="privacyCard" style="max-width: 600px; margin: 0 auto;">
-    <h2>Privacy &amp; Data Use</h2>
+    <section id="privacy-data-use" style="margin-top: 2em;">
+  <div style="max-width: 600px; margin: 0 auto;">
 
-    <p>
-      <strong>Your privacy matters to us.</strong>
-      ZenCards is designed to help you study more efficiently — not to collect or exploit your personal data.
-    </p>
+    <details class="privacyDrop">
+      <summary>
+        <span>Privacy &amp; Data Use</span>
+        <span class="chev" aria-hidden="true"></span>
+      </summary>
 
-    <h3 style="margin-top:1rem;">What we <u>do not</u> access or store</h3>
-    <ul>
-      <li>
-        We <strong>do not have access to your password</strong>. Passwords are securely handled and hashed by our authentication provider.
-      </li>
-      <li>
-        We <strong>do not read or monitor the content of your decks or flashcards</strong>. Your study materials belong to you.
-      </li>
-      <li>
-        We <strong>do not sell, rent, or share your personal data</strong> with third parties for advertising or marketing purposes.
-      </li>
-    </ul>
+      <div class="privacyDropContent">
+        <p>
+          <strong>Your privacy matters to us.</strong>
+          ZenCards is designed to help you study more efficiently — not to collect or exploit your personal data.
+        </p>
 
-    <h3 style="margin-top:1rem;">Email</h3>
-    <p>
-      We send emails only for essential account-related purposes (verification, password resets, and account notifications).
-      We do not send marketing emails without your consent.
-    </p>
+        <h3>What we <u>do not</u> access or store</h3>
+        <ul>
+          <li>
+            We <strong>do not have access to your password</strong>. Passwords are securely handled and hashed by our authentication provider.
+          </li>
+          <li>
+            We <strong>do not read or monitor the content of your decks or flashcards</strong>. Your study materials belong to you.
+          </li>
+          <li>
+            We <strong>do not sell, rent, or share your personal data</strong> with third parties for advertising or marketing purposes.
+          </li>
+        </ul>
 
-    <h3 style="margin-top:1rem;">Questions</h3>
-    <p>
-      If you have any privacy questions, contact us at
-      <a href="mailto:support@zencardstudy.com">support@zencardstudy.com</a>
-      and we will answer promptly.
-    </p>
+        <h3>Email</h3>
+        <p>
+          We send emails only for essential account-related purposes (verification, password resets, and account notifications).
+          We do not send marketing emails without your consent.
+        </p>
+
+        <h3>Questions</h3>
+        <p>
+          If you have any privacy questions, contact us at
+          <a href="mailto:support@zencardstudy.com">support@zencardstudy.com</a>
+          and we will answer promptly.
+        </p>
+      </div>
+    </details>
+
   </div>
 </section>
+
 
 
 
