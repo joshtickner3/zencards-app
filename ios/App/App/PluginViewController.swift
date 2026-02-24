@@ -12,6 +12,7 @@ class PluginViewController: CAPBridgeViewController {
 
         // Register your Swift plugins with the Capacitor bridge
         bridge?.registerPluginInstance(VoiceCommandsPlugin())
+        bridge?.registerPluginInstance(IAPPlugin())
 
         print("✅ Finished registering VoiceCommandsPlugin + NativeAudioPlayerPlugin")
     }

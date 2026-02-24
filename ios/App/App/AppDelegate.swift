@@ -29,9 +29,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 let webView = bridgeVC.webView
             else { return }
 
-            // ✅ Register custom plugins here
+            // ✅ Register custom plugins here (cast to concrete CAPBridge)
+      
 
-            // Existing zoom behavior
             webView.scrollView.isScrollEnabled = true
             webView.scrollView.pinchGestureRecognizer?.isEnabled = true
         }
