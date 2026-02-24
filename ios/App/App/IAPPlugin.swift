@@ -3,7 +3,16 @@ import Capacitor
 import StoreKit
 
 @objc(IAPPlugin)
-public class IAPPlugin: CAPPlugin {
+public class IAPPlugin: CAPPlugin, CAPBridgedPlugin {
+
+    // Capacitor 7 bridge metadata (THIS is the important part)
+    public let identifier = "IAPPlugin"
+    public let jsName = "IAPPlugin"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "getProducts", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "purchase", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getEntitlements", returnType: CAPPluginReturnPromise)
+    ]
 
     // Replace with your real App Store Connect product id(s)
     private let productIds: Set<String> = [
