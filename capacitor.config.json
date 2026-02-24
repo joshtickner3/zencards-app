@@ -9,5 +9,9 @@
     "allowsBackForwardNavigationGestures": true,
     "allowsViewportScale": true,
     "webContentsDebuggingEnabled": true
-  }
+  },
+  "packageClassList": [
+    "PreferencesPlugin",
+    "IAPPlugin"
+  ]
 }
