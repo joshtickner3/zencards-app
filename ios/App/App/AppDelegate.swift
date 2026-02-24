@@ -29,6 +29,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 let webView = bridgeVC.webView
             else { return }
 
+            // ✅ Register custom plugins here
+
+            // Existing zoom behavior
             webView.scrollView.isScrollEnabled = true
             webView.scrollView.pinchGestureRecognizer?.isEnabled = true
         }
