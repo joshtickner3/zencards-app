@@ -1461,6 +1461,91 @@ const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
       },
     });
 
+    // ===================== APPLE IAP ENTITLEMENT ENFORCEMENT =====================
+// Set your exact product id here:
+const ZC_IAP_PRODUCT_ID = "com.zencards.pro.monthly";
+
+// Robust native detection (you already use similar checks elsewhere)
+function zcIsNative() {
+  return !!window.Capacitor || !!window.cordova || !!window.webkit?.messageHandlers?.bridge;
+}
+
+// Writes subscription state to Supabase (best-effort, won't crash app if table missing)
+async function zcUpsertSubscriptionStatus({ userId, status }) {
+  try {
+    await window.supabaseClient
+      .from("subscriptions")
+      .upsert(
+        {
+          user_id: userId,
+          status,                // "active" | "expired" (keep it simple)
+          platform: "ios",
+          product_id: ZC_IAP_PRODUCT_ID,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" }
+      );
+  } catch (e) {
+    console.warn("[IAP] Could not upsert subscriptions row (table/columns may differ):", e);
+  }
+}
+
+// Returns true if Apple says we currently have entitlement
+async function zcHasAppleEntitlement() {
+  try {
+    // Must exist in your Capacitor plugin build
+    const IAP = window.Capacitor?.Plugins?.IAPPlugin;
+    if (!IAP || typeof IAP.getEntitlements !== "function") {
+      console.warn("[IAP] IAPPlugin.getEntitlements not available");
+      return false;
+    }
+
+    const ent = await IAP.getEntitlements();
+    const active = ent?.activeProductIds || ent?.active || ent?.productIds || [];
+    const list = Array.isArray(active) ? active : [];
+    const ok = list.includes(ZC_IAP_PRODUCT_ID);
+
+    console.log("[IAP] entitlements:", { list, ok });
+    return ok;
+  } catch (e) {
+    console.warn("[IAP] getEntitlements failed:", e);
+    return false;
+  }
+}
+
+// Enforces access inside app.html (this is the real “lock”)
+// - If entitled: upsert active and allow
+// - If NOT entitled: upsert expired, sign out, redirect to index.html
+async function zcSyncEntitlementAndEnforceAccess() {
+  if (!zcIsNative()) return true; // only enforce Apple IAP inside the iOS app
+
+  // Ensure we have a logged-in user first
+  const { data: sessData } = await window.supabaseClient.auth.getSession();
+  const user = sessData?.session?.user;
+
+  if (!user) {
+    console.warn("[IAP] No session user; redirecting to index.html");
+    window.location.replace("index.html");
+    return false;
+  }
+
+  const entitled = await zcHasAppleEntitlement();
+
+  if (entitled) {
+    await zcUpsertSubscriptionStatus({ userId: user.id, status: "active" });
+    return true;
+  }
+
+  // Not entitled -> remove access
+  await zcUpsertSubscriptionStatus({ userId: user.id, status: "expired" });
+
+  console.warn("[IAP] Not entitled -> signing out and redirecting");
+  try { await window.supabaseClient.auth.signOut(); } catch (_) {}
+  try { localStorage.removeItem("zencards-auth"); } catch (_) {}
+  window.location.replace("index.html");
+  return false;
+}
+
     // ===== Delete Account Modal =====
     function showDeleteAccountModal() {
       const modal = document.createElement('div');
@@ -2064,6 +2149,10 @@ if (!session?.user) {
 }
 
 currentUser = session.user;
+
+  // ✅ ENFORCE Apple entitlement before loading any app data
+  const allowed = await zcSyncEntitlementAndEnforceAccess();
+  if (!allowed) return;
 
   if (userEmailLabel) userEmailLabel.textContent = currentUser.email || "";
   if (authLoggedIn) authLoggedIn.classList.remove("hidden");

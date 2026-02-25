@@ -921,6 +921,22 @@ a:hover{
         </button>
       </div>
 
+      <div class="row" style="justify-content:center; margin-top:0.75rem;">
+  <button class="btn" id="startTrialBtn" type="button" style="max-width:360px;">
+    Start 3-Day Free Trial
+  </button>
+</div>
+
+<p class="muted" id="trialPriceLine" style="font-size:0.92rem; margin-top:0.6rem;">
+  Loading price…
+</p>
+
+<div class="row" style="justify-content:center; margin-top:0.5rem;">
+  <button class="btn secondary small" id="restoreBtn" type="button">
+    Restore Purchase
+  </button>
+</div>
+
       <p class="muted" style="font-size:0.9rem; margin-top:0.85rem;">
       </p>
     </div>
@@ -1114,6 +1130,171 @@ a:hover{
     },
   });
 
+  // --- IAP / Trial wiring (native-only) ---
+const PRODUCT_ID = "com.zencards.pro.monthly";
+
+function isNativeApp() {
+  return (
+    window.Capacitor !== undefined ||
+    navigator.userAgent.includes("Capacitor") ||
+    window.webkit?.messageHandlers?.bridge !== undefined
+  );
+}
+
+async function loadPriceLine() {
+  const line = document.getElementById("trialPriceLine");
+  if (!line) return;
+
+  if (!isNativeApp() || !window.Capacitor?.Plugins?.IAPPlugin) {
+    line.textContent = "Subscriptions available in the iOS app.";
+    return;
+  }
+
+  try {
+    const res = await window.Capacitor.Plugins.IAPPlugin.getProducts();
+    const p = res?.products?.find(x => x.id === PRODUCT_ID);
+    line.textContent = p
+      ? `3 days free, then ${p.displayPrice} / month`
+      : "3 days free, then monthly (price loads after Apple approves the product)";
+  } catch (e) {
+    console.error(e);
+    line.textContent = "3 days free, then monthly";
+  }
+}
+
+async function ensureLoggedIn() {
+  const { data } = await supabaseClient.auth.getSession();
+  const user = data?.session?.user;
+  if (!user) throw new Error("Please log in first, then start the free trial.");
+  return user;
+}
+
+async function verifyWithServer({ userId, productId, transactionId, receipt }) {
+  const url = `${SUPABASE_URL}/functions/v1/verify-ios-subscription`;
+
+  // Use the logged-in user's JWT so the function can trust who is calling
+  const { data } = await supabaseClient.auth.getSession();
+  const accessToken = data?.session?.access_token;
+  if (!accessToken) throw new Error("Missing session token. Please log in again.");
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      user_id: userId,
+      product_id: productId,
+      transaction_id: transactionId,
+      receipt, // function will verify this with Apple
+    }),
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(json?.error || "Subscription verification failed.");
+  }
+
+  return json;
+}
+
+async function startTrialFlow() {
+  const btn = document.getElementById("startTrialBtn");
+  const line = document.getElementById("trialPriceLine");
+
+  if (!isNativeApp()) {
+    alert("Start your free trial from the iOS app.");
+    return;
+  }
+
+  if (!window.Capacitor?.Plugins?.IAPPlugin) {
+    alert("In-app purchases not available yet (plugin not loaded).");
+    return;
+  }
+
+  btn.disabled = true;
+  const oldText = btn.textContent;
+  btn.textContent = "Starting…";
+  if (line) line.textContent = "Contacting Apple…";
+
+  try {
+    const user = await ensureLoggedIn();
+
+    const purchaseRes = await window.Capacitor.Plugins.IAPPlugin.purchase({
+      productId: PRODUCT_ID
+    });
+
+    if (purchaseRes?.status === "cancelled") {
+      if (line) line.textContent = "Cancelled.";
+      return;
+    }
+
+    if (purchaseRes?.status !== "success") {
+      throw new Error("Purchase did not complete.");
+    }
+
+ // You must pass a receipt/proof from your IAP plugin.
+// The exact field name depends on your plugin response.
+// Common names: purchaseRes.receipt / purchaseRes.transactionReceipt / purchaseRes.signedTransactionInfo
+const receipt =
+  purchaseRes.receipt ||
+  purchaseRes.transactionReceipt ||
+  purchaseRes.signedTransactionInfo ||
+  null;
+
+await verifyWithServer({
+  userId: user.id,
+  productId: purchaseRes.productId,
+  transactionId: purchaseRes.transactionId,
+  receipt,
+});
+
+window.location.replace("app.html");
+  } catch (e) {
+    console.error(e);
+    alert(e?.message || "Could not start trial.");
+    if (line) line.textContent = "3 days free, then monthly";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldText;
+  }
+}
+
+async function restoreFlow() {
+  try {
+    const user = await ensureLoggedIn();
+
+    const ent = await window.Capacitor.Plugins.IAPPlugin.getEntitlements();
+    const active = ent?.activeProductIds || [];
+
+    if (!active.includes(PRODUCT_ID)) {
+      alert("No active subscription found to restore.");
+      return;
+    }
+
+    // Try to pull a receipt / signed transaction from entitlements if available
+    const receipt =
+      ent?.receipt ||
+      ent?.transactionReceipt ||
+      ent?.signedTransactionInfo ||
+      null;
+
+    // ✅ Call your Edge Function to verify + update subscriptions server-side
+    await verifyWithServer({
+      userId: user.id,
+      productId: PRODUCT_ID,
+      transactionId: null,
+      receipt,
+    });
+
+    window.location.replace("app.html");
+  } catch (e) {
+    console.error(e);
+    alert(e?.message || "Restore failed.");
+  }
+}
+
   async function checkUserAccess(uid) {
     const { data, error } = await supabaseClient
       .from("subscriptions")
@@ -1132,9 +1313,74 @@ a:hover{
     };
   }
 
+  async function setPaywallModeIfNeeded() {
+  // Only matters inside the native app
+  if (!isNativeApp()) return;
+
+  const { data } = await supabaseClient.auth.getSession();
+  const user = data?.session?.user;
+
+  // Not logged in: keep default UI (login CTA)
+  if (!user) return;
+
+  // Logged in: check access
+  const access = await checkUserAccess(user.id);
+
+  // If they have access, redirect (extra safety)
+  if (access.hasAccess) {
+    window.location.replace("app.html");
+    return;
+  }
+
+  // ---- PAYWALL MODE ----
+  // Make page clearly tell them they’re signed in but need Pro
+  const heroTitle = document.querySelector(".card.hero h1");
+  if (heroTitle) heroTitle.textContent = "You’re signed in — start your free trial to unlock ZenCards Pro";
+
+  // Make login button less prominent (optional)
+  const loginBtn = document.getElementById("loginBtn");
+  if (loginBtn) {
+    loginBtn.textContent = "Switch account";
+    loginBtn.classList.add("secondary");
+  }
+
+  // Show trial UI (it may already be visible in native)
+  const startTrialBtn = document.getElementById("startTrialBtn");
+  const restoreBtn = document.getElementById("restoreBtn");
+  const priceLine = document.getElementById("trialPriceLine");
+
+  if (startTrialBtn) startTrialBtn.style.display = "";
+  if (restoreBtn) restoreBtn.style.display = "";
+  if (priceLine) priceLine.style.display = "";
+
+  // Show a clear message in the modal msg area (or add a new line under buttons)
+  const msg = document.getElementById("trialPriceLine");
+  if (msg) {
+    // Keep the price line behavior, but you can prepend clarity:
+    // (don’t overwrite if loadPriceLine will populate)
+  }
+}
+
+// Run once on load
+setPaywallModeIfNeeded();
+
   // Modal wiring
   const loginModal = document.getElementById("loginModal");
   const loginBtn = document.getElementById("loginBtn");
+  // Show/hide trial UI (only show in native app)
+const startTrialBtn = document.getElementById("startTrialBtn");
+const restoreBtn = document.getElementById("restoreBtn");
+
+if (!isNativeApp()) {
+  if (startTrialBtn) startTrialBtn.style.display = "none";
+  if (restoreBtn) restoreBtn.style.display = "none";
+  const line = document.getElementById("trialPriceLine");
+  if (line) line.style.display = "none";
+} else {
+  loadPriceLine();
+  startTrialBtn?.addEventListener("click", startTrialFlow);
+  restoreBtn?.addEventListener("click", restoreFlow);
+}
   const loginCloseBtn = document.getElementById("loginCloseBtn");
   const loginCancelBtn = document.getElementById("loginCancelBtn");
   const loginSubmitBtn = document.getElementById("loginSubmitBtn");
@@ -1228,10 +1474,13 @@ a:hover{
       }
 
       // ❌ no subscription: sign them out and tell them what to do
-      await supabaseClient.auth.signOut();
+
       loginMsg.textContent =
-        "No active subscription found for this account.";
+  "No active subscription found. Tap “Start 3-Day Free Trial” to unlock ZenCards Pro.";
       loginMsg.className = "modalMsg error";
+        // Flip the page into paywall mode immediately
+  closeLoginModal();
+  setPaywallModeIfNeeded();
       return;
 
     } catch (e) {
