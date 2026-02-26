@@ -23,111 +23,63 @@
 <body style="font-family:'Inter Tight',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:#0b1220;color:#e5e7eb;padding:24px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;letter-spacing:-0.011em;">
   <h2>Confirming your email…</h2>
   <p id="msg">One moment.</p>
+<script>
+  const msgEl = document.getElementById("msg");
+  const setMsg = (t) => { msgEl.textContent = t; console.log("[confirm]", t); };
 
-  <script>
-    const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
+  function buildDeepLink() {
+    const url = new URL(window.location.href);
 
-    const msgEl = document.getElementById("msg");
-    const setMsg = (t) => { msgEl.textContent = t; console.log("[confirm]", t); };
+    // Supabase may return PKCE ?code=... OR implicit #access_token=...
+    const code = url.searchParams.get("code");
 
-    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-    storage: window.localStorage,
-  },
-});
+    const hashParams = new URLSearchParams((url.hash || "").replace(/^#/, ""));
+    const access_token = hashParams.get("access_token");
+    const refresh_token = hashParams.get("refresh_token");
 
-    function scrubUrl() {
-      history.replaceState({}, document.title, window.location.pathname + window.location.search);
+    const next = url.searchParams.get("next") || "startTrial";
+
+    // Prefer PKCE code when present
+    if (code) {
+      return `zencards://auth-callback?code=${encodeURIComponent(code)}&next=${encodeURIComponent(next)}`;
     }
 
-    async function createCheckoutAndRedirect(accessToken) {
-      setMsg("Email confirmed ✅ Creating checkout session…");
-
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/create-checkout-session`, {
-        method: "POST",
-        headers: {
-  "Content-Type": "application/json",
-  "Authorization": `Bearer ${accessToken}`,
-  "apikey": SUPABASE_ANON_KEY,
-},
-        body: JSON.stringify({
-           success_url: "https://zencardstudy.com/?success=1&session_id={CHECKOUT_SESSION_ID}",
-cancel_url: "https://zencardstudy.com/?canceled=1",
-        }),
-      });
-
-      const raw = await res.text();
-      let json = null;
-      try { json = JSON.parse(raw); } catch {}
-
-      if (!res.ok || !json?.url) {
-        console.error("Checkout error:", res.status, raw);
-        setMsg(`Checkout failed (${res.status}). ${raw.slice(0, 250)}`);
-        return;
-      }
-
-      setMsg("Redirecting to Stripe…");
-      window.location.href = json.url;
+    // Fallback: implicit tokens (only if Supabase uses this mode)
+    if (access_token) {
+      return `zencards://auth-callback?access_token=${encodeURIComponent(access_token)}&refresh_token=${encodeURIComponent(refresh_token || "")}&next=${encodeURIComponent(next)}`;
     }
 
-    async function go() {
-      setMsg("Finalizing confirmation…");
+    return null;
+  }
 
-      const url = new URL(window.location.href);
-      const hashParams = new URLSearchParams(url.hash.replace(/^#/, ""));
-      const queryParams = url.searchParams;
+  async function go() {
+    setMsg("Opening the app…");
 
-      // If Supabase returned an error in the hash, show it clearly
-      const err = hashParams.get("error");
-      if (err) {
-        const errDesc = hashParams.get("error_description") || "";
-        const errCode = hashParams.get("error_code") || "";
-        setMsg(`Confirmation error: ${err}${errCode ? " (" + errCode + ")" : ""}${errDesc ? " — " + errDesc : ""}`);
-        return;
-      }
-
-      // FLOW 1: implicit hash tokens
-      const access_token = hashParams.get("access_token");
-      if (access_token) {
-        // IMPORTANT: use token directly, do NOT await setSession
-        scrubUrl();
-        await createCheckoutAndRedirect(access_token);
-        return;
-      }
-
-      // FLOW 2: PKCE code
-      const code = queryParams.get("code");
-      if (code) {
-        setMsg("Finishing sign-in…");
-        const { error } = await sb.auth.exchangeCodeForSession(code);
-        if (error) {
-          console.error(error);
-          setMsg("exchangeCodeForSession error: " + (error.message || String(error)));
-          return;
-        }
-        scrubUrl();
-
-        const { data } = await sb.auth.getSession();
-        const token = data?.session?.access_token;
-        if (!token) {
-          setMsg("Verified, but no session token was created. Please log in.");
-          return;
-        }
-        await createCheckoutAndRedirect(token);
-        return;
-      }
-
-      setMsg("Missing tokens/code in confirmation link. Please request a new link.");
+    const deepLink = buildDeepLink();
+    if (!deepLink) {
+      setMsg("Missing code/token in confirmation link. Please request a new confirmation email.");
+      return;
     }
 
-    go().catch((e) => {
-      console.error(e);
-      setMsg("Something went wrong: " + (e?.message || String(e)));
-    });
-  </script>
+    // Try to open the app
+    window.location.href = deepLink;
+
+    // Fallback UI if app doesn't open (or not installed)
+    setTimeout(() => {
+      setMsg("If the app didn’t open automatically, tap the button below.");
+      const btn = document.createElement("button");
+      btn.textContent = "Open ZenCards App";
+      btn.style.cssText =
+        "margin-top:12px;padding:12px 16px;border-radius:12px;border:none;font-weight:700;cursor:pointer;";
+      btn.onclick = () => (window.location.href = deepLink);
+      document.body.appendChild(btn);
+    }, 800);
+  }
+
+  go().catch((e) => {
+    console.error(e);
+    setMsg("Something went wrong: " + (e?.message || String(e)));
+  });
+</script>
 </body>
 </html>

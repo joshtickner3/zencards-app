@@ -1139,22 +1139,28 @@ a:hover{
   // ✅ Handle email confirmation deep links like: zencards://auth-callback?code=...&next=startTrial
 async function handleDeepLink(url) {
   try {
-    // Supabase will include ?code=... for PKCE flows
-    if (!url || !url.includes("code=")) return;
+    if (!url) return;
 
-    // Create a session from the confirmation link
-    const { data, error } = await supabaseClient.auth.exchangeCodeForSession(url);
-    if (error) throw error;
-
-    // If you want to auto-continue to trial after confirm:
     const u = new URL(url);
     const next = u.searchParams.get("next");
 
+    const code = u.searchParams.get("code");
+    const access_token = u.searchParams.get("access_token");
+    const refresh_token = u.searchParams.get("refresh_token");
+
+    if (code) {
+      const { error } = await supabaseClient.auth.exchangeCodeForSession(code);
+      if (error) throw error;
+    } else if (access_token) {
+      const { error } = await supabaseClient.auth.setSession({
+        access_token,
+        refresh_token: refresh_token || "",
+      });
+      if (error) throw error;
+    }
+
     if (next === "startTrial") {
-      // user is now logged in for real
-      closeLoginModal?.();
-      // continue flow
-      await startTrialFlow();
+      await startTrialFlow(); // your Apple IAP flow
     }
   } catch (e) {
     console.error("Deep link auth failed:", e);
@@ -1162,13 +1168,11 @@ async function handleDeepLink(url) {
   }
 }
 
-  // Listen for app open via deep link (native app only)
-  if (window.Capacitor?.Plugins?.App?.addListener) {
-    window.Capacitor.Plugins.App.addListener("appUrlOpen", async (event) => {
-      console.log("Opened via URL:", event?.url);
-      await handleDeepLink(event?.url);
-    });
-  }
+if (window.Capacitor?.Plugins?.App?.addListener) {
+  window.Capacitor.Plugins.App.addListener("appUrlOpen", async (event) => {
+    await handleDeepLink(event?.url);
+  });
+}
 
 
   // --- IAP / Trial wiring (native-only) ---
@@ -1566,9 +1570,8 @@ res = await supabaseClient.auth.signUp({
   email,
   password,
   options: {
-    // ✅ when they tap the email link, it opens the iOS app
-    emailRedirectTo: "zencards://auth-callback?next=startTrial"
-  }
+    emailRedirectTo: "https://zencardstudy.com/confirm.html?next=startTrial",
+  },
 });
     } else {
       res = await supabaseClient.auth.signInWithPassword({ email, password });
