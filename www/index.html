@@ -1548,7 +1548,7 @@ if (toggleAuthModeBtn) {
   });
 
   // Submit login (subscription-gated)
-  loginSubmitBtn.addEventListener("click", async () => {
+ loginSubmitBtn.addEventListener("click", async () => {
   const email = (loginEmail.value || "").trim();
   const password = loginPassword.value || "";
 
@@ -1565,64 +1565,68 @@ if (toggleAuthModeBtn) {
 
   try {
     let res;
+
     if (AUTH_MODE === "signup") {
-// ✅ App-only signup bypasses email confirmation
-const r = await fetch(`${SUPABASE_URL}/functions/v1/app-signup`, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "apikey": SUPABASE_ANON_KEY,
-  },
-  body: JSON.stringify({ email, password }),
-});
+      // ✅ App-only signup bypasses email confirmation
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/app-signup`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-const j = await r.json().catch(() => ({}));
-if (!r.ok) {
-  throw new Error(j?.error || "Could not create account.");
-}
+      const raw = await r.text();
+      let j = {};
+      try { j = JSON.parse(raw); } catch {}
 
-// Now log them in immediately (session created in-app)
-res = await supabaseClient.auth.signInWithPassword({ email, password });
+      if (!r.ok) {
+        console.error("app-signup failed:", r.status, raw);
+        throw new Error(j?.error || raw || "Could not create account.");
+      }
+
+      // Now log them in immediately (session created in-app)
+      res = await supabaseClient.auth.signInWithPassword({ email, password });
     } else {
       res = await supabaseClient.auth.signInWithPassword({ email, password });
     }
 
-    if (res.error) {
+    if (res?.error) {
       loginMsg.textContent = res.error.message;
       loginMsg.className = "modalMsg error";
       return;
     }
 
-if (AUTH_MODE === "signup") {
-  loginMsg.textContent =
-  loginMsg.className = "modalMsg ok";
+    // ✅ Ensure we actually have a session + user
+    const { data: sessData } = await supabaseClient.auth.getSession();
+    const user = sessData?.session?.user;
+    if (!user) throw new Error("Login succeeded but no session was created.");
+
+   // ✅ run pending action (startTrialFlow / restoreFlow) if this login/signup was triggered by them
+if (typeof pendingAfterAuth === "function") {
+  const fn = pendingAfterAuth;
+  pendingAfterAuth = null;
+
+  closeLoginModal();   // close only when we’re about to continue elsewhere
+  await fn();
   return;
 }
 
-    // ✅ run pending action (startTrialFlow / restoreFlow) if this login was triggered by them
-    closeLoginModal();
-    if (typeof pendingAfterAuth === "function") {
-      const fn = pendingAfterAuth;
-      pendingAfterAuth = null;
-      await fn();
-      return;
-    }
-
+    // Otherwise, normal login path: check access
     const access = await checkUserAccess(user.id);
 
-    if (access.hasAccess) {
-      window.location.replace("app.html");
-      return;
-    }
+   if (access.hasAccess) {
+  closeLoginModal();
+  window.location.replace("app.html");
+  return;
+}
 
     loginMsg.textContent =
       "No active subscription found. Tap “Start 3-Day Free Trial” to unlock ZenCards Pro.";
     loginMsg.className = "modalMsg error";
 
-    closeLoginModal();
     setPaywallModeIfNeeded();
-    return;
-
   } catch (e) {
     console.error(e);
     loginMsg.textContent = e?.message || "Login failed. Please try again.";
