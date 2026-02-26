@@ -1,6 +1,7 @@
 import Foundation
-import Capacitor
+@preconcurrency import Capacitor
 import StoreKit
+import UIKit
 
 @objc(IAPPlugin)
 public class IAPPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -11,7 +12,8 @@ public class IAPPlugin: CAPPlugin, CAPBridgedPlugin {
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "getProducts", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "purchase", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "getEntitlements", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "getEntitlements", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "manageSubscriptions", returnType: CAPPluginReturnPromise)
     ]
 
     // Replace with your real App Store Connect product id(s)
@@ -98,8 +100,50 @@ public class IAPPlugin: CAPPlugin, CAPBridgedPlugin {
 
             call.resolve(["activeProductIds": active])
         }
+        
     }
 
+    @objc func manageSubscriptions(_ call: CAPPluginCall) {
+        Task {
+            do {
+                // Try the official StoreKit UI first (iOS 15+)
+                if #available(iOS 15.0, *) {
+
+                    // AppStore.showManageSubscriptions(in:) needs a UIWindowScene, not a UIViewController
+                    let windowScene: UIWindowScene? = await MainActor.run {
+                        UIApplication.shared.connectedScenes
+                            .compactMap { $0 as? UIWindowScene }
+                            .first(where: { $0.activationState == .foregroundActive })
+                        ?? UIApplication.shared.connectedScenes
+                            .compactMap { $0 as? UIWindowScene }
+                            .first
+                    }
+
+                    guard let windowScene else {
+                        call.reject("Missing UIWindowScene")
+                        return
+                    }
+
+                    try await AppStore.showManageSubscriptions(in: windowScene)
+                    call.resolve(["ok": true])
+                    return
+                }
+
+                // Fallback: open Apple subscriptions page
+                guard let url = URL(string: "https://apps.apple.com/account/subscriptions") else {
+                    call.reject("Invalid URL")
+                    return
+                }
+
+                await MainActor.run {
+                                  UIApplication.shared.open(url, options: [:], completionHandler: nil)
+                                  call.resolve(["ok": true])
+                              }
+            } catch {
+                call.reject("Failed to open subscriptions: \(error.localizedDescription)")
+            }
+        }
+    }
     private func checkVerified<T>(_ result: VerificationResult<T>) throws -> T {
         switch result {
         case .unverified:
@@ -111,3 +155,4 @@ public class IAPPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 }
+

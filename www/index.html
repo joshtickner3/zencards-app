@@ -937,6 +937,12 @@ a:hover{
   </button>
 </div>
 
+<div class="row" style="justify-content:center; margin-top:0.5rem;">
+  <button class="btn secondary small" id="manageSubBtn" type="button">
+    Manage Subscription
+  </button>
+</div>
+
       <p class="muted" style="font-size:0.9rem; margin-top:0.85rem;">
       </p>
     </div>
@@ -1162,11 +1168,9 @@ async function loadPriceLine() {
   }
 }
 
-async function ensureLoggedIn() {
+async function getUserOrNull() {
   const { data } = await supabaseClient.auth.getSession();
-  const user = data?.session?.user;
-  if (!user) throw new Error("Please log in first, then start the free trial.");
-  return user;
+  return data?.session?.user || null;
 }
 
 async function verifyWithServer({ userId, productId, transactionId, receipt }) {
@@ -1198,7 +1202,6 @@ async function verifyWithServer({ userId, productId, transactionId, receipt }) {
 
   return json;
 }
-
 async function startTrialFlow() {
   const btn = document.getElementById("startTrialBtn");
   const line = document.getElementById("trialPriceLine");
@@ -1219,14 +1222,27 @@ async function startTrialFlow() {
   if (line) line.textContent = "Contacting Apple…";
 
   try {
-    const user = await ensureLoggedIn();
+    const existingUser = await getUserOrNull();
+
+    if (!existingUser) {
+      pendingAfterAuth = startTrialFlow;
+      openLoginModal("signup");
+
+      // reset UI before returning
+      btn.disabled = false;
+      btn.textContent = oldText;
+      if (line) line.textContent = "Create an account to start your free trial.";
+      return;
+    }
+
+    const user = existingUser;
 
     const purchaseRes = await window.Capacitor.Plugins.IAPPlugin.purchase({
-      productId: PRODUCT_ID
+      productId: PRODUCT_ID,
     });
 
     if (purchaseRes?.status === "cancelled") {
-      if (line) line.textContent = "Cancelled.";
+      if (line) await loadPriceLine(); // puts the real price back
       return;
     }
 
@@ -1234,23 +1250,17 @@ async function startTrialFlow() {
       throw new Error("Purchase did not complete.");
     }
 
- // You must pass a receipt/proof from your IAP plugin.
-// The exact field name depends on your plugin response.
-// Common names: purchaseRes.receipt / purchaseRes.transactionReceipt / purchaseRes.signedTransactionInfo
-const receipt =
-  purchaseRes.receipt ||
-  purchaseRes.transactionReceipt ||
-  purchaseRes.signedTransactionInfo ||
-  null;
+    // ✅ IMPORTANT: make sure transactionId exists
+    const txId = purchaseRes?.transactionId;
+    if (!txId) throw new Error("Missing transactionId from IAP plugin.");
 
-await verifyWithServer({
-  userId: user.id,
-  productId: purchaseRes.productId,
-  transactionId: purchaseRes.transactionId,
-  receipt,
-});
+    await verifyWithServer({
+      userId: user.id,
+      productId: purchaseRes.productId,
+      transactionId: txId,
+    });
 
-window.location.replace("app.html");
+    window.location.replace("app.html");
   } catch (e) {
     console.error(e);
     alert(e?.message || "Could not start trial.");
@@ -1263,7 +1273,13 @@ window.location.replace("app.html");
 
 async function restoreFlow() {
   try {
-    const user = await ensureLoggedIn();
+let user = await getUserOrNull();
+
+if (!user) {
+  pendingAfterAuth = restoreFlow;
+  openLoginModal("login");
+  return;
+}
 
     const ent = await window.Capacitor.Plugins.IAPPlugin.getEntitlements();
     const active = ent?.activeProductIds || [];
@@ -1293,6 +1309,27 @@ async function restoreFlow() {
     console.error(e);
     alert(e?.message || "Restore failed.");
   }
+}
+
+async function openManageSubscription() {
+  // If not native (web browser), send to Apple account subscriptions page (or your own web billing page)
+  if (!isNativeApp()) {
+    window.location.href = "https://apps.apple.com/account/subscriptions";
+    return;
+  }
+
+  // If your IAP plugin exposes a native “manage subscriptions” method, use it
+  try {
+    if (window.Capacitor?.Plugins?.IAPPlugin?.openManageSubscriptions) {
+      await window.Capacitor.Plugins.IAPPlugin.openManageSubscriptions();
+      return;
+    }
+  } catch (e) {
+    console.warn("openManageSubscriptions failed, falling back:", e);
+  }
+
+  // Fallback: open Apple's manage subscriptions page
+  window.open("https://apps.apple.com/account/subscriptions", "_system");
 }
 
   async function checkUserAccess(uid) {
@@ -1380,6 +1417,10 @@ if (!isNativeApp()) {
   loadPriceLine();
   startTrialBtn?.addEventListener("click", startTrialFlow);
   restoreBtn?.addEventListener("click", restoreFlow);
+
+  // ✅ Manage Subscription button (Apple)
+  const manageSubBtn = document.getElementById("manageSubBtn");
+  manageSubBtn?.addEventListener("click", openManageSubscription);
 }
   const loginCloseBtn = document.getElementById("loginCloseBtn");
   const loginCancelBtn = document.getElementById("loginCancelBtn");
@@ -1388,19 +1429,48 @@ if (!isNativeApp()) {
   const loginPassword = document.getElementById("loginPassword");
   const loginMsg = document.getElementById("loginMsg");
   const forgotPwBtn = document.getElementById("forgotPwBtn");
-  const toggleAuthModeBtn = document.getElementById("toggleAuthModeBtn");
+const toggleAuthModeBtn = document.getElementById("toggleAuthModeBtn");
 
-  function openLoginModal() {
-    loginMsg.textContent = "";
-    loginMsg.className = "modalMsg";
-    loginModal.classList.add("show");
-    setTimeout(() => loginEmail.focus(), 50);
+let AUTH_MODE = "login"; // "login" | "signup"
+let pendingAfterAuth = null; // function to run after successful auth
+
+// Toggle between Login and Create Account modes
+toggleAuthModeBtn?.addEventListener("click", () => {
+  if (AUTH_MODE === "login") setAuthMode("signup");
+  else setAuthMode("login");
+});
+
+function setAuthMode(mode) {
+  AUTH_MODE = mode;
+
+  const title = document.getElementById("loginTitle");
+  const submit = document.getElementById("loginSubmitBtn");
+  const toggle = document.getElementById("toggleAuthModeBtn");
+
+  if (mode === "signup") {
+    if (title) title.textContent = "Create account";
+    if (submit) submit.textContent = "Create account";
+    if (toggle) toggle.textContent = "Already have an account?";
+  } else {
+    if (title) title.textContent = "Log in";
+    if (submit) submit.textContent = "Log in";
+    if (toggle) toggle.textContent = "Create account";
   }
+}
+
+  function openLoginModal(mode = "login") {
+  setAuthMode(mode);
+  loginMsg.textContent = "";
+  loginMsg.className = "modalMsg";
+  loginModal.classList.add("show");
+  setTimeout(() => loginEmail.focus(), 50);
+}
+  
   function closeLoginModal() {
     loginModal.classList.remove("show");
   }
 
-  loginBtn.addEventListener("click", openLoginModal);
+loginBtn.addEventListener("click", () => openLoginModal("login"));
   loginCloseBtn.addEventListener("click", closeLoginModal);
   loginCancelBtn.addEventListener("click", closeLoginModal);
 
@@ -1410,9 +1480,10 @@ if (!isNativeApp()) {
 
   // ✅ IMPORTANT for Apple: disable account creation in-app
   // (You can remove the button entirely, but this guarantees it can’t be used.)
-  if (toggleAuthModeBtn) {
-    toggleAuthModeBtn.style.display = "none";
-  }
+  // In the iOS app we DO allow account creation (required for trial flow)
+if (toggleAuthModeBtn) {
+  toggleAuthModeBtn.style.display = "";
+}
 
   // Forgot password is fine
   forgotPwBtn.addEventListener("click", async () => {
@@ -1439,59 +1510,71 @@ if (!isNativeApp()) {
 
   // Submit login (subscription-gated)
   loginSubmitBtn.addEventListener("click", async () => {
-    const email = (loginEmail.value || "").trim();
-    const password = loginPassword.value || "";
+  const email = (loginEmail.value || "").trim();
+  const password = loginPassword.value || "";
 
-    if (!email || !password) {
-      loginMsg.textContent = "Please enter your email and password.";
+  if (!email || !password) {
+    loginMsg.textContent = "Please enter your email and password.";
+    loginMsg.className = "modalMsg error";
+    return;
+  }
+
+  loginSubmitBtn.disabled = true;
+  loginSubmitBtn.textContent = (AUTH_MODE === "signup") ? "Creating…" : "Logging in…";
+  loginMsg.textContent = "";
+  loginMsg.className = "modalMsg";
+
+  try {
+    let res;
+    if (AUTH_MODE === "signup") {
+      res = await supabaseClient.auth.signUp({ email, password });
+    } else {
+      res = await supabaseClient.auth.signInWithPassword({ email, password });
+    }
+
+    if (res.error) {
+      loginMsg.textContent = res.error.message;
       loginMsg.className = "modalMsg error";
       return;
     }
 
-    loginSubmitBtn.disabled = true;
-    loginSubmitBtn.textContent = "Logging in…";
-    loginMsg.textContent = "";
-    loginMsg.className = "modalMsg";
+    const { data: sess } = await supabaseClient.auth.getSession();
+    const user = sess?.session?.user;
+    if (!user) throw new Error("Session not ready. Close and reopen the app, then try again.");
 
-    try {
-      const res = await supabaseClient.auth.signInWithPassword({ email, password });
-      if (res.error) {
-        loginMsg.textContent = res.error.message;
-        loginMsg.className = "modalMsg error";
-        return;
-      }
-
-      const { data: sess } = await supabaseClient.auth.getSession();
-      const user = sess?.session?.user;
-      if (!user) throw new Error("Session not ready. Close and reopen the app, then try again.");
-
-      const access = await checkUserAccess(user.id);
-
-      if (access.hasAccess) {
-        // ✅ allow
-        window.location.replace("app.html");
-        return;
-      }
-
-      // ❌ no subscription: sign them out and tell them what to do
-
-      loginMsg.textContent =
-  "No active subscription found. Tap “Start 3-Day Free Trial” to unlock ZenCards Pro.";
-      loginMsg.className = "modalMsg error";
-        // Flip the page into paywall mode immediately
-  closeLoginModal();
-  setPaywallModeIfNeeded();
+    // ✅ run pending action (startTrialFlow / restoreFlow) if this login was triggered by them
+    closeLoginModal();
+    if (typeof pendingAfterAuth === "function") {
+      const fn = pendingAfterAuth;
+      pendingAfterAuth = null;
+      await fn();
       return;
-
-    } catch (e) {
-      console.error(e);
-      loginMsg.textContent = (e && e.message) ? e.message : "Login failed. Please try again.";
-      loginMsg.className = "modalMsg error";
-    } finally {
-      loginSubmitBtn.disabled = false;
-      loginSubmitBtn.textContent = "Log in";
     }
-  });
+
+    const access = await checkUserAccess(user.id);
+
+    if (access.hasAccess) {
+      window.location.replace("app.html");
+      return;
+    }
+
+    loginMsg.textContent =
+      "No active subscription found. Tap “Start 3-Day Free Trial” to unlock ZenCards Pro.";
+    loginMsg.className = "modalMsg error";
+
+    closeLoginModal();
+    setPaywallModeIfNeeded();
+    return;
+
+  } catch (e) {
+    console.error(e);
+    loginMsg.textContent = e?.message || "Login failed. Please try again.";
+    loginMsg.className = "modalMsg error";
+  } finally {
+    loginSubmitBtn.disabled = false;
+    loginSubmitBtn.textContent = (AUTH_MODE === "signup") ? "Create account" : "Log in";
+  }
+});
 
   // Enter key submits
   [loginEmail, loginPassword].forEach(el => {
