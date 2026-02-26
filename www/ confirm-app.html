@@ -2,99 +2,49 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <link rel="icon" href="favicon.png" />
-  <link rel="shortcut icon" href="favicon.png" />
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon.png" />
-  <link rel="apple-touch-icon" sizes="180x180" href="favicon.png" />
-  <meta property="og:title" content="Live Life to the Fullest as a Student" />
-  <meta property="og:image" content="favicon.png" />
-  <meta property="og:type" content="website" />
-  <meta name="twitter:card" content="summary" />
-  <meta name="twitter:title" content="Live Life to the Fullest as a Student" />
-  <meta name="twitter:image" content="favicon.png" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Live Life to the Fullest as a Student</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <title>Confirming…</title>
 </head>
+<body style="font-family:system-ui;background:#0b1220;color:#e5e7eb;padding:24px;">
+  <h2>Email confirmed ✅</h2>
+  <p id="msg">Opening the app…</p>
 
-<body style="font-family:'Inter Tight',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:#0b1220;color:#e5e7eb;padding:24px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;letter-spacing:-0.011em;">
-  <h2>Confirming your email…</h2>
-  <p id="msg">One moment.</p>
-<script>
-  const msgEl = document.getElementById("msg");
-  const setMsg = (t) => { msgEl.textContent = t; console.log("[confirm]", t); };
+  <script>
+    const msgEl = document.getElementById("msg");
+    const setMsg = (t) => { msgEl.textContent = t; console.log("[confirm-app]", t); };
 
-  function buildDeepLink() {
-    const url = new URL(window.location.href);
-
-    // Supabase may return PKCE ?code=... OR implicit #access_token=...
-    const code = url.searchParams.get("code");
-
-    const hashParams = new URLSearchParams((url.hash || "").replace(/^#/, ""));
-    const access_token = hashParams.get("access_token");
-    const refresh_token = hashParams.get("refresh_token");
-
-    const next = url.searchParams.get("next") || "startTrial";
-
-    // Prefer PKCE code when present
-    if (code) {
+    function buildDeepLink() {
+      const url = new URL(window.location.href);
+      const code = url.searchParams.get("code");
+      const next = url.searchParams.get("next") || "startTrial";
+      if (!code) return null;
       return `zencards://auth-callback?code=${encodeURIComponent(code)}&next=${encodeURIComponent(next)}`;
     }
 
-    // Fallback: implicit tokens (only if Supabase uses this mode)
-    if (access_token) {
-      return `zencards://auth-callback?access_token=${encodeURIComponent(access_token)}&refresh_token=${encodeURIComponent(refresh_token || "")}&next=${encodeURIComponent(next)}`;
-    }
-
-    return null;
-  }
-
-  async function go() {
-    setMsg("Opening the app…");
-
-    const deepLink = buildDeepLink();
-    if (!deepLink) {
-      setMsg("Missing code/token in confirmation link. Please request a new confirmation email.");
-      return;
-    }
-
-setMsg("Email confirmed ✅ Tap below to return to the app.");
-
-const btn = document.createElement("button");
-btn.textContent = "Open ZenCards App";
-btn.style.cssText =
-  "margin-top:12px;padding:12px 16px;border-radius:12px;border:none;font-weight:700;cursor:pointer;";
-btn.onclick = () => {
-  window.location.href = deepLink;
-};
-document.body.appendChild(btn);
-
-// Optional: also render a plain link
-const a = document.createElement("a");
-a.href = deepLink;
-a.textContent = "Or tap here if the button doesn’t work";
-a.style.cssText = "display:block;margin-top:12px;color:#93c5fd;font-weight:700;";
-document.body.appendChild(a);
-
-    // Fallback UI if app doesn't open (or not installed)
-    setTimeout(() => {
-      setMsg("If the app didn’t open automatically, tap the button below.");
+    function renderOpenButton(deepLink) {
       const btn = document.createElement("button");
       btn.textContent = "Open ZenCards App";
       btn.style.cssText =
         "margin-top:12px;padding:12px 16px;border-radius:12px;border:none;font-weight:700;cursor:pointer;";
       btn.onclick = () => (window.location.href = deepLink);
       document.body.appendChild(btn);
-    }, 800);
-  }
 
-  go().catch((e) => {
-    console.error(e);
-    setMsg("Something went wrong: " + (e?.message || String(e)));
-  });
-</script>
+      const a = document.createElement("a");
+      a.href = deepLink;
+      a.textContent = "Tap here if the button doesn’t work";
+      a.style.cssText = "display:block;margin-top:12px;color:#93c5fd;font-weight:700;";
+      document.body.appendChild(a);
+    }
+
+    (function go() {
+      const deepLink = buildDeepLink();
+      if (!deepLink) {
+        setMsg("Missing code in link. Please request a new confirmation email.");
+        return;
+      }
+      setMsg("Tap to return to the app and start your trial.");
+      renderOpenButton(deepLink);
+    })();
+  </script>
 </body>
 </html>
