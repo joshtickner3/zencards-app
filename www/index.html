@@ -1196,8 +1196,14 @@ async function loadPriceLine() {
   }
 
   try {
-    const res = await window.Capacitor.Plugins.IAPPlugin.getProducts();
-    const p = res?.products?.find(x => x.id === PRODUCT_ID);
+const res = await window.Capacitor.Plugins.IAPPlugin.getProducts({
+  productIdentifiers: [PRODUCT_ID],
+});
+console.log("getProducts res:", res);
+
+const p =
+  res?.products?.find(x => (x.id || x.productId) === PRODUCT_ID) ||
+  res?.products?.[0];
     line.textContent = p
       ? `3 days free, then ${p.displayPrice} / month`
       : "3 days free, then monthly (price loads after Apple approves the product)";
