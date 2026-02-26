@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+"Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-app-signup-secret",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -17,6 +17,17 @@ serve(async (req) => {
     if (req.method !== "POST") {
       return new Response("Method not allowed", { status: 405, headers: corsHeaders });
     }
+
+    // --- Guardrail: require secret header since verify_jwt is off ---
+const expected = Deno.env.get("APP_SIGNUP_SECRET");
+const got = req.headers.get("x-app-signup-secret");
+
+if (!expected || got !== expected) {
+return new Response(JSON.stringify({ error: "Unauthorized" }), {
+  status: 401,
+  headers: { "Content-Type": "application/json", ...corsHeaders },
+});
+}
 
     const { email, password } = await req.json().catch(() => ({}));
     if (!email || !password) {
