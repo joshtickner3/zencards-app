@@ -1136,6 +1136,41 @@ a:hover{
     },
   });
 
+  // ✅ Handle email confirmation deep links like: zencards://auth-callback?code=...&next=startTrial
+async function handleDeepLink(url) {
+  try {
+    // Supabase will include ?code=... for PKCE flows
+    if (!url || !url.includes("code=")) return;
+
+    // Create a session from the confirmation link
+    const { data, error } = await supabaseClient.auth.exchangeCodeForSession(url);
+    if (error) throw error;
+
+    // If you want to auto-continue to trial after confirm:
+    const u = new URL(url);
+    const next = u.searchParams.get("next");
+
+    if (next === "startTrial") {
+      // user is now logged in for real
+      closeLoginModal?.();
+      // continue flow
+      await startTrialFlow();
+    }
+  } catch (e) {
+    console.error("Deep link auth failed:", e);
+    alert(e?.message || "Could not complete email confirmation.");
+  }
+}
+
+  // Listen for app open via deep link (native app only)
+  if (window.Capacitor?.Plugins?.App?.addListener) {
+    window.Capacitor.Plugins.App.addListener("appUrlOpen", async (event) => {
+      console.log("Opened via URL:", event?.url);
+      await handleDeepLink(event?.url);
+    });
+  }
+
+
   // --- IAP / Trial wiring (native-only) ---
 const PRODUCT_ID = "com.zencards.pro.monthly";
 
@@ -1527,7 +1562,14 @@ if (toggleAuthModeBtn) {
   try {
     let res;
     if (AUTH_MODE === "signup") {
-      res = await supabaseClient.auth.signUp({ email, password });
+res = await supabaseClient.auth.signUp({
+  email,
+  password,
+  options: {
+    // ✅ when they tap the email link, it opens the iOS app
+    emailRedirectTo: "zencards://auth-callback?next=startTrial"
+  }
+});
     } else {
       res = await supabaseClient.auth.signInWithPassword({ email, password });
     }
@@ -1538,9 +1580,12 @@ if (toggleAuthModeBtn) {
       return;
     }
 
-    const { data: sess } = await supabaseClient.auth.getSession();
-    const user = sess?.session?.user;
-    if (!user) throw new Error("Session not ready. Close and reopen the app, then try again.");
+if (AUTH_MODE === "signup") {
+  loginMsg.textContent =
+    "Check your email to confirm your account. After you confirm, you’ll return to the app to start your trial.";
+  loginMsg.className = "modalMsg ok";
+  return;
+}
 
     // ✅ run pending action (startTrialFlow / restoreFlow) if this login was triggered by them
     closeLoginModal();
