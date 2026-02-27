@@ -834,7 +834,8 @@ input[type="number"]:focus-visible{
     Signed in as <strong id="userEmailLabel"></strong>
   </p>
 <div class="btnRow">
-  <button id="logOutBtn" class="secondary small">Log Out</button>
+  <button id="manageBillingBtn" class="secondary small" type="button">Manage Billing</button>
+  <button id="logOutBtn" class="secondary small" type="button">Log Out</button>
   <button class="btn danger small" id="deleteAccountBtn" type="button" style="background:#dc2626;color:#fff;">Delete Account</button>
 </div>
 </div>
@@ -1596,7 +1597,7 @@ async function zcSyncEntitlementAndEnforceAccess() {
           return;
         }
         // Confirm deletion
-        if (!confirm('Are you sure you want to permanently delete your account and cancel your subscription? This cannot be undone.')) return;
+        if (!confirm('Are you sure you want to permanently delete your account? If you created your account on the app, your App Store subscription is managed by Apple and will continue until you cancel it in Subscriptions. Hit "Manage Billing" to cancel before deleting your account.')) return;
         // Call Supabase Edge Function to delete account and cancel subscription
         try {
           console.log('[DeleteAccount] Attempting to call edge function...');
@@ -1725,6 +1726,25 @@ const deckBadge = document.getElementById("deckBadge");
 const authLoggedIn = document.getElementById("authLoggedIn");
 const userEmailLabel = document.getElementById("userEmailLabel");
 const signOutBtn = document.getElementById("logOutBtn");
+const manageBillingBtn = document.getElementById("manageBillingBtn");
+
+function openManageSubscriptions() {
+  const url = "https://apps.apple.com/account/subscriptions";
+
+  // Prefer native open if available (Capacitor Browser plugin)
+  const Browser = window.Capacitor?.Plugins?.Browser;
+  if (Browser && typeof Browser.open === "function") {
+    Browser.open({ url }).catch(() => window.open(url, "_blank"));
+    return;
+  }
+
+  // Fallback (web)
+  window.open(url, "_blank");
+}
+
+if (manageBillingBtn) {
+  manageBillingBtn.addEventListener("click", openManageSubscriptions);
+}
 
 // Optional buttons (keep if you use them)
 const studyAddCardBtn = document.getElementById("studyAddCardBtn");
