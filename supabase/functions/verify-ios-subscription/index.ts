@@ -13,6 +13,9 @@ type Body = {
 
   // Option B: StoreKit2 signed transaction JWS (best)
   signed_transaction_jws?: string;
+
+  // TEMP: allow entitlement-only proof from the client
+  active_product_ids?: string[] | null;
 };
 
 function json(status: number, data: unknown) {
@@ -23,6 +26,7 @@ function json(status: number, data: unknown) {
       "access-control-allow-origin": "*",
       "access-control-allow-headers": "authorization, x-client-info, apikey, content-type",
       "access-control-allow-methods": "POST, OPTIONS",
+      "apikey": SUPABASE_ANON_KEY,
     },
   });
 }
@@ -48,9 +52,20 @@ const {
   transaction_id,
   receipt_b64,
   signed_transaction_jws,
+  active_product_ids,
   // accept the old client field name too:
   receipt,
 } = body as Body & { receipt?: string };
+
+// ✅ DEBUG LOG (put it right here)
+console.log("verify-ios-subscription payload:", {
+  user_id,
+  product_id,
+  transaction_id,
+  hasReceiptFinal: !!(receipt_b64 ?? receipt),
+  hasJws: !!signed_transaction_jws,
+  active_product_ids,
+});
 
 // ✅ Guardrail: require a valid Supabase user JWT and make sure it matches user_id
 const authHeader = req.headers.get("authorization") || "";
@@ -79,15 +94,21 @@ if (userData.user.id !== user_id) {
 
 const receiptFinal = receipt_b64 ?? receipt ?? null;
 
-if (!receiptFinal && !signed_transaction_jws) {
-  return json(400, { error: "Provide receipt_b64 (or receipt) or signed_transaction_jws" });
+const activeIds = Array.isArray(active_product_ids) ? active_product_ids : [];
+const hasEntitlement = activeIds.includes(product_id);
+
+// TEMP rule: allow if we have receipt/JWS OR entitlement list says this product is active
+if (!receiptFinal && !signed_transaction_jws && !hasEntitlement) {
+  return json(400, {
+    error: "Provide receipt_b64 (or receipt) or signed_transaction_jws, or active_product_ids must include product_id",
+  });
 }
 
   // ----------------------------
   // TEMP placeholder (do not ship):
   // Pretend verification succeeded and mark trialing.
   // ----------------------------
-  const newStatus = "trialing";
+const newStatus = hasEntitlement ? "active" : "trialing";
 
   const { error: upsertErr } = await sb
     .from("subscriptions")

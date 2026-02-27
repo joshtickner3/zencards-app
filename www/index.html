@@ -1218,22 +1218,24 @@ async function getUserOrNull() {
   const { data } = await supabaseClient.auth.getSession();
   return data?.session?.user || null;
 }
-async function verifyWithServer({ userId, productId, transactionId, receipt_b64, signed_transaction_jws, receipt }) {
+async function verifyWithServer({ userId, productId, transactionId, receipt_b64, signed_transaction_jws, receipt, active_product_ids }) {
   const url = `${SUPABASE_URL}/functions/v1/verify-ios-subscription`;
 
   const { data } = await supabaseClient.auth.getSession();
   const accessToken = data?.session?.access_token;
   if (!accessToken) throw new Error("Missing session token. Please log in again.");
 
-  const payload = {
-    user_id: userId,
-    product_id: productId,
-    transaction_id: transactionId ?? null,
+ const payload = {
+  user_id: userId,
+  product_id: productId,
+  transaction_id: transactionId ?? null,
 
-    // IMPORTANT: your edge function expects one of these:
-receipt_b64: receipt_b64 ?? receipt ?? null,
-signed_transaction_jws: signed_transaction_jws ?? null,
-  };
+  receipt_b64: receipt_b64 ?? receipt ?? null,
+  signed_transaction_jws: signed_transaction_jws ?? null,
+
+  // ✅ NEW: entitlement-only fallback
+  active_product_ids: Array.isArray(active_product_ids) ? active_product_ids : null,
+};
 
   console.log("verify payload:", {
     ...payload,
@@ -1343,6 +1345,7 @@ const receipt =
 
 // After purchase, pull entitlements/receipt (many plugins only provide receipt here)
 const ent = await window.Capacitor.Plugins.IAPPlugin.getEntitlements();
+const active_product_ids = ent?.activeProductIds || [];
 alert("ENT (startTrialFlow):\n" + JSON.stringify(ent, null, 2));
 
 const receipt_b64 =
@@ -1362,6 +1365,7 @@ await verifyWithServer({
   transactionId: txId,
   receipt_b64,
   signed_transaction_jws,
+  active_product_ids: ent?.activeProductIds || [],
 });
 
 window.location.replace("app.html");
@@ -1388,7 +1392,7 @@ if (!user) {
     const ent = await window.Capacitor.Plugins.IAPPlugin.getEntitlements();
     alert("ENTITLEMENTS:\n" + JSON.stringify(ent, null, 2));
     console.log("entitlements:", ent);
-    const active = ent?.activeProductIds || [];
+ const active_product_ids = ent?.activeProductIds || [];
 
     if (!active.includes(PRODUCT_ID)) {
       alert("No active subscription found to restore.");
@@ -1417,8 +1421,8 @@ await verifyWithServer({
   userId: user.id,
   productId: PRODUCT_ID,
   transactionId: null,
-  receipt_b64,
-  signed_transaction_jws,
+  receipt,
+  active_product_ids: ent?.activeProductIds || [],
 });
 
     window.location.replace("app.html");
