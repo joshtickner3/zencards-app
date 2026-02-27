@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
   // Only redirect to app.html if running in native app AND user has ACTIVE/TRIALING subscription
   async function redirectToAppIfLoggedIn() {
@@ -65,7 +66,7 @@
   redirectToAppIfLoggedIn();
 </script>
   <meta charset="UTF-8" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <meta
   name="viewport"
   content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes, maximum-scale=5.0"
@@ -1226,18 +1227,23 @@ async function verifyWithServer({ userId, productId, transactionId, receipt }) {
   const accessToken = data?.session?.access_token;
   if (!accessToken) throw new Error("Missing session token. Please log in again.");
 
+  // ✅ Build payload OUTSIDE fetch options
+  const payload = {
+    user_id: userId,
+    product_id: productId,
+    transaction_id: transactionId,
+    receipt, // may be undefined/null sometimes; that's OK if your function handles it
+  };
+
+  console.log("verify payload:", { ...payload, hasReceipt: !!payload.receipt });
+
   const res = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${accessToken}`,
     },
-    body: JSON.stringify({
-      user_id: userId,
-      product_id: productId,
-      transaction_id: transactionId,
-      receipt, // function will verify this with Apple
-    }),
+    body: JSON.stringify(payload),
   });
 
   const json = await res.json().catch(() => ({}));
@@ -1247,6 +1253,7 @@ async function verifyWithServer({ userId, productId, transactionId, receipt }) {
 
   return json;
 }
+
 async function startTrialFlow() {
   const btn = document.getElementById("startTrialBtn");
   const line = document.getElementById("trialPriceLine");
@@ -1299,11 +1306,22 @@ async function startTrialFlow() {
     const txId = purchaseRes?.transactionId;
     if (!txId) throw new Error("Missing transactionId from IAP plugin.");
 
-    await verifyWithServer({
-      userId: user.id,
-      productId: purchaseRes.productId,
-      transactionId: txId,
-    });
+  console.log("purchaseRes:", purchaseRes);
+
+// Try to extract a receipt / signed transaction from whatever the plugin returns
+const receipt =
+  purchaseRes?.receipt ||
+  purchaseRes?.transactionReceipt ||
+  purchaseRes?.signedTransactionInfo ||
+  purchaseRes?.transaction?.signedTransactionInfo ||
+  null;
+
+await verifyWithServer({
+  userId: user.id,
+  productId: purchaseRes.productId,
+  transactionId: txId,
+  receipt,
+});
 
     window.location.replace("app.html");
   } catch (e) {

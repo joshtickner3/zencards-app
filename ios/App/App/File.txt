@@ -1,0 +1,8 @@
+const res = await window.Capacitor.Plugins.IAPPlugin.getProducts({
+  productIdentifiers: [PRODUCT_ID],
+});
+console.log("getProducts res:", res);
+
+const p =
+  res?.products?.find(x => (x.id || x.productId) === PRODUCT_ID) ||
+  res?.products?.[0];
