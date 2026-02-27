@@ -1258,6 +1258,7 @@ signed_transaction_jws: signed_transaction_jws ?? null,
 }
 
 async function startTrialFlow() {
+  alert("startTrialFlow fired");
   const btn = document.getElementById("startTrialBtn");
   const line = document.getElementById("trialPriceLine");
 
@@ -1342,6 +1343,7 @@ const receipt =
 
 // After purchase, pull entitlements/receipt (many plugins only provide receipt here)
 const ent = await window.Capacitor.Plugins.IAPPlugin.getEntitlements();
+alert("ENT (startTrialFlow):\n" + JSON.stringify(ent, null, 2));
 
 const receipt_b64 =
   ent?.receipt ||
