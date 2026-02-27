@@ -42,23 +42,45 @@ serve(async (req) => {
     return json(400, { error: "Invalid JSON" });
   }
 
-  const { user_id, product_id, transaction_id, receipt_b64, signed_transaction_jws } = body;
+const {
+  user_id,
+  product_id,
+  transaction_id,
+  receipt_b64,
+  signed_transaction_jws,
+  // accept the old client field name too:
+  receipt,
+} = body as Body & { receipt?: string };
+
+// ✅ Guardrail: require a valid Supabase user JWT and make sure it matches user_id
+const authHeader = req.headers.get("authorization") || "";
+if (!authHeader.startsWith("Bearer ")) {
+  return json(401, { error: "Missing bearer token" });
+}
+
+const anon = Deno.env.get("SUPABASE_ANON_KEY")!;
+const authed = createClient(SUPABASE_URL, anon, {
+  global: { headers: { Authorization: authHeader } },
+});
+
+const { data: userData, error: userErr } = await authed.auth.getUser();
+if (userErr || !userData?.user?.id) {
+  return json(401, { error: "Invalid token" });
+}
+
+if (userData.user.id !== user_id) {
+  return json(403, { error: "user_id mismatch" });
+}
 
   if (!user_id || !product_id) {
     return json(400, { error: "Missing user_id or product_id" });
   }
 
-  // ✅ TODO: VERIFY WITH APPLE HERE
-  // You have 2 ways:
-  // 1) Receipt verification (legacy): send receipt_b64 to Apple verifyReceipt endpoint
-  // 2) StoreKit2 JWS verification (recommended): validate signed_transaction_jws with Apple
-  //
-  // Which one we implement depends entirely on what your IAPPlugin returns.
-  //
-  // For now, we enforce that one of them is provided:
-  if (!receipt_b64 && !signed_transaction_jws) {
-    return json(400, { error: "Provide receipt_b64 or signed_transaction_jws" });
-  }
+const receiptFinal = receipt_b64 ?? receipt ?? null;
+
+if (!receiptFinal && !signed_transaction_jws) {
+  return json(400, { error: "Provide receipt_b64 (or receipt) or signed_transaction_jws" });
+}
 
   // ----------------------------
   // TEMP placeholder (do not ship):
