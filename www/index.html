@@ -1218,24 +1218,28 @@ async function getUserOrNull() {
   const { data } = await supabaseClient.auth.getSession();
   return data?.session?.user || null;
 }
-
-async function verifyWithServer({ userId, productId, transactionId, receipt }) {
+async function verifyWithServer({ userId, productId, transactionId, receipt_b64, signed_transaction_jws }) {
   const url = `${SUPABASE_URL}/functions/v1/verify-ios-subscription`;
 
-  // Use the logged-in user's JWT so the function can trust who is calling
   const { data } = await supabaseClient.auth.getSession();
   const accessToken = data?.session?.access_token;
   if (!accessToken) throw new Error("Missing session token. Please log in again.");
 
-  // ✅ Build payload OUTSIDE fetch options
   const payload = {
     user_id: userId,
     product_id: productId,
-    transaction_id: transactionId,
-    receipt, // may be undefined/null sometimes; that's OK if your function handles it
+    transaction_id: transactionId ?? null,
+
+    // IMPORTANT: your edge function expects one of these:
+    receipt_b64: receipt_b64 ?? null,
+    signed_transaction_jws: signed_transaction_jws ?? null,
   };
 
-  console.log("verify payload:", { ...payload, hasReceipt: !!payload.receipt });
+  console.log("verify payload:", {
+    ...payload,
+    hasReceipt: !!payload.receipt_b64,
+    hasJws: !!payload.signed_transaction_jws,
+  });
 
   const res = await fetch(url, {
     method: "POST",
@@ -1248,9 +1252,8 @@ async function verifyWithServer({ userId, productId, transactionId, receipt }) {
 
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(json?.error || "Subscription verification failed.");
+    throw new Error(json?.error || `Subscription verification failed (${res.status}).`);
   }
-
   return json;
 }
 
@@ -1289,18 +1292,40 @@ async function startTrialFlow() {
 
     const user = existingUser;
 
-    const purchaseRes = await window.Capacitor.Plugins.IAPPlugin.purchase({
-      productId: PRODUCT_ID,
-    });
+  const purchaseRes = await window.Capacitor.Plugins.IAPPlugin.purchase({
+  productId: PRODUCT_ID,
+});
 
-    if (purchaseRes?.status === "cancelled") {
-      if (line) await loadPriceLine(); // puts the real price back
-      return;
-    }
+// If Apple says already owned/subscribed, run restore instead
+if (purchaseRes?.status === "already_owned" || purchaseRes?.status === "alreadySubscribed") {
+  await restoreFlow();
+  return;
+}
 
-    if (purchaseRes?.status !== "success") {
-      throw new Error("Purchase did not complete.");
-    }
+console.log("purchaseRes:", purchaseRes);
+
+// User canceled
+if (purchaseRes?.status === "cancelled") {
+  if (line) await loadPriceLine();
+  return;
+}
+
+// ✅ If Apple says "already subscribed/owned", do restore instead
+if (
+  purchaseRes?.status === "already_owned" ||
+  purchaseRes?.status === "alreadyPurchased" ||
+  purchaseRes?.status === "owned" ||
+  String(purchaseRes?.message || "").toLowerCase().includes("already") ||
+  String(purchaseRes?.error || "").toLowerCase().includes("already")
+) {
+  await restoreFlow();
+  return;
+}
+
+// Anything else not success = fail
+if (purchaseRes?.status !== "success") {
+  throw new Error(purchaseRes?.message || "Purchase did not complete.");
+}
 
     // ✅ IMPORTANT: make sure transactionId exists
     const txId = purchaseRes?.transactionId;
@@ -1316,14 +1341,29 @@ const receipt =
   purchaseRes?.transaction?.signedTransactionInfo ||
   null;
 
+// After purchase, pull entitlements/receipt (many plugins only provide receipt here)
+const ent = await window.Capacitor.Plugins.IAPPlugin.getEntitlements();
+
+const receipt_b64 =
+  ent?.receipt ||
+  ent?.transactionReceipt ||
+  ent?.appStoreReceipt ||
+  null;
+
+const signed_transaction_jws =
+  ent?.signedTransactionInfo ||
+  ent?.signed_transaction_jws ||
+  null;
+
 await verifyWithServer({
   userId: user.id,
-  productId: purchaseRes.productId,
+  productId: PRODUCT_ID,
   transactionId: txId,
-  receipt,
+  receipt_b64,
+  signed_transaction_jws,
 });
 
-    window.location.replace("app.html");
+window.location.replace("app.html");
   } catch (e) {
     console.error(e);
     alert(e?.message || "Could not start trial.");
@@ -1345,6 +1385,7 @@ if (!user) {
 }
 
     const ent = await window.Capacitor.Plugins.IAPPlugin.getEntitlements();
+    console.log("entitlements:", ent);
     const active = ent?.activeProductIds || [];
 
     if (!active.includes(PRODUCT_ID)) {
