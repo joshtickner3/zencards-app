@@ -2,6 +2,13 @@
   "appId": "com.zencards.app",
   "appName": "ZenCards",
   "webDir": "www",
+
+  "server": {
+    "allowNavigation": [
+      "elpfcnnrripftxoqeckv.supabase.co"
+    ]
+  },
+
   "ios": {
     "allowLinkPreviews": true,
     "scrollEnabled": true,
@@ -10,6 +17,7 @@
     "allowsViewportScale": true,
     "webContentsDebuggingEnabled": true
   },
+
   "packageClassList": [
     "PreferencesPlugin",
     "IAPPlugin"

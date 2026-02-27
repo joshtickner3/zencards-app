@@ -1228,75 +1228,80 @@ async function verifyWithServer({
   active_product_ids,
 }) {
   const url = `${SUPABASE_URL}/functions/v1/verify-ios-subscription`;
+  console.log("VERIFY → URL:", url);
 
-  // ✅ Get Supabase session
   const { data } = await supabaseClient.auth.getSession();
   const accessToken = data?.session?.access_token;
 
-  if (!accessToken) {
-    alert("No access token found. User is not authenticated.");
-    throw new Error("Missing session token. Please log in again.");
-  }
+  console.log("VERIFY → session?", {
+    hasSession: !!data?.session,
+    hasAccessToken: !!accessToken,
+    userFromSession: data?.session?.user?.id || null,
+  });
 
-  // ✅ Build payload
+  if (!accessToken) throw new Error("Missing session token. Please log in again.");
+
   const payload = {
     user_id: userId,
     product_id: productId,
     transaction_id: transactionId ?? null,
-
     receipt_b64: receipt_b64 ?? receipt ?? null,
     signed_transaction_jws: signed_transaction_jws ?? null,
-
-    // entitlement fallback
-    active_product_ids: Array.isArray(active_product_ids)
-      ? active_product_ids
-      : null,
+    active_product_ids: Array.isArray(active_product_ids) ? active_product_ids : null,
   };
 
-  console.log("VERIFY → URL:", url);
   console.log("VERIFY → payload:", payload);
 
-  let res;
+  // helper so we can see the real thrown error in iOS WebView
+  function logThrown(err) {
+    console.log("VERIFY → fetch threw (typeof):", typeof err);
+    console.log("VERIFY → fetch threw (String):", String(err));
+    console.log("VERIFY → fetch threw (name):", err?.name);
+    console.log("VERIFY → fetch threw (message):", err?.message);
+    console.log("VERIFY → fetch threw (stack):", err?.stack);
+    console.log("VERIFY → fetch threw (keys):", err ? Object.keys(err) : null);
+    console.log("VERIFY → fetch threw (raw):", err);
+  }
 
-  // ✅ Wrap fetch in try/catch so “load failed” shows real error
+  // quick connectivity test (eliminates “no internet / DNS / ATS / domain restriction”)
+  try {
+    const ping = await fetch(`${SUPABASE_URL}/rest/v1/`, {
+      method: "GET",
+      headers: { apikey: SUPABASE_ANON_KEY },
+    });
+    console.log("VERIFY → ping status:", ping.status);
+  } catch (e) {
+    console.log("VERIFY → ping failed BEFORE verify call");
+    logThrown(e);
+    throw new Error("Network blocked BEFORE verify. Check iOS domain restrictions / ATS.");
+  }
+
+  let res;
   try {
     res = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${accessToken}`,
-        "apikey": SUPABASE_ANON_KEY, // ✅ REQUIRED for Edge Functions
+        "apikey": SUPABASE_ANON_KEY, // not required for your function, but helps in some setups
       },
       body: JSON.stringify(payload),
     });
   } catch (e) {
-    console.error("verify fetch threw:", e);
-    alert("verify fetch threw:\n" + (e?.message || String(e)));
-    throw e;
+    logThrown(e);
+    throw new Error("verify fetch failed before getting a response (network / iOS WebView restriction).");
   }
+
+  const text = await res.text().catch(() => "");
+  console.log("VERIFY → response status:", res.status);
+  console.log("VERIFY → response text:", text);
 
   let json = {};
-  try {
-    json = await res.json();
-  } catch (e) {
-    console.warn("verify: response not JSON");
-  }
-
-  console.log("VERIFY → status:", res.status);
-  console.log("VERIFY → response:", json);
+  try { json = text ? JSON.parse(text) : {}; } catch {}
 
   if (!res.ok) {
-    alert(
-      "verify failed:\nStatus: " +
-        res.status +
-        "\nError: " +
-        (json?.error || "Unknown")
-    );
     throw new Error(json?.error || `Subscription verification failed (${res.status}).`);
   }
-
-  alert("verify success:\n" + JSON.stringify(json, null, 2));
-
   return json;
 }
 

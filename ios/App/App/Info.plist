@@ -66,5 +66,10 @@
 	<string>VoiceCommands</string>
 	<key>WKWebViewAllowViewportScale</key>
 	<string>YES</string>
+	<key>WKAppBoundDomains</key>
+	<array>
+		<string>elpfcnnrripftxoqeckv.supabase.co</string>
+		<string>cdn.jsdelivr.net</string>
+	</array>
 </dict>
 </plist>
