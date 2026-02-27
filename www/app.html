@@ -2123,6 +2123,105 @@ async function ensureSessionHealthy({ reason = "unknown", redirectOnFail = true 
   }
 }
 
+// ===== ZenCards MVP: Sync entitlement to Supabase on app open =====
+const PRODUCT_ID = "com.zencards.pro.monthly";
+
+function isNativeApp() {
+  return (
+    window.Capacitor !== undefined ||
+    navigator.userAgent.includes("Capacitor") ||
+    window.webkit?.messageHandlers?.bridge !== undefined
+  );
+}
+
+async function getUserOrNull() {
+  const { data } = await window.supabaseClient.auth.getSession();
+  return data?.session?.user || null;
+}
+
+// Normalize whatever your plugin returns into a list of active product IDs
+function extractActiveProductIds(ent) {
+  const active =
+    ent?.activeProductIds ||
+    ent?.active ||
+    ent?.productIds ||
+    ent?.entitlements ||
+    [];
+
+  if (Array.isArray(active)) return active;
+
+  if (Array.isArray(active?.productIds)) return active.productIds;
+
+  return [];
+}
+
+async function syncEntitlementToServer({ userId, active_product_ids }) {
+  const payload = {
+    user_id: userId,
+    product_id: PRODUCT_ID,
+    transaction_id: null,
+    active_product_ids: Array.isArray(active_product_ids) ? active_product_ids : [],
+    // No receipt/JWS for MVP, we’re using entitlement presence only
+  };
+
+  const { data, error } = await window.supabaseClient.functions.invoke("verify-ios-subscription", {
+    body: payload,
+  });
+
+  if (error) throw new Error(error.message || "verify-ios-subscription failed");
+  return data;
+}
+
+async function enforceSubscriptionOnOpen() {
+  // Only enforce inside native wrapper
+  if (!isNativeApp()) return true;
+
+  // If plugin missing, don't boot — just allow (same logic as before)
+  if (!window.Capacitor?.Plugins?.IAPPlugin?.getEntitlements) {
+    console.warn("[IAP] Plugin not ready; allowing for now.");
+    return true;
+  }
+
+  const user = await getUserOrNull();
+  if (!user) {
+    console.warn("[IAP] No user session; redirecting to index.");
+    window.location.replace("index.html");
+    return false;
+  }
+
+  let ent = null;
+  try {
+    ent = await window.Capacitor.Plugins.IAPPlugin.getEntitlements();
+  } catch (e) {
+    console.warn("[IAP] getEntitlements failed; allowing for now:", e);
+    return true;
+  }
+
+  const activeIds = extractActiveProductIds(ent);
+  const hasEntitlement = activeIds.includes(PRODUCT_ID);
+
+  console.log("[IAP] entitlement check:", { activeIds, hasEntitlement });
+
+  // ✅ Always sync DB so it corrects itself
+  try {
+    await syncEntitlementToServer({ userId: user.id, active_product_ids: activeIds });
+  } catch (e) {
+    console.warn("[IAP] server sync failed (allowing):", e);
+    // For MVP: allow if server sync fails to avoid false boots
+    return true;
+  }
+
+  // ✅ Enforce locally
+  if (hasEntitlement) return true;
+
+  // Not entitled → sign out + redirect
+  console.warn("[IAP] Not entitled; signing out.");
+  try { await window.supabaseClient.auth.signOut(); } catch (_) {}
+  try { localStorage.removeItem("zencards-auth"); } catch (_) {}
+  window.location.replace("index.html");
+  return false;
+}
+
 async function initAppSession() {
     // ✅ install auth listener once
   if (!window.__zc_auth_sub) {
@@ -2171,8 +2270,8 @@ if (!session?.user) {
 currentUser = session.user;
 
   // ✅ ENFORCE Apple entitlement before loading any app data
-  const allowed = await zcSyncEntitlementAndEnforceAccess();
-  if (!allowed) return;
+const allowed = await enforceSubscriptionOnOpen();
+if (!allowed) return;
 
   if (userEmailLabel) userEmailLabel.textContent = currentUser.email || "";
   if (authLoggedIn) authLoggedIn.classList.remove("hidden");

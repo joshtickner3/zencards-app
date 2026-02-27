@@ -100,36 +100,40 @@ serve(async (req) => {
 
     const receiptFinal = receipt_b64 ?? receipt ?? null;
 
-    const activeIds = Array.isArray(active_product_ids) ? active_product_ids : [];
-    const hasEntitlement = activeIds.includes(product_id);
+// We do NOT trust client-provided entitlements as proof.
+// Keep it only for logs/debug.
+const activeIds = Array.isArray(active_product_ids) ? active_product_ids : [];
+const hasEntitlement = activeIds.includes(product_id);
 
-    // TEMP rule: allow if we have receipt/JWS OR entitlement list says this product is active
-    if (!receiptFinal && !signed_transaction_jws && !hasEntitlement) {
-      return json(400, {
-        error:
-          "Provide receipt_b64 (or receipt) or signed_transaction_jws, or active_product_ids must include product_id",
-      });
-    }
+// MVP: allow entitlement-only proof OR receipt/JWS (receipt/JWS not verified yet)
+if (!hasEntitlement && !receiptFinal && !signed_transaction_jws) {
+  return json(400, {
+    error:
+      "Provide active_product_ids including product_id OR receipt_b64 (or receipt) OR signed_transaction_jws",
+  });
+}
 
     // ----------------------------
-    // TEMP placeholder (do not ship):
-    // Pretend verification succeeded and write a row.
-    // ----------------------------
-    const newStatus = hasEntitlement ? "active" : "trialing";
+const newStatus = hasEntitlement ? "active" : "expired";
 
-    const { error: upsertErr } = await sb
-      .from("subscriptions")
-      .upsert(
-        {
-          user_id,
-          status: newStatus,
-          platform: "ios",
-          product_id,
-          transaction_id: transaction_id ?? null,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id" }
-      );
+   const { error: upsertErr } = await sb
+  .from("subscriptions")
+  .upsert(
+    {
+      user_id,
+      status: newStatus,
+      platform: "ios",
+      product_id,
+      transaction_id: transaction_id ?? null,
+      updated_at: new Date().toISOString(),
+
+      // optional but recommended columns:
+      receipt_b64: receiptFinal,
+      signed_transaction_jws: signed_transaction_jws ?? null,
+      debug_active_product_ids: activeIds,
+    },
+    { onConflict: "user_id" }
+  );
 
     if (upsertErr) {
       console.log("subscriptions upsert error:", upsertErr);

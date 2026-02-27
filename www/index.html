@@ -1123,9 +1123,13 @@ a:hover{
   document.getElementById("year").textContent = String(new Date().getFullYear());
 
   // Supabase
-  const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
-  const AUTH_KEY = "zencards-auth";
+const SUPABASE_URL = "https://elpfcnnrripftxoqeckv.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscGZjbm5ycmlwZnR4b3FlY2t2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4NTk5MzQsImV4cCI6MjA4MDQzNTkzNH0.uiLHVcRfMXu0V7QRW41TARMIy-Hbhovc4h9uYFzzGLQ";
+const AUTH_KEY = "zencards-auth";
+
+// ✅ Where Supabase should send the user after they confirm their email.
+// This triggers your existing handleDeepLink() and will auto-start the trial.
+const SIGNUP_REDIRECT_TO = "zencards://auth-callback?next=startTrial";
 
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
@@ -1353,7 +1357,7 @@ alert("ENT (startTrialFlow):\n" + JSON.stringify(ent, null, 2));
 const entActiveIds = Array.isArray(ent?.activeProductIds) ? ent.activeProductIds : [];
 
 // ✅ TEMP BYPASS: if Apple purchase succeeded but entitlements are empty, assume entitlement
-const active_product_ids = entActiveIds.length ? entActiveIds : [PRODUCT_ID];
+const active_product_ids = entActiveIds; // do not force PRODUCT_ID
 
 const receipt_b64 =
   ent?.receipt ||
@@ -1639,33 +1643,35 @@ if (toggleAuthModeBtn) {
   try {
     let res;
 
-    if (AUTH_MODE === "signup") {
-      // ✅ App-only signup bypasses email confirmation
-    const r = await fetch(`${SUPABASE_URL}/functions/v1/app-signup`, {
-  method: "POST",
-headers: {
-  "Content-Type": "application/json",
-  "apikey": SUPABASE_ANON_KEY,
-  "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,   // ✅ add this
-  "x-app-signup-secret": "zencards_app_signup_9f3c2a0d7b4e4c3a9a8d1f2b6c7d8e9f",
-},
-  body: JSON.stringify({ email, password }),
+ if (AUTH_MODE === "signup") {
+  // ✅ Standard Supabase signup (safe). User must confirm email.
+  // After confirmation, iOS deep link returns here with ?next=startTrial
+  // and your existing handleDeepLink() will auto-run startTrialFlow().
+await supabaseClient.auth.signUp({
+  email,
+  password,
+options: {
+  emailRedirectTo: "zencards://auth-callback?next=startTrial"
+}
 });
 
-      const raw = await r.text();
-      let j = {};
-      try { j = JSON.parse(raw); } catch {}
+  if (res?.error) {
+    loginMsg.textContent = res.error.message;
+    loginMsg.className = "modalMsg error";
+    return;
+  }
 
-      if (!r.ok) {
-        console.error("app-signup failed:", r.status, raw);
-        throw new Error(j?.error || raw || "Could not create account.");
-      }
+  // IMPORTANT: With email confirmation, you usually won't have a session yet.
+  loginMsg.textContent =
+    "Account created. Check your email to confirm your account — then you’ll be brought back to ZenCards to start your free trial.";
+  loginMsg.className = "modalMsg ok";
 
-      // Now log them in immediately (session created in-app)
-      res = await supabaseClient.auth.signInWithPassword({ email, password });
-    } else {
-      res = await supabaseClient.auth.signInWithPassword({ email, password });
-    }
+  // Keep the modal open so they can read it.
+  // Do NOT continue to access check / redirect yet.
+  return;
+} else {
+  res = await supabaseClient.auth.signInWithPassword({ email, password });
+}
 
     if (res?.error) {
       loginMsg.textContent = res.error.message;
