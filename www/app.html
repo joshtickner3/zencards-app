@@ -1597,7 +1597,7 @@ async function zcSyncEntitlementAndEnforceAccess() {
           return;
         }
         // Confirm deletion
-        if (!confirm('Are you sure you want to permanently delete your account? If you created your account on the app, your App Store subscription is managed by Apple and will continue until you cancel it in Subscriptions. Hit "Manage Billing" to cancel before deleting your account.')) return;
+        if (!confirm('Reminder: Deleting your account does not end your subscription. Cancel to avoid being charged through apple subscriptions. We will miss you- ZenCards.')) return;
         // Call Supabase Edge Function to delete account and cancel subscription
         try {
           console.log('[DeleteAccount] Attempting to call edge function...');
