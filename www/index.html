@@ -1634,11 +1634,12 @@ if (toggleAuthModeBtn) {
       // ✅ App-only signup bypasses email confirmation
     const r = await fetch(`${SUPABASE_URL}/functions/v1/app-signup`, {
   method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "apikey": SUPABASE_ANON_KEY,
-    "x-app-signup-secret": "zencards_app_signup_9f3c2a0d7b4e4c3a9a8d1f2b6c7d8e9f",
-  },
+headers: {
+  "Content-Type": "application/json",
+  "apikey": SUPABASE_ANON_KEY,
+  "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,   // ✅ add this
+  "x-app-signup-secret": "zencards_app_signup_9f3c2a0d7b4e4c3a9a8d1f2b6c7d8e9f",
+},
   body: JSON.stringify({ email, password }),
 });
 
