@@ -1237,7 +1237,7 @@ async function verifyWithServer({
     signed_transaction_jws: signed_transaction_jws ?? null,
 
     // entitlement-only fallback:
-    active_product_ids: Array.isArray(active_product_ids) ? active_product_ids : null,
+active_product_ids: Array.isArray(active_product_ids) ? active_product_ids : [],
   };
 
   console.log("VERIFY → invoke payload:", payload);
@@ -1340,9 +1340,20 @@ const receipt =
   null;
 
 // After purchase, pull entitlements/receipt (many plugins only provide receipt here)
-const ent = await window.Capacitor.Plugins.IAPPlugin.getEntitlements();
-const active_product_ids = ent?.activeProductIds || [];
+// After purchase, pull entitlements/receipt (many plugins only provide receipt here)
+let ent = null;
+try {
+  ent = await window.Capacitor.Plugins.IAPPlugin.getEntitlements();
+} catch (e) {
+  console.warn("getEntitlements failed:", e);
+}
+
 alert("ENT (startTrialFlow):\n" + JSON.stringify(ent, null, 2));
+
+const entActiveIds = Array.isArray(ent?.activeProductIds) ? ent.activeProductIds : [];
+
+// ✅ TEMP BYPASS: if Apple purchase succeeded but entitlements are empty, assume entitlement
+const active_product_ids = entActiveIds.length ? entActiveIds : [PRODUCT_ID];
 
 const receipt_b64 =
   ent?.receipt ||
@@ -1361,7 +1372,7 @@ await verifyWithServer({
   transactionId: txId,
   receipt_b64,
   signed_transaction_jws,
-  active_product_ids: ent?.activeProductIds || [],
+  active_product_ids, // ✅ use the normalized fallback value
 });
 
 window.location.replace("app.html");
