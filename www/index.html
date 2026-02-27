@@ -1218,7 +1218,7 @@ async function getUserOrNull() {
   const { data } = await supabaseClient.auth.getSession();
   return data?.session?.user || null;
 }
-async function verifyWithServer({ userId, productId, transactionId, receipt_b64, signed_transaction_jws }) {
+async function verifyWithServer({ userId, productId, transactionId, receipt_b64, signed_transaction_jws, receipt }) {
   const url = `${SUPABASE_URL}/functions/v1/verify-ios-subscription`;
 
   const { data } = await supabaseClient.auth.getSession();
@@ -1231,8 +1231,8 @@ async function verifyWithServer({ userId, productId, transactionId, receipt_b64,
     transaction_id: transactionId ?? null,
 
     // IMPORTANT: your edge function expects one of these:
-    receipt_b64: receipt_b64 ?? null,
-    signed_transaction_jws: signed_transaction_jws ?? null,
+receipt_b64: receipt_b64 ?? receipt ?? null,
+signed_transaction_jws: signed_transaction_jws ?? null,
   };
 
   console.log("verify payload:", {
@@ -1328,8 +1328,7 @@ if (purchaseRes?.status !== "success") {
 }
 
     // ✅ IMPORTANT: make sure transactionId exists
-    const txId = purchaseRes?.transactionId;
-    if (!txId) throw new Error("Missing transactionId from IAP plugin.");
+const txId = purchaseRes?.transactionId ?? null;
 
   console.log("purchaseRes:", purchaseRes);
 
