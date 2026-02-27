@@ -1384,6 +1384,7 @@ if (!user) {
 }
 
     const ent = await window.Capacitor.Plugins.IAPPlugin.getEntitlements();
+    alert("ENTITLEMENTS:\n" + JSON.stringify(ent, null, 2));
     console.log("entitlements:", ent);
     const active = ent?.activeProductIds || [];
 
@@ -1392,20 +1393,31 @@ if (!user) {
       return;
     }
 
-    // Try to pull a receipt / signed transaction from entitlements if available
-    const receipt =
-      ent?.receipt ||
-      ent?.transactionReceipt ||
-      ent?.signedTransactionInfo ||
-      null;
+ const receipt_b64 =
+  ent?.receipt ||
+  ent?.transactionReceipt ||
+  ent?.appStoreReceipt ||
+  null;
 
-    // ✅ Call your Edge Function to verify + update subscriptions server-side
-    await verifyWithServer({
-      userId: user.id,
-      productId: PRODUCT_ID,
-      transactionId: null,
-      receipt,
-    });
+const signed_transaction_jws =
+  ent?.signedTransactionInfo ||
+  ent?.signed_transaction_jws ||
+  null;
+
+console.log("restore proof:", {
+  hasReceiptB64: !!receipt_b64,
+  hasJws: !!signed_transaction_jws,
+  entKeys: ent ? Object.keys(ent) : null,
+});
+
+// ✅ Call your Edge Function to verify + update subscriptions server-side
+await verifyWithServer({
+  userId: user.id,
+  productId: PRODUCT_ID,
+  transactionId: null,
+  receipt_b64,
+  signed_transaction_jws,
+});
 
     window.location.replace("app.html");
   } catch (e) {
