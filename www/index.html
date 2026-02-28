@@ -1650,9 +1650,9 @@ if (toggleAuthModeBtn) {
 await supabaseClient.auth.signUp({
   email,
   password,
-options: {
-  emailRedirectTo: "zencards://auth-callback?next=startTrial"
-}
+  options: {
+    emailRedirectTo: "https://zencardstudy.com/confirm-app.html?next=startTrial"
+  }
 });
 
   if (res?.error) {
