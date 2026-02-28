@@ -15,10 +15,26 @@
 
     function buildDeepLink() {
       const url = new URL(window.location.href);
+
+      // query params
       const code = url.searchParams.get("code");
       const next = url.searchParams.get("next") || "startTrial";
-      if (!code) return null;
-      return `zencards://auth-callback?code=${encodeURIComponent(code)}&next=${encodeURIComponent(next)}`;
+
+      // hash params (#access_token=...&refresh_token=...)
+      const hash = (url.hash || "").replace(/^#/, "");
+      const hp = new URLSearchParams(hash);
+      const access_token = hp.get("access_token");
+      const refresh_token = hp.get("refresh_token");
+
+      if (code) {
+        return `zencards://auth-callback?code=${encodeURIComponent(code)}&next=${encodeURIComponent(next)}`;
+      }
+
+      if (access_token) {
+        return `zencards://auth-callback?access_token=${encodeURIComponent(access_token)}&refresh_token=${encodeURIComponent(refresh_token || "")}&next=${encodeURIComponent(next)}`;
+      }
+
+      return null;
     }
 
     function renderOpenButton(deepLink) {
@@ -39,11 +55,15 @@
     (function go() {
       const deepLink = buildDeepLink();
       if (!deepLink) {
-        setMsg("Missing code in link. Please request a new confirmation email.");
+        setMsg("Missing tokens in link. Please request a new confirmation email.");
         return;
       }
+
       setMsg("Tap to return to the app and start your trial.");
       renderOpenButton(deepLink);
+
+      // Optional auto-try (some browsers block it; button still works)
+      setTimeout(() => { window.location.href = deepLink; }, 400);
     })();
   </script>
 </body>

@@ -1651,13 +1651,11 @@ if (AUTH_MODE === "signup") {
     ? "https://zencardstudy.com/confirm-app.html?next=startTrial"
     : "https://zencardstudy.com/confirm.html";
 
-  res = await supabaseClient.auth.signUp({
-    email,
-    password,
-    options: {
-      emailRedirectTo: redirectUrl
-    }
-  });
+const res = await supabaseClient.auth.signUp({
+  email,
+  password,
+  options: { emailRedirectTo: redirectUrl }
+});
 
   if (res?.error) {
     loginMsg.textContent = res.error.message;
