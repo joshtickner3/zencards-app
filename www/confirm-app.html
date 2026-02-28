@@ -1,0 +1,50 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Confirming…</title>
+</head>
+<body style="font-family:system-ui;background:#0b1220;color:#e5e7eb;padding:24px;">
+  <h2>Email confirmed ✅</h2>
+  <p id="msg">Opening the app…</p>
+
+  <script>
+    const msgEl = document.getElementById("msg");
+    const setMsg = (t) => { msgEl.textContent = t; console.log("[confirm-app]", t); };
+
+    function buildDeepLink() {
+      const url = new URL(window.location.href);
+      const code = url.searchParams.get("code");
+      const next = url.searchParams.get("next") || "startTrial";
+      if (!code) return null;
+      return `zencards://auth-callback?code=${encodeURIComponent(code)}&next=${encodeURIComponent(next)}`;
+    }
+
+    function renderOpenButton(deepLink) {
+      const btn = document.createElement("button");
+      btn.textContent = "Open ZenCards App";
+      btn.style.cssText =
+        "margin-top:12px;padding:12px 16px;border-radius:12px;border:none;font-weight:700;cursor:pointer;";
+      btn.onclick = () => (window.location.href = deepLink);
+      document.body.appendChild(btn);
+
+      const a = document.createElement("a");
+      a.href = deepLink;
+      a.textContent = "Tap here if the button doesn’t work";
+      a.style.cssText = "display:block;margin-top:12px;color:#93c5fd;font-weight:700;";
+      document.body.appendChild(a);
+    }
+
+    (function go() {
+      const deepLink = buildDeepLink();
+      if (!deepLink) {
+        setMsg("Missing code in link. Please request a new confirmation email.");
+        return;
+      }
+      setMsg("Tap to return to the app and start your trial.");
+      renderOpenButton(deepLink);
+    })();
+  </script>
+</body>
+</html>
