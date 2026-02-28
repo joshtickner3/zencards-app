@@ -1643,18 +1643,16 @@ if (toggleAuthModeBtn) {
   try {
     let res;
 
-if (AUTH_MODE === "signup") {
-
-  // ✅ Web signup -> confirm.html
-  // ✅ App signup -> confirm-app.html (bridge page that opens the app)
-  const redirectUrl = isNativeApp()
-    ? "https://zencardstudy.com/confirm-app.html?next=startTrial"
-    : "https://zencardstudy.com/confirm.html";
-
-const res = await supabaseClient.auth.signUp({
+ if (AUTH_MODE === "signup") {
+  // ✅ Standard Supabase signup (safe). User must confirm email.
+  // After confirmation, iOS deep link returns here with ?next=startTrial
+  // and your existing handleDeepLink() will auto-run startTrialFlow().
+await supabaseClient.auth.signUp({
   email,
   password,
-  options: { emailRedirectTo: redirectUrl }
+options: {
+  emailRedirectTo: "zencards://auth-callback?next=startTrial"
+}
 });
 
   if (res?.error) {
@@ -1663,10 +1661,13 @@ const res = await supabaseClient.auth.signUp({
     return;
   }
 
+  // IMPORTANT: With email confirmation, you usually won't have a session yet.
   loginMsg.textContent =
-    "Account created. Check your email to confirm your account — then you’ll be brought back to ZenCards.";
+    "Account created. Check your email to confirm your account — then you’ll be brought back to ZenCards to start your free trial.";
   loginMsg.className = "modalMsg ok";
 
+  // Keep the modal open so they can read it.
+  // Do NOT continue to access check / redirect yet.
   return;
 } else {
   res = await supabaseClient.auth.signInWithPassword({ email, password });
