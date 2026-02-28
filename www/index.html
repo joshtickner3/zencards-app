@@ -1643,17 +1643,19 @@ if (toggleAuthModeBtn) {
   try {
     let res;
 
- if (AUTH_MODE === "signup") {
-  // ✅ Standard Supabase signup (safe). User must confirm email.
-  // After confirmation, iOS deep link returns here with ?next=startTrial
-  // and your existing handleDeepLink() will auto-run startTrialFlow().
-await supabaseClient.auth.signUp({
-  email,
-  password,
-options: {
-  emailRedirectTo: "zencards://auth-callback?next=startTrial"
-}
-});
+if (AUTH_MODE === "signup") {
+
+  const redirectUrl = isNativeApp()
+    ? "zencards://auth-callback?next=startTrial"
+    : "https://zencardstudy.com/confirm-app.html";
+
+  const { error } = await supabaseClient.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: redirectUrl
+    }
+  });
 
   if (res?.error) {
     loginMsg.textContent = res.error.message;
