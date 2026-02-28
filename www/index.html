@@ -913,6 +913,21 @@ a:hover{
 
     <div class="card hero" style="text-align:center;">
       <h1 style="margin-top:0.25rem;">Sign in to access your decks and begin studying</h1>
+      <!-- ✅ Access notice (shown when user is redirected here due to expired sub) -->
+<div id="accessNotice" class="note" style="display:none; margin:0.85rem auto 0.25rem auto; max-width:46ch; text-align:left;">
+  <div style="font-weight:900; margin-bottom:0.25rem;">Subscription expired</div>
+  <div class="muted" style="color:#d1fae5;">
+    Your ZenCards Pro access ended. To continue, start a new trial (if available) or resubscribe.
+  </div>
+  <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.65rem;">
+    <button class="btn secondary small" id="noticeRestoreBtn" type="button">
+      Restore Purchase
+    </button>
+    <button class="btn secondary small" id="noticeManageBtn" type="button">
+      Manage Subscription
+    </button>
+  </div>
+</div>
       <p class="muted" style="max-width:46ch;margin:0.5rem auto 0.75rem auto;">
       </p>
 
@@ -1447,6 +1462,46 @@ async function openManageSubscription() {
   // Fallback: open Apple's manage subscriptions page
   window.open("https://apps.apple.com/account/subscriptions", "_system");
 }
+
+function showAccessNoticeIfNeeded() {
+  const reason = localStorage.getItem("zc_access_block_reason");
+  if (!reason) return;
+
+  // Clear immediately so it doesn't persist forever
+  localStorage.removeItem("zc_access_block_reason");
+
+  const box = document.getElementById("accessNotice");
+  if (!box) return;
+
+  // Customize message per reason if you want
+  if (reason === "subscription_expired") {
+    // keep default text
+  } else {
+    // fallback copy
+    box.querySelector("div")?.textContent = "Access required";
+  }
+
+  box.style.display = "block";
+
+  // Wire the notice buttons to your existing flows
+  const r = document.getElementById("noticeRestoreBtn");
+  const m = document.getElementById("noticeManageBtn");
+
+  r?.addEventListener("click", async () => {
+    try { await restoreFlow(); } catch(e) { console.error(e); }
+  });
+
+  m?.addEventListener("click", async () => {
+    try { await openManageSubscription(); } catch(e) { console.error(e); }
+  });
+
+  // Also switch page into paywall mode if they're signed in
+  // (this will change the hero title to "You're signed in — start trial...")
+  setPaywallModeIfNeeded();
+}
+
+// Run on load
+showAccessNoticeIfNeeded();
 
   async function checkUserAccess(uid) {
     const { data, error } = await supabaseClient

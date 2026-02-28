@@ -1526,6 +1526,13 @@ async function zcSyncEntitlementAndEnforceAccess() {
 
   if (!user) {
     console.warn("[IAP] No session user; redirecting to index.html");
+
+    // ✅ Optional: show a generic "please sign in" (not expired)
+    try {
+      localStorage.setItem("zc_access_block_reason", "signed_out");
+      localStorage.setItem("zc_access_block_at", new Date().toISOString());
+    } catch (_) {}
+
     window.location.replace("index.html");
     return false;
   }
@@ -1541,8 +1548,17 @@ async function zcSyncEntitlementAndEnforceAccess() {
   await zcUpsertSubscriptionStatus({ userId: user.id, status: "expired" });
 
   console.warn("[IAP] Not entitled -> signing out and redirecting");
+
+  // ✅ ADD THESE LINES HERE (this is the important case)
+  // This is what makes index.html show "Subscription expired" clearly.
+  try {
+    localStorage.setItem("zc_access_block_reason", "subscription_expired");
+    localStorage.setItem("zc_access_block_at", new Date().toISOString());
+  } catch (_) {}
+
   try { await window.supabaseClient.auth.signOut(); } catch (_) {}
   try { localStorage.removeItem("zencards-auth"); } catch (_) {}
+
   window.location.replace("index.html");
   return false;
 }
