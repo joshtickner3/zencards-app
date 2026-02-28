@@ -944,6 +944,21 @@ a:hover{
   </button>
 </div>
 
+<div class="fineprint" style="max-width:640px;margin:0.9rem auto 0 auto;text-align:left;">
+  <div style="font-weight:800;color:#e5e7eb;margin-bottom:0.25rem;">Subscription details</div>
+
+  <div class="muted" style="font-size:0.86rem;line-height:1.35;">
+    Payment will be charged to your Apple ID at confirmation of purchase.
+    Subscription automatically renews unless canceled at least 24 hours before the end of the current period.
+    Your account will be charged for renewal within 24 hours prior to the end of the current period.
+    You can manage or cancel your subscription in your Apple ID settings.
+  </div>
+
+  <div class="muted" style="font-size:0.86rem;margin-top:0.4rem;">
+    Free trial available to new subscribers. Cancel anytime in Apple ID settings before the trial ends to avoid being charged.
+  </div>
+</div>
+
       <p class="muted" style="font-size:0.9rem; margin-top:0.85rem;">
       </p>
     </div>
@@ -997,11 +1012,15 @@ a:hover{
 
 
 
-    <p class="footer">
-      © <span id="year"></span> ZenCards
-      <span class="muted"> • </span>
-      <span class="legalLink" id="openTermsLink">Terms of Service</span>
-    </p>
+ <p class="footer">
+  © <span id="year"></span> ZenCards
+  <span class="muted"> • </span>
+  <a href="https://zencardstudy.com/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
+  <span class="muted"> • </span>
+  <a href="https://zencardstudy.com/terms.html" target="_blank" rel="noopener">Terms of Use</a>
+  <span class="muted"> • </span>
+  <a href="mailto:support@zencardstudy.com">Support</a>
+</p>
   </div>
 
   <!-- ===== Login Modal ===== -->
@@ -1204,7 +1223,6 @@ async function loadPriceLine() {
 const res = await window.Capacitor.Plugins.IAPPlugin.getProducts({
   productIdentifiers: [PRODUCT_ID],
 });
-console.log("getProducts res:", res);
 
 const p =
   res?.products?.find(x => (x.id || x.productId) === PRODUCT_ID) ||
@@ -1244,8 +1262,6 @@ async function verifyWithServer({
 active_product_ids: Array.isArray(active_product_ids) ? active_product_ids : [],
   };
 
-  console.log("VERIFY → invoke payload:", payload);
-
   const { data, error } = await supabaseClient.functions.invoke("verify-ios-subscription", {
     body: payload,
   });
@@ -1255,12 +1271,10 @@ active_product_ids: Array.isArray(active_product_ids) ? active_product_ids : [],
     throw new Error(error.message || "Subscription verification failed.");
   }
 
-  console.log("VERIFY → invoke response:", data);
   return data;
 }
 
 async function startTrialFlow() {
-  alert("startTrialFlow fired");
   const btn = document.getElementById("startTrialBtn");
   const line = document.getElementById("trialPriceLine");
 
@@ -1305,8 +1319,6 @@ if (purchaseRes?.status === "already_owned" || purchaseRes?.status === "alreadyS
   return;
 }
 
-console.log("purchaseRes:", purchaseRes);
-
 // User canceled
 if (purchaseRes?.status === "cancelled") {
   if (line) await loadPriceLine();
@@ -1333,8 +1345,6 @@ if (purchaseRes?.status !== "success") {
     // ✅ IMPORTANT: make sure transactionId exists
 const txId = purchaseRes?.transactionId ?? null;
 
-  console.log("purchaseRes:", purchaseRes);
-
 // Try to extract a receipt / signed transaction from whatever the plugin returns
 const receipt =
   purchaseRes?.receipt ||
@@ -1352,7 +1362,6 @@ try {
   console.warn("getEntitlements failed:", e);
 }
 
-alert("ENT (startTrialFlow):\n" + JSON.stringify(ent, null, 2));
 
 const entActiveIds = Array.isArray(ent?.activeProductIds) ? ent.activeProductIds : [];
 
@@ -1400,8 +1409,6 @@ async function restoreFlow() {
     }
 
     const ent = await window.Capacitor.Plugins.IAPPlugin.getEntitlements();
-    console.log("ENT (restoreFlow):", ent);
-    alert("ENT (restoreFlow):\n" + JSON.stringify(ent, null, 2));
 
     const activeIds = Array.isArray(ent?.activeProductIds) ? ent.activeProductIds : [];
 
@@ -1428,24 +1435,20 @@ async function restoreFlow() {
 }
 
 async function openManageSubscription() {
-  // If not native (web browser), send to Apple account subscriptions page (or your own web billing page)
   if (!isNativeApp()) {
     window.location.href = "https://apps.apple.com/account/subscriptions";
     return;
   }
 
-  // If your IAP plugin exposes a native “manage subscriptions” method, use it
   try {
     if (window.Capacitor?.Plugins?.IAPPlugin?.openManageSubscriptions) {
       await window.Capacitor.Plugins.IAPPlugin.openManageSubscriptions();
       return;
     }
-  } catch (e) {
-    console.warn("openManageSubscriptions failed, falling back:", e);
-  }
+  } catch (e) {}
 
-  // Fallback: open Apple's manage subscriptions page
-  window.open("https://apps.apple.com/account/subscriptions", "_system");
+  // Best fallback inside iOS apps:
+  window.open("itms-apps://apps.apple.com/account/subscriptions", "_system");
 }
 
   async function checkUserAccess(uid) {
