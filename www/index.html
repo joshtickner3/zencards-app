@@ -1649,7 +1649,7 @@ if (AUTH_MODE === "signup") {
     ? "zencards://auth-callback?next=startTrial"
     : "https://zencardstudy.com/confirm-app.html";
 
-  const { error } = await supabaseClient.auth.signUp({
+  const res = await supabaseClient.auth.signUp({
     email,
     password,
     options: {
@@ -1663,13 +1663,10 @@ if (AUTH_MODE === "signup") {
     return;
   }
 
-  // IMPORTANT: With email confirmation, you usually won't have a session yet.
   loginMsg.textContent =
-    "Account created. Check your email to confirm your account — then you’ll be brought back to ZenCards to start your free trial.";
+    "Account created. Check your email to confirm your account — then you’ll be brought back to ZenCards.";
   loginMsg.className = "modalMsg ok";
 
-  // Keep the modal open so they can read it.
-  // Do NOT continue to access check / redirect yet.
   return;
 } else {
   res = await supabaseClient.auth.signInWithPassword({ email, password });
