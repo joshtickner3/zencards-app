@@ -1645,11 +1645,13 @@ if (toggleAuthModeBtn) {
 
 if (AUTH_MODE === "signup") {
 
+  // ✅ Web signup -> confirm.html
+  // ✅ App signup -> confirm-app.html (bridge page that opens the app)
   const redirectUrl = isNativeApp()
-    ? "zencards://auth-callback?next=startTrial"
-    : "https://zencardstudy.com/confirm-app.html";
+    ? "https://zencardstudy.com/confirm-app.html?next=startTrial"
+    : "https://zencardstudy.com/confirm.html";
 
-  const res = await supabaseClient.auth.signUp({
+  res = await supabaseClient.auth.signUp({
     email,
     password,
     options: {
