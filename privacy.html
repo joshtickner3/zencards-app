@@ -34,16 +34,27 @@
     .card{
       background: var(--card);
       border-radius: 1rem;
-      padding: 1.15rem;
-      margin-top: 1rem;
+padding: 1.4rem 1.35rem;
+margin-top: 1.8rem;
       border: 1px solid var(--border);
       box-shadow: var(--shadow);
     }
     h1{margin:0.25rem 0 0.5rem 0; font-size:2rem; letter-spacing:0.02em;}
-    h2{margin:1.1rem 0 0.5rem 0; font-size:1.15rem;}
-    p{color:var(--muted); margin:0.5rem 0;}
+h2{
+  margin:1.6rem 0 0.5rem 0;
+  font-size:1.2rem;
+  letter-spacing:0.01em;
+}
+p{
+  color:var(--muted);
+  margin:0.55rem 0;
+  max-width:70ch;
+}
     ul{margin:0.5rem 0 0 1.15rem; color:var(--muted);}
-    li{margin:0.35rem 0;}
+li{
+  margin:0.45rem 0;
+  line-height:1.5;
+}
     .topbar{
       display:flex; align-items:center; justify-content:space-between;
       gap:1rem; margin:0.25rem 0 0.75rem 0;
@@ -76,9 +87,11 @@
       font-size:0.88rem;
       margin:1.25rem 0 0.5rem 0;
     }
-    .divider{
-      height:1px; background:#111827; margin:0.9rem 0;
-    }
+.divider{
+  height:1px;
+  background:#111827;
+  margin:1.2rem 0 0.4rem 0;
+}
     code.inline{
       background:#111827;
       padding:0.15rem 0.4rem;
@@ -91,28 +104,21 @@
 </head>
 
 <body>
-  <div class="container">
-    <div class="topbar">
-      <div class="brand">
-        <div class="logo">Z</div>
-        <div>
-          <div style="font-weight:900;">ZenCards</div>
-          <div class="mutedSmall">Privacy Policy</div>
-        </div>
-      </div>
-      <span class="pill">Last updated: March 2026</span>
-    </div>
 
+  <p class="mutedSmall" style="text-align:right; margin-bottom:0.5rem;">
+  Last updated: March 2026
+</p>
     <div class="card">
-      <h1>Privacy Policy</h1>
+<h1 style="font-size:2.3rem; margin-bottom:0.4rem;">Privacy Policy</h1>
+<p class="mutedSmall" style="margin-top:0;">ZenCards</p>
       <p>
-        ZenCards (“we”, “us”, “our”) respects your privacy. This Privacy Policy explains what information we collect,
+        ZenCards respects your privacy. This Privacy Policy explains what information we collect,
         how we use it, and the choices you have.
       </p>
 
       <div class="divider"></div>
 
-      <h2>Summary (plain English)</h2>
+      <h2>Summary </h2>
       <ul>
         <li>We collect only what’s needed to run your account and provide the service.</li>
         <li>We do not sell your personal information.</li>
@@ -121,7 +127,7 @@
 
       <h2>Information we collect</h2>
       <p><strong>Account information:</strong> When you create an account, we may collect your email address and authentication identifiers.</p>
-      <p><strong>Subscription status:</strong> We store your subscription status (e.g., active/trialing) so we can unlock paid features.</p>
+      <p><strong>Subscription status:</strong> We store your subscription status so we can unlock paid features.</p>
       <p><strong>App usage data (limited):</strong> We may collect basic diagnostics (e.g., crash logs) to keep the app stable.</p>
 
       <h2>Information we do not collect</h2>
@@ -146,7 +152,7 @@
 
       <h2>Payments</h2>
       <p>
-        Subscriptions purchased through Apple are processed by Apple. We do not receive or store your full payment card details.
+        Subscriptions purchased through Apple are processed by Apple and Stripe. We do not receive or store your full payment card details.
       </p>
 
       <h2>Data retention</h2>
@@ -173,7 +179,7 @@
         Questions or requests: <a href="mailto:support@zencardstudy.com">support@zencardstudy.com</a>
       </p>
       <p class="mutedSmall">
-        If you need to include a company name, use your legal entity here (e.g., “ZenCards LLC”).
+    
       </p>
     </div>
 
@@ -182,6 +188,6 @@
       <span class="mutedSmall"> • </span>
       <a href="/privacy.html" style="color:inherit;">Privacy</a>
     </p>
-  </div>
+  </div> 
 </body>
 </html>
