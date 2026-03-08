@@ -71,7 +71,7 @@
   name="viewport"
   content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes, maximum-scale=5.0"
 />
-  <title>ZenCards — Hands-Free Flashcards (3-Day Free Trial)</title>
+<title>ZenCards — Audio Flashcards</title>
   <script>
     // Prevent double-tap to zoom on iOS
     (function() {
@@ -912,9 +912,9 @@ a:hover{
     </div>
 
     <div class="card hero" style="text-align:center;">
-      <h1 style="margin-top:0.25rem;">Sign in to access your decks and begin studying</h1>
-      <p class="muted" style="max-width:60ch;margin:0.35rem auto 0.25rem auto;font-size:0.95rem;">
-  ZenCards is free to download. ZenCards Pro features require a subscription after a 3-day free trial (if eligible).
+   <h1 style="margin-top:0.25rem;">Unlock ZenCards Pro</h1>
+<p class="muted" style="max-width:60ch;margin:0.35rem auto 0.25rem auto;font-size:0.95rem;">
+  Study with hands-free audio flashcards, synced decks, and Pro features across your devices.
 </p>
       <p class="muted" style="max-width:46ch;margin:0.5rem auto 0.75rem auto;">
       </p>
@@ -925,15 +925,21 @@ a:hover{
         </button>
       </div>
 
-      <div class="row" style="justify-content:center; margin-top:0.75rem;">
-  <button class="btn" id="startTrialBtn" type="button" style="max-width:360px;">
-    Start 3-Day Free Trial
-  </button>
+   <div id="priceBlock" style="margin-top:0.9rem; text-align:center;">
+  <div id="mainPriceLine" style="font-size:2rem; font-weight:900; color:#e5e7eb; line-height:1.1;">
+    Loading price…
+  </div>
+
+  <div id="trialDetailLine" class="muted" style="max-width:34rem; margin:0.5rem auto 0 auto; font-size:0.95rem; line-height:1.4;">
+    3-day free trial for eligible new subscribers. Auto-renews unless canceled.
+  </div>
 </div>
 
-<p class="muted" id="trialPriceLine" style="font-size:0.92rem; margin-top:0.6rem;">
-  Loading price…
-</p>
+<div class="row" style="justify-content:center; margin-top:0.9rem;">
+  <button class="btn" id="startTrialBtn" type="button" style="max-width:360px;">
+    Start Free Trial
+  </button>
+</div>
 
 <div class="row" style="justify-content:center; margin-top:0.5rem;">
   <button class="btn secondary small" id="restoreBtn" type="button">
@@ -958,9 +964,9 @@ a:hover{
     You can manage and cancel your subscription in your Apple ID account settings.
   </div>
 
-  <div class="muted" style="font-size:0.86rem;margin-top:0.4rem;">
-    Free trial is available to eligible new subscribers. Cancel anytime in Apple ID settings before the trial ends to avoid being charged.
-  </div>
+<div class="muted" style="font-size:0.86rem;margin-top:0.4rem;">
+Eligible new subscribers may receive a 3-day free trial. After the trial, ZenCards Pro renews automatically at the monthly subscription price unless canceled at least 24 hours before the end of the trial or current billing period.
+</div>
 
   <div class="muted" style="font-size:0.86rem;margin-top:0.55rem;">
     Privacy Policy:
@@ -1219,28 +1225,40 @@ function isNativeApp() {
 }
 
 async function loadPriceLine() {
-  const line = document.getElementById("trialPriceLine");
-  if (!line) return;
+  const main = document.getElementById("mainPriceLine");
+  const detail = document.getElementById("trialDetailLine");
+
+  if (!main || !detail) return;
 
   if (!isNativeApp() || !window.Capacitor?.Plugins?.IAPPlugin) {
-    line.textContent = "Subscriptions available in the iOS app.";
+    main.textContent = "Subscriptions available in the iOS app.";
+    detail.textContent = "";
     return;
   }
 
   try {
-const res = await window.Capacitor.Plugins.IAPPlugin.getProducts({
-  productIdentifiers: [PRODUCT_ID],
-});
+    const res = await window.Capacitor.Plugins.IAPPlugin.getProducts({
+      productIdentifiers: [PRODUCT_ID],
+    });
 
-const p =
-  res?.products?.find(x => (x.id || x.productId) === PRODUCT_ID) ||
-  res?.products?.[0];
-    line.textContent = p
-      ? `3 days free, then ${p.displayPrice} / month`
-      : "3 days free, then monthly (price loads after Apple approves the product)";
+    const p =
+      res?.products?.find(x => (x.id || x.productId) === PRODUCT_ID) ||
+      res?.products?.[0];
+
+    if (p?.displayPrice) {
+      main.textContent = `${p.displayPrice} / month`;
+      detail.textContent =
+        `3-day free trial for eligible new subscribers, then ${p.displayPrice} per month. Auto-renews unless canceled at least 24 hours before the end of the trial or current billing period.`;
+    } else {
+      main.textContent = "Monthly subscription";
+      detail.textContent =
+        "3-day free trial for eligible new subscribers. Auto-renews unless canceled.";
+    }
   } catch (e) {
     console.error(e);
-    line.textContent = "3 days free, then monthly";
+    main.textContent = "Monthly subscription";
+    detail.textContent =
+      "3-day free trial for eligible new subscribers. Auto-renews unless canceled.";
   }
 }
 
@@ -1284,7 +1302,8 @@ active_product_ids: Array.isArray(active_product_ids) ? active_product_ids : [],
 
 async function startTrialFlow() {
   const btn = document.getElementById("startTrialBtn");
-  const line = document.getElementById("trialPriceLine");
+const main = document.getElementById("mainPriceLine");
+const detail = document.getElementById("trialDetailLine");
 
   if (!isNativeApp()) {
     alert("Start your free trial from the iOS app.");
@@ -1299,7 +1318,8 @@ async function startTrialFlow() {
   btn.disabled = true;
   const oldText = btn.textContent;
   btn.textContent = "Starting…";
-  if (line) line.textContent = "Contacting Apple…";
+if (main) main.textContent = "Contacting Apple…";
+if (detail) detail.textContent = "Please wait while we connect to Apple.";
 
   try {
     const existingUser = await getUserOrNull();
@@ -1311,7 +1331,8 @@ async function startTrialFlow() {
       // reset UI before returning
       btn.disabled = false;
       btn.textContent = oldText;
-      if (line) line.textContent = "Create an account to start your free trial.";
+if (main) main.textContent = "Create an account first";
+if (detail) detail.textContent = "Then you can continue with your subscription purchase.";
       return;
     }
 
@@ -1329,7 +1350,7 @@ if (purchaseRes?.status === "already_owned" || purchaseRes?.status === "alreadyS
 
 // User canceled
 if (purchaseRes?.status === "cancelled") {
-  if (line) await loadPriceLine();
+  await loadPriceLine();
   return;
 }
 
@@ -1400,7 +1421,7 @@ window.location.replace("app.html");
   } catch (e) {
     console.error(e);
     alert(e?.message || "Could not start trial.");
-    if (line) line.textContent = "3 days free, then monthly";
+await loadPriceLine();
   } finally {
     btn.disabled = false;
     btn.textContent = oldText;
@@ -1511,18 +1532,16 @@ async function openManageSubscription() {
   // Show trial UI (it may already be visible in native)
   const startTrialBtn = document.getElementById("startTrialBtn");
   const restoreBtn = document.getElementById("restoreBtn");
-  const priceLine = document.getElementById("trialPriceLine");
+const mainPriceLine = document.getElementById("mainPriceLine");
+const trialDetailLine = document.getElementById("trialDetailLine");
 
   if (startTrialBtn) startTrialBtn.style.display = "";
   if (restoreBtn) restoreBtn.style.display = "";
-  if (priceLine) priceLine.style.display = "";
+
+if (mainPriceLine) mainPriceLine.style.display = "";
+if (trialDetailLine) trialDetailLine.style.display = "";
 
   // Show a clear message in the modal msg area (or add a new line under buttons)
-  const msg = document.getElementById("trialPriceLine");
-  if (msg) {
-    // Keep the price line behavior, but you can prepend clarity:
-    // (don’t overwrite if loadPriceLine will populate)
-  }
 }
 
 // Run once on load
@@ -1538,8 +1557,10 @@ const restoreBtn = document.getElementById("restoreBtn");
 if (!isNativeApp()) {
   if (startTrialBtn) startTrialBtn.style.display = "none";
   if (restoreBtn) restoreBtn.style.display = "none";
-  const line = document.getElementById("trialPriceLine");
-  if (line) line.style.display = "none";
+const main = document.getElementById("mainPriceLine");
+const detail = document.getElementById("trialDetailLine");
+if (main) main.style.display = "none";
+if (detail) detail.style.display = "none";
 } else {
   loadPriceLine();
   startTrialBtn?.addEventListener("click", startTrialFlow);
@@ -1713,9 +1734,8 @@ if (typeof pendingAfterAuth === "function") {
   window.location.replace("app.html");
   return;
 }
-
-    loginMsg.textContent =
-      "No active subscription found. Tap “Start 3-Day Free Trial” to unlock ZenCards Pro.";
+loginMsg.textContent =
+  "No active subscription found. Tap “Start Free Trial” to unlock ZenCards Pro.";
     loginMsg.className = "modalMsg error";
 
     setPaywallModeIfNeeded();
