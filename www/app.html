@@ -1492,13 +1492,12 @@ async function zcUpsertSubscriptionStatus({ userId, status }) {
 }
 
 // Returns true if Apple says we currently have entitlement
-async function zcHasAppleEntitlement() {
+async function zcGetAppleEntitlementInfo() {
   try {
-    // Must exist in your Capacitor plugin build
     const IAP = window.Capacitor?.Plugins?.IAPPlugin;
     if (!IAP || typeof IAP.getEntitlements !== "function") {
       console.warn("[IAP] IAPPlugin.getEntitlements not available");
-      return false;
+      return { ok: false, list: [], source: "missing_plugin" };
     }
 
     const ent = await IAP.getEntitlements();
@@ -1507,9 +1506,35 @@ async function zcHasAppleEntitlement() {
     const ok = list.includes(ZC_IAP_PRODUCT_ID);
 
     console.log("[IAP] entitlements:", { list, ok });
-    return ok;
+    return { ok, list, source: "apple" };
   } catch (e) {
     console.warn("[IAP] getEntitlements failed:", e);
+    return { ok: false, list: [], source: "error" };
+  }
+}
+
+async function zcHasServerSubscriptionAccess(userId) {
+  try {
+    const { data, error } = await window.supabaseClient
+      .from("subscriptions")
+      .select("status")
+      .eq("user_id", userId);
+
+    if (error) {
+      console.warn("[ACCESS] subscriptions lookup failed:", error);
+      return false;
+    }
+
+    const statuses = Array.isArray(data)
+      ? data.map(r => String(r?.status || "").toLowerCase())
+      : [];
+
+    const ok = statuses.some(s => s === "active" || s === "trialing");
+
+    console.log("[ACCESS] server statuses:", statuses, "ok =", ok);
+    return ok;
+  } catch (e) {
+    console.warn("[ACCESS] zcHasServerSubscriptionAccess crashed:", e);
     return false;
   }
 }
@@ -1520,29 +1545,34 @@ async function zcHasAppleEntitlement() {
 async function zcSyncEntitlementAndEnforceAccess() {
   if (!zcIsNative()) return true; // only enforce Apple IAP inside the iOS app
 
-  // Ensure we have a logged-in user first
   const { data: sessData } = await window.supabaseClient.auth.getSession();
   const user = sessData?.session?.user;
 
   if (!user) {
-    console.warn("[IAP] No session user; redirecting to index.html");
+    console.warn("[ACCESS] No session user; redirecting to index.html");
     window.location.replace("index.html");
     return false;
   }
 
-  const entitled = await zcHasAppleEntitlement();
+  // 1) First try Apple entitlement
+  const apple = await zcGetAppleEntitlementInfo();
 
-  if (entitled) {
+  if (apple.ok) {
     await zcUpsertSubscriptionStatus({ userId: user.id, status: "active" });
+    console.log("[ACCESS] allowed via Apple entitlement");
     return true;
   }
 
-  // Not entitled -> remove access
-  await zcUpsertSubscriptionStatus({ userId: user.id, status: "expired" });
+  // 2) Fallback to server-side subscription truth
+  const serverAccess = await zcHasServerSubscriptionAccess(user.id);
 
-  console.warn("[IAP] Not entitled -> signing out and redirecting");
-  try { await window.supabaseClient.auth.signOut(); } catch (_) {}
-  try { localStorage.removeItem("zencards-auth"); } catch (_) {}
+  if (serverAccess) {
+    console.log("[ACCESS] allowed via server subscription fallback");
+    return true;
+  }
+
+  // 3) Only deny if both Apple + server checks fail
+  console.warn("[ACCESS] denied: no Apple entitlement and no active server subscription");
   window.location.replace("index.html");
   return false;
 }
@@ -2089,28 +2119,17 @@ async function ensureSessionHealthy({ reason = "unknown", redirectOnFail = true 
     }
 
     const { data: userData, error: userErr } = await supabaseClient.auth.getUser();
-    if (userErr || !userData?.user) {
-      console.warn("[AUTH] ensureSessionHealthy: getUser failed", {
-        reason,
-        userErr: userErr ? { message: userErr.message, name: userErr.name, status: userErr.status } : null
-      });
+  if (userErr || !userData?.user) {
+  console.warn("[AUTH] ensureSessionHealthy: getUser failed", {
+    reason,
+    userErr: userErr ? { message: userErr.message, name: userErr.name, status: userErr.status } : null
+  });
 
-      // If the session is present but user lookup fails, it's usually a broken token state.
-      // Clear all Supabase auth tokens and force relogin.
-      try {
-        for (let i = localStorage.length - 1; i >= 0; i--) {
-          const k = localStorage.key(i);
-          if (k && (k.endsWith("-auth-token") || k === "zencards-auth")) {
-            localStorage.removeItem(k);
-          }
-        }
-      } catch (_) {}
-      try { await supabaseClient.auth.signOut(); } catch (_) {}
-
-      // Do not redirect to index.html on app version; show message instead
-      showSessionError("Session invalid or expired. Please log in again.");
-      return false;
-    }
+  // Do not destroy the session here.
+  // Let the app fail gracefully and show UI instead of forcibly signing out.
+  showSessionError("Session could not be verified. Please try again.");
+  return false;
+}
 
     // Good state: keep globals aligned
     currentUser = userData.user;
@@ -2171,6 +2190,8 @@ if (!session?.user) {
 }
 
 currentUser = session.user;
+
+console.log("[BOOT] session user before entitlement check:", currentUser?.id, currentUser?.email);
 
   // ✅ ENFORCE Apple entitlement before loading any app data
   const allowed = await zcSyncEntitlementAndEnforceAccess();
