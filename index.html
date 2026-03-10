@@ -135,6 +135,65 @@
   flex-wrap: wrap;
 }
 
+/* ===== App Store Download Banner ===== */
+.appDownloadBar{
+  width: 100%;
+  position: sticky;
+  top: 0;
+  z-index: 20000;
+  background: linear-gradient(135deg, rgba(34,197,94,0.96), rgba(22,163,74,0.96));
+  color: #020617;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.28);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.appDownloadBarInner{
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0.7rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  text-align: center;
+}
+
+.appDownloadBarText{
+  font-weight: 900;
+  font-size: 0.98rem;
+  line-height: 1.25;
+}
+
+.appStoreBadgeLink{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.appStoreBadge{
+  height: 40px;
+  width: auto;
+  display: block;
+}
+
+@media (max-width: 640px){
+  .appDownloadBarInner{
+    padding: 0.65rem 0.8rem;
+    gap: 0.55rem;
+  }
+
+  .appDownloadBarText{
+    font-size: 0.9rem;
+  }
+
+  .appStoreBadge{
+    height: 36px;
+  }
+}
+
 
     /* ===== Top-right user counter ===== */
 .userCounter{
@@ -680,6 +739,41 @@ a:hover{
   box-shadow: 0 0 0 3px rgba(16,185,129,0.10);
 }
 
+.heroCtaRow{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  align-items: center;
+}
+
+.btn.appStoreHero{
+  background: #020617;
+  color: #ffffff;
+  border: 1px solid rgba(148,163,184,0.2);
+  box-shadow: 0 10px 24px rgba(2,6,23,0.4);
+}
+
+.btn.appStoreHero:hover{
+  background: #0f172a;
+  color: #ffffff;
+}
+
+.btn.webTrialHero{
+  font-weight: 900;
+}
+
+@media (max-width: 640px){
+  .heroCtaRow{
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .heroCtaRow .btn{
+    width: 100%;
+  }
+}
+
 
     /* ===== Login Modal ===== */
     .modalOverlay{
@@ -938,6 +1032,29 @@ a:hover{
 </head>
 
 <body>
+
+  <!-- App Store Download Banner -->
+<div class="appDownloadBar">
+  <div class="appDownloadBarInner">
+    <div class="appDownloadBarText">
+      📱 ZenCards is now on the App Store
+    </div>
+
+    <a
+      class="appStoreBadgeLink"
+      href="https://apps.apple.com/us/app/zencards-audio-flashcards/id6756385422/"
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Download ZenCards on the App Store"
+    >
+      <img
+        class="appStoreBadge"
+        src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg"
+        alt="Download on the App Store"
+      />
+    </a>
+  </div>
+</div>
     <!-- Background Music -->
     <audio id="bgMusic" src="Zen-Meditation.mp3" loop preload="auto"></audio>
     <div style="text-align:center;font-size:0.7rem;color:#64748b;margin-top:0.5rem;opacity:0.6;">
@@ -988,6 +1105,22 @@ a:hover{
       <p>
         For dedicated full time students or working professionals taking some classes on the side who wish to have it all: an impressive GPA, strong finances, and an active social life, ZenCards is your solution.
       </p>
+
+      <div class="heroCtaRow">
+  <a
+    class="btn appStoreHero"
+    href="https://apps.apple.com/us/app/zencards-audio-flashcards/id6756385422/"
+    target="_blank"
+    rel="noopener noreferrer"
+    aria-label="Download ZenCards on the App Store"
+  >
+    Download on App Store
+  </a>
+
+  <button class="btn webTrialHero" id="heroStartTrialBtn" type="button">
+    Start Free Trial on Web
+  </button>
+</div>
       <!-- ===== Student pain strip (NEW) ===== -->
 <div class="painStrip">
   <div class="painTitle">
@@ -2654,6 +2787,9 @@ resetLoginButton();
 })();
 
 document.getElementById("startTrialTopBtn")
+  ?.addEventListener("click", () => window.startFreeTrial());
+
+  document.getElementById("heroStartTrialBtn")
   ?.addEventListener("click", () => window.startFreeTrial());
 
 // ✅ Robust fix for Back button / BFCache restoring stale auth state
