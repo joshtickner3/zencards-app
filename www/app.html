@@ -227,6 +227,18 @@ document.addEventListener('visibilitychange', function() {
   max-width: calc(100% - 28px);
 }
 
+.sharedDeckBadge{
+  display:inline-block;
+  margin-left:0.4rem;
+  padding:0.18rem 0.5rem;
+  border-radius:999px;
+  font-size:0.72rem;
+  font-weight:700;
+  background:rgba(34,197,94,0.12);
+  color:#86efac;
+  border:1px solid rgba(34,197,94,0.25);
+}
+
 .topUserBar .signedInLine {
   margin: 0 0 6px 0;
   font-size: 0.95rem;
@@ -881,6 +893,46 @@ input[type="number"]:focus-visible{
         <p style="font-size:0.8rem;color:#9ca3af;margin-top:0.35rem;">
   Legend: <em>Deck name (new / learning / <span class="dueCount">due today</span>)</em>
 </p>
+
+<div class="card" style="margin-top:0.85rem;">
+  <h3>Deck Sharing</h3>
+
+  <div class="row deckRow">
+    <div>
+      <label for="shareDeckCodeInput">Share code for selected deck:</label>
+      <input
+        id="shareDeckCodeInput"
+        type="text"
+        placeholder="No code yet"
+        readonly
+      />
+    </div>
+
+    <div style="flex:0 0 auto;">
+      <button id="generateShareCodeBtn" class="secondary">Generate Code</button>
+      <button id="disableShareCodeBtn" class="secondary">Disable Code</button>
+    </div>
+  </div>
+
+  <div class="row deckRow" style="margin-top:0.5rem;">
+    <div>
+      <label for="joinDeckCodeInput">Join shared deck by code:</label>
+      <input
+        id="joinDeckCodeInput"
+        type="text"
+        placeholder="Enter deck code"
+        autocapitalize="characters"
+        spellcheck="false"
+      />
+    </div>
+
+    <div style="flex:0 0 auto;">
+      <button id="joinDeckByCodeBtn">Join Deck</button>
+    </div>
+  </div>
+
+  <p id="deckSharingStatus" style="font-size:0.8rem;color:#9ca3af;margin-top:0.5rem;"></p>
+</div>
         <p id="deckCountsDisplay" style="font-size:0.8rem;color:#9ca3af;margin-top:0.25rem;"></p>
       </div>
 
@@ -1829,7 +1881,7 @@ function getCurrentState() {
     // threshold for "show again in this session" behavior
     const SHORT_REVIEW_THRESHOLD_MINUTES = 10;
 
-    function loadFromStorage() {
+  function loadFromStorage() {
   try {
     const d = localStorage.getItem("srsDecks");
     decks = d ? JSON.parse(d) : [];
@@ -1837,6 +1889,16 @@ function getCurrentState() {
     decks = [];
   }
   if (!Array.isArray(decks)) decks = [];
+
+  decks = decks.map(deck => ({
+    ownerUserId: null,
+    shareCode: null,
+    shareEnabled: false,
+    sharedWithMe: false,
+    sourceDeckId: null,
+    readOnly: false,
+    ...deck
+  }));
 
   try {
     const s = localStorage.getItem("srsSchedule");
@@ -1848,16 +1910,22 @@ function getCurrentState() {
 
   // ✅ Only create sample deck if NOT logged in
   if (decks.length === 0 && !currentUser) {
-    decks = [{
-      id: "deck1",
-      name: "Sample Deck",
-      qLang: "en-US",
-aLang: "en-US",
-      cards: [
-        { id: "c1", question: "What does DOMS stand for?", answer: "Delayed onset muscle soreness." },
-        { id: "c2", question: "In a dumbbell incline press, what area of the chest is emphasized?", answer: "The upper chest, especially the clavicular head of the pectoralis major." }
-      ]
-    }];
+  decks = [{
+  id: "deck1",
+  name: "Sample Deck",
+  qLang: "en-US",
+  aLang: "en-US",
+  ownerUserId: null,
+  shareCode: null,
+  shareEnabled: false,
+  sharedWithMe: false,
+  sourceDeckId: null,
+  readOnly: false,
+  cards: [
+    { id: "c1", question: "What does DOMS stand for?", answer: "Delayed onset muscle soreness." },
+    { id: "c2", question: "In a dumbbell incline press, what area of the chest is emphasized?", answer: "The upper chest, especially the clavicular head of the pectoralis major." }
+  ]
+}];
   }
 }
 
@@ -2520,6 +2588,11 @@ function updateEditDeckNameBtnState() {
 
 if (editDeckNameBtn) {
   editDeckNameBtn.addEventListener("click", () => {
+    if (isDeckReadOnly(selectedDeckId)) {
+      if (deckSharingStatus) deckSharingStatus.textContent = "Shared decks cannot be renamed.";
+      return;
+    }
+
     if (!selectedDeckId) return;
     const deck = getDeckById(selectedDeckId);
     if (!deck) return;
@@ -2544,6 +2617,13 @@ refreshDeckSelect = function() {
     const newDeckNameInput = document.getElementById("newDeckName");
     const addDeckBtn = document.getElementById("addDeckBtn");
     const deleteDeckBtn = document.getElementById("deleteDeckBtn");
+
+    const shareDeckCodeInput = document.getElementById("shareDeckCodeInput");
+const generateShareCodeBtn = document.getElementById("generateShareCodeBtn");
+const disableShareCodeBtn = document.getElementById("disableShareCodeBtn");
+const joinDeckCodeInput = document.getElementById("joinDeckCodeInput");
+const joinDeckByCodeBtn = document.getElementById("joinDeckByCodeBtn");
+const deckSharingStatus = document.getElementById("deckSharingStatus");
 
     // Disable/enable Add Deck button based on input
 function updateAddDeckButtonState() {
@@ -2622,6 +2702,70 @@ function refreshMoveDeckSelect() {
 
   if (moveCardBtn) {
     moveCardBtn.disabled = !selectedCardId || !hasOtherDeck;
+  }
+}
+
+function refreshDeckSharingUI() {
+  const deck = getDeckById(selectedDeckId);
+
+  if (!deck) {
+    if (shareDeckCodeInput) shareDeckCodeInput.value = "";
+    if (deckSharingStatus) deckSharingStatus.textContent = "";
+
+    if (generateShareCodeBtn) generateShareCodeBtn.disabled = true;
+    if (disableShareCodeBtn) disableShareCodeBtn.disabled = true;
+
+    if (editDeckNameBtn) editDeckNameBtn.disabled = true;
+    if (deleteDeckBtn) deleteDeckBtn.disabled = true;
+    if (addCardBtn) addCardBtn.disabled = true;
+    if (updateCardBtn) updateCardBtn.disabled = true;
+    if (moveCardBtn) moveCardBtn.disabled = true;
+
+    return;
+  }
+
+  const readOnly = !!deck.readOnly;
+
+  if (shareDeckCodeInput) {
+    shareDeckCodeInput.value = deck.shareEnabled && deck.shareCode ? deck.shareCode : "";
+  }
+
+  if (generateShareCodeBtn) {
+    generateShareCodeBtn.disabled = readOnly;
+  }
+
+  if (disableShareCodeBtn) {
+    disableShareCodeBtn.disabled = readOnly || !deck.shareEnabled || !deck.shareCode;
+  }
+
+  if (editDeckNameBtn) {
+    editDeckNameBtn.disabled = readOnly;
+  }
+
+  if (deleteDeckBtn) {
+    deleteDeckBtn.disabled = readOnly;
+  }
+
+  if (addCardBtn) {
+    addCardBtn.disabled = readOnly;
+  }
+
+  if (updateCardBtn) {
+    updateCardBtn.disabled = readOnly || !selectedCardId;
+  }
+
+  if (moveCardBtn) {
+    moveCardBtn.disabled = readOnly || !selectedCardId;
+  }
+
+  if (deckSharingStatus) {
+    if (readOnly) {
+      deckSharingStatus.textContent = "This is a shared deck. It is view-only.";
+    } else if (deck.shareEnabled && deck.shareCode) {
+      deckSharingStatus.textContent = "Anyone with an active ZenCards account and access can join this deck using the code above.";
+    } else {
+      deckSharingStatus.textContent = "Deck sharing is currently off for this deck.";
+    }
   }
 }
 
@@ -2752,6 +2896,32 @@ function getLastMode() {
     function getDeckById(id) {
       return decks.find(d => d.id === id) || null;
     }
+
+       function isDeckReadOnly(deckId) {
+  const deck = getDeckById(deckId);
+  return !!deck?.readOnly;
+}
+
+    function findDeckByShareCode(code) {
+  const normalized = String(code || "").trim().toUpperCase();
+  if (!normalized) return null;
+
+  return decks.find(deck =>
+    deck.shareEnabled &&
+    deck.shareCode &&
+    String(deck.shareCode).toUpperCase() === normalized
+  ) || null;
+}
+
+    function generateDeckShareCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let out = "";
+  for (let i = 0; i < 8; i++) {
+    out += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return out;
+}
+
     // ===== Languages for TTS dropdowns =====
 const ZC_LANGS = [
   ["en-US", "English (US)"],
@@ -2844,7 +3014,7 @@ function rebuildDeckUI() {
   refreshCardsList();
 }
 
-    function refreshDeckSelect() {
+  function refreshDeckSelect() {
   const currentValue = selectedDeckId;
   deckSelect.innerHTML = "";
 
@@ -2853,11 +3023,12 @@ function rebuildDeckUI() {
     opt.value = deck.id;
 
     const counts = getDeckPhaseCounts(deck);
-    opt.textContent = `${deck.name} (${counts.newCount}/${counts.learningCount}/${counts.dueTodayCount})`;
+    const sharedLabel = deck.readOnly ? " [Shared]" : "";
+    opt.textContent = `${deck.name}${sharedLabel} (${counts.newCount}/${counts.learningCount}/${counts.dueTodayCount})`;
+
     deckSelect.appendChild(opt);
   });
 
-  // ✅ Preserve previously selected deck if possible
   if (!selectedDeckId && decks.length > 0) {
     selectedDeckId = decks[0].id;
   }
@@ -2877,6 +3048,7 @@ function rebuildDeckUI() {
 
   refreshMoveDeckSelect();
   updateDeckCountsDisplay();
+  refreshDeckSharingUI();
 }
 
 function updateDeckCountsDisplay() {
@@ -3025,6 +3197,7 @@ window.speakCardText = function(questionRaw, answerRaw, deckId, cardObj) {
 
         function refreshCardsList() {
       const deck = getDeckById(selectedDeckId);
+        const readOnly = isDeckReadOnly(selectedDeckId);
       cardsListDiv.innerHTML = "";
       selectedCardId = null;
       selectedCardInfo.textContent = "";
@@ -3061,49 +3234,54 @@ window.speakCardText = function(questionRaw, answerRaw, deckId, cardObj) {
 });
         actionsDiv.appendChild(playBtn);
 
-        const editBtn = document.createElement("button");
-        editBtn.textContent = "Edit";
-        editBtn.className = "secondary small";
-        editBtn.addEventListener("click", () => {
-  selectedCardId = card.id;
-  cardQuestionInput.value = card.question;
-  cardAnswerInput.value = card.answer;
+      if (!readOnly) {
 
-  refreshCardLanguageDropdownsForCurrentDeck(card);
+  const editBtn = document.createElement("button");
+  editBtn.textContent = "Edit";
+  editBtn.className = "secondary small";
+  editBtn.addEventListener("click", () => {
+    selectedCardId = card.id;
+    cardQuestionInput.value = card.question;
+    cardAnswerInput.value = card.answer;
 
-  selectedCardInfo.textContent = ''; // Don't show card ID
-  updateCardBtn.disabled = false;
-  refreshMoveDeckSelect();
-});
+    refreshCardLanguageDropdownsForCurrentDeck(card);
 
-        actionsDiv.appendChild(editBtn);
+    selectedCardInfo.textContent = '';
+    updateCardBtn.disabled = false;
+    refreshMoveDeckSelect();
+  });
 
-        const deleteBtn = document.createElement("button");
-        deleteBtn.textContent = "Delete";
-        deleteBtn.className = "secondary small";
-        deleteBtn.addEventListener("click", () => {
-          if (!confirm("Delete this card?")) return;
-          const d = getDeckById(selectedDeckId);
-          if (!d) return;
-          const idx = d.cards.findIndex(c => c.id === card.id);
-          if (idx !== -1) {
-            d.cards.splice(idx, 1);
-          }
-          const key = scheduleKey(selectedDeckId, card.id);
-          delete schedule[key];
-          saveDecks();
-          saveSchedule();
-          if (selectedCardId === card.id) {
-            selectedCardId = null;
-            cardQuestionInput.value = "";
-            cardAnswerInput.value = "";
-            selectedCardInfo.textContent = "";
-            updateCardBtn.disabled = true;
-          }
-          refreshCardsList();
-          refreshDeckSelect();
-        });
-        actionsDiv.appendChild(deleteBtn);
+  actionsDiv.appendChild(editBtn);
+
+  const deleteBtn = document.createElement("button");
+  deleteBtn.textContent = "Delete";
+  deleteBtn.className = "secondary small";
+  deleteBtn.addEventListener("click", () => {
+    if (!confirm("Delete this card?")) return;
+    const d = getDeckById(selectedDeckId);
+    if (!d) return;
+    const idx = d.cards.findIndex(c => c.id === card.id);
+    if (idx !== -1) {
+      d.cards.splice(idx, 1);
+    }
+    const key = scheduleKey(selectedDeckId, card.id);
+    delete schedule[key];
+    saveDecks();
+    saveSchedule();
+    if (selectedCardId === card.id) {
+      selectedCardId = null;
+      cardQuestionInput.value = "";
+      cardAnswerInput.value = "";
+      selectedCardInfo.textContent = "";
+      updateCardBtn.disabled = true;
+    }
+    refreshCardsList();
+    refreshDeckSelect();
+  });
+
+  actionsDiv.appendChild(deleteBtn);
+
+}
 
         row.appendChild(actionsDiv);
         cardsListDiv.appendChild(row);
@@ -3126,7 +3304,19 @@ window.speakCardText = function(questionRaw, answerRaw, deckId, cardObj) {
 
   console.log("Creating deck:", { id, name });
 
- decks.push({ id, name, qLang: "en-US", aLang: "en-US", cards: [] });
+decks.push({
+  id,
+  name,
+  qLang: "en-US",
+  aLang: "en-US",
+  cards: [],
+  ownerUserId: currentUser?.id || null,
+  shareCode: null,
+  shareEnabled: false,
+  sharedWithMe: false,
+  sourceDeckId: null,
+  readOnly: false
+});
 
   console.log("Decks after push:", decks);
 
@@ -3142,31 +3332,139 @@ window.speakCardText = function(questionRaw, answerRaw, deckId, cardObj) {
   refreshCardsList();
 });
 
-    deleteDeckBtn.addEventListener("click", () => {
-      if (!selectedDeckId) return;
-      const deck = getDeckById(selectedDeckId);
-      if (!deck) return;
-      if (!confirm(`Delete deck "${deck.name}" and all its cards?`)) return;
+  deleteDeckBtn.addEventListener("click", () => {
+  if (isDeckReadOnly(selectedDeckId)) {
+    if (deckSharingStatus) deckSharingStatus.textContent = "Shared decks cannot be deleted.";
+    return;
+  }
 
-      decks = decks.filter(d => d.id !== selectedDeckId);
+  if (!selectedDeckId) return;
+  const deck = getDeckById(selectedDeckId);
+  if (!deck) return;
+  if (!confirm(`Delete deck "${deck.name}" and all its cards?`)) return;
+
+  decks = decks.filter(d => d.id !== selectedDeckId);
+  saveDecks();
+
+  const prefix = selectedDeckId + "_";
+  Object.keys(schedule).forEach(key => {
+    if (key.startsWith(prefix)) {
+      delete schedule[key];
+    }
+  });
+  saveSchedule();
+
+  if (decks.length > 0) {
+    selectedDeckId = decks[0].id;
+  } else {
+    selectedDeckId = null;
+  }
+  refreshDeckSelect();
+  refreshCardsList();
+});
+
+    if (generateShareCodeBtn) {
+  generateShareCodeBtn.addEventListener("click", () => {
+    const deck = getDeckById(selectedDeckId);
+    if (!deck) return;
+
+    if (isDeckReadOnly(selectedDeckId)) {
+      if (deckSharingStatus) deckSharingStatus.textContent = "Shared decks cannot generate codes.";
+      return;
+    }
+
+    deck.shareCode = generateDeckShareCode();
+    deck.shareEnabled = true;
+
+    saveDecks();
+    refreshDeckSharingUI();
+  });
+}
+if (disableShareCodeBtn) {
+  disableShareCodeBtn.addEventListener("click", () => {
+    const deck = getDeckById(selectedDeckId);
+    if (!deck) return;
+
+    if (isDeckReadOnly(selectedDeckId)) {
+      if (deckSharingStatus) deckSharingStatus.textContent = "Shared decks cannot change sharing settings.";
+      return;
+    }
+
+    deck.shareCode = null;
+    deck.shareEnabled = false;
+
+    saveDecks();
+    refreshDeckSharingUI();
+  });
+}
+
+if (joinDeckByCodeBtn) {
+  joinDeckByCodeBtn.addEventListener("click", () => {
+    const code = (joinDeckCodeInput?.value || "").trim().toUpperCase();
+    if (!code) {
+      if (deckSharingStatus) deckSharingStatus.textContent = "Enter a share code first.";
+      return;
+    }
+
+    const sourceDeck = findDeckByShareCode(code);
+    if (!sourceDeck) {
+      if (deckSharingStatus) deckSharingStatus.textContent = "Invalid share code.";
+      return;
+    }
+
+    const existingSharedDeck = decks.find(deck =>
+      deck.sharedWithMe &&
+      deck.sourceDeckId === sourceDeck.id
+    );
+
+    if (existingSharedDeck) {
+      existingSharedDeck.name = sourceDeck.name + " (Shared)";
+      existingSharedDeck.qLang = sourceDeck.qLang || "en-US";
+      existingSharedDeck.aLang = sourceDeck.aLang || "en-US";
+      existingSharedDeck.ownerUserId = sourceDeck.ownerUserId || null;
+      existingSharedDeck.cards = (sourceDeck.cards || []).map(card => ({ ...card }));
+
       saveDecks();
 
-      const prefix = selectedDeckId + "_";
-      Object.keys(schedule).forEach(key => {
-        if (key.startsWith(prefix)) {
-          delete schedule[key];
-        }
-      });
-      saveSchedule();
+      selectedDeckId = existingSharedDeck.id;
+      if (joinDeckCodeInput) joinDeckCodeInput.value = "";
 
-      if (decks.length > 0) {
-        selectedDeckId = decks[0].id;
-      } else {
-        selectedDeckId = null;
-      }
       refreshDeckSelect();
       refreshCardsList();
-    });
+      refreshDeckSharingUI();
+
+      if (deckSharingStatus) deckSharingStatus.textContent = "Shared deck refreshed.";
+      return;
+    }
+
+    const clonedDeck = {
+      id: "shared_" + Date.now(),
+      name: sourceDeck.name + " (Shared)",
+      qLang: sourceDeck.qLang || "en-US",
+      aLang: sourceDeck.aLang || "en-US",
+      ownerUserId: sourceDeck.ownerUserId || null,
+      shareCode: null,
+      shareEnabled: false,
+      sharedWithMe: true,
+      sourceDeckId: sourceDeck.id,
+      readOnly: true,
+      cards: (sourceDeck.cards || []).map(card => ({ ...card }))
+    };
+
+    decks.push(clonedDeck);
+    saveDecks();
+
+    selectedDeckId = clonedDeck.id;
+    if (joinDeckCodeInput) joinDeckCodeInput.value = "";
+
+    refreshDeckSelect();
+    refreshCardsList();
+    refreshDeckSharingUI();
+
+    if (deckSharingStatus) deckSharingStatus.textContent = "Shared deck added successfully.";
+  });
+}
+
 
     deckSelect.addEventListener("change", () => {
   selectedDeckId = deckSelect.value;
@@ -3174,53 +3472,69 @@ window.speakCardText = function(questionRaw, answerRaw, deckId, cardObj) {
   refreshCardsList();
   refreshCardLanguageDropdownsForCurrentDeck(null);
   updateDeckCountsDisplay();
+  refreshDeckSharingUI();
 });
 
-    addCardBtn.addEventListener("click", () => {
-      const q = cardQuestionInput.value.trim();
-      const a = cardAnswerInput.value.trim();
-      if (!q || !a) return;
-      const deck = getDeckById(selectedDeckId);
-      if (!deck) return;
-      const id = "c_" + Date.now();
-const qLang = cardQuestionLangSelect?.value || null;
-const aLang = cardAnswerLangSelect?.value || null;
+ addCardBtn.addEventListener("click", () => {
+  if (isDeckReadOnly(selectedDeckId)) {
+    if (deckSharingStatus) deckSharingStatus.textContent = "You cannot add cards to a shared deck.";
+    return;
+  }
 
-deck.cards.push({ id, question: q, answer: a, qLang, aLang });
+  const q = cardQuestionInput.value.trim();
+  const a = cardAnswerInput.value.trim();
+  if (!q || !a) return;
+  const deck = getDeckById(selectedDeckId);
+  if (!deck) return;
+  const id = "c_" + Date.now();
+  const qLang = cardQuestionLangSelect?.value || null;
+  const aLang = cardAnswerLangSelect?.value || null;
 
-      saveDecks();
-      cardQuestionInput.value = "";
-      cardAnswerInput.value = "";
-      selectedCardId = null;
-      selectedCardInfo.textContent = "";
-      updateCardBtn.disabled = true;
-      refreshCardsList();
-      refreshDeckSelect();
-    });
+  deck.cards.push({ id, question: q, answer: a, qLang, aLang });
 
-    updateCardBtn.addEventListener("click", () => {
-      if (!selectedCardId) return;
-      const q = cardQuestionInput.value.trim();
-      const a = cardAnswerInput.value.trim();
-      if (!q || !a) return;
-      const deck = getDeckById(selectedDeckId);
-      if (!deck) return;
-      const card = deck.cards.find(c => c.id === selectedCardId);
-      if (!card) return;
-      card.question = q;
-      card.qLang = cardQuestionLangSelect?.value || null;
-card.aLang = cardAnswerLangSelect?.value || null;
-      card.answer = a;
-      saveDecks();
-      refreshCardsList();
-      cardQuestionInput.value = "";
-      cardAnswerInput.value = "";
-      selectedCardId = null;
-      selectedCardInfo.textContent = "";
-      updateCardBtn.disabled = true;
-    });
-    if (moveCardBtn) {
+  saveDecks();
+  cardQuestionInput.value = "";
+  cardAnswerInput.value = "";
+  selectedCardId = null;
+  selectedCardInfo.textContent = "";
+  updateCardBtn.disabled = true;
+  refreshCardsList();
+  refreshDeckSelect();
+});
+
+ updateCardBtn.addEventListener("click", () => {
+  if (isDeckReadOnly(selectedDeckId)) {
+    if (deckSharingStatus) deckSharingStatus.textContent = "You cannot edit cards in a shared deck.";
+    return;
+  }
+
+  if (!selectedCardId) return;
+  const q = cardQuestionInput.value.trim();
+  const a = cardAnswerInput.value.trim();
+  if (!q || !a) return;
+  const deck = getDeckById(selectedDeckId);
+  if (!deck) return;
+  const card = deck.cards.find(c => c.id === selectedCardId);
+  if (!card) return;
+  card.question = q;
+  card.qLang = cardQuestionLangSelect?.value || null;
+  card.aLang = cardAnswerLangSelect?.value || null;
+  card.answer = a;
+  saveDecks();
+  refreshCardsList();
+  cardQuestionInput.value = "";
+  cardAnswerInput.value = "";
+  selectedCardId = null;
+  selectedCardInfo.textContent = "";
+  updateCardBtn.disabled = true;
+});
+  if (moveCardBtn) {
   moveCardBtn.addEventListener("click", () => {
+    if (isDeckReadOnly(selectedDeckId)) {
+      if (deckSharingStatus) deckSharingStatus.textContent = "You cannot move cards from a shared deck.";
+      return;
+    }
+
     if (!selectedCardId) return;
     const fromDeckId = selectedDeckId;
     const toDeckId = moveDeckSelect ? moveDeckSelect.value : null;
@@ -3235,11 +3549,9 @@ card.aLang = cardAnswerLangSelect?.value || null;
     const idx = fromDeck.cards.findIndex(c => c.id === selectedCardId);
     if (idx === -1) return;
 
-    // Move the card object
     const [movedCard] = fromDeck.cards.splice(idx, 1);
     toDeck.cards.push(movedCard);
 
-    // Move schedule entry (because key includes deckId)
     const oldKey = scheduleKey(fromDeckId, movedCard.id);
     const newKey = scheduleKey(toDeckId, movedCard.id);
 
@@ -3249,7 +3561,6 @@ card.aLang = cardAnswerLangSelect?.value || null;
       saveSchedule();
     }
 
-    // Persist + reset editor selection
     saveDecks();
 
     selectedCardId = null;
@@ -3259,7 +3570,7 @@ card.aLang = cardAnswerLangSelect?.value || null;
     updateCardBtn.disabled = true;
 
     refreshCardsList();
-    refreshDeckSelect();     // also refreshes move dropdown + counts
+    refreshDeckSelect();
   });
 }
 
@@ -5485,6 +5796,10 @@ if (addCardModal) {
 // Save card into CURRENT deck
 if (addCardModalSaveBtn) {
   addCardModalSaveBtn.addEventListener("click", () => {
+    if (isDeckReadOnly(currentDeckId)) {
+  if (addCardModalStatus) addCardModalStatus.textContent = "You cannot add cards to a shared deck.";
+  return;
+}
     const q = (addCardModalQuestion?.value || "").trim();
     const a = (addCardModalAnswer?.value || "").trim();
 
@@ -5500,8 +5815,8 @@ if (addCardModalSaveBtn) {
     }
 
     const id = "c_" + Date.now();
-const qLang = cardQuestionLangSelect?.value || null;
-const aLang = cardAnswerLangSelect?.value || null;
+const qLang = addCardModalQuestionLangSelect?.value || null;
+const aLang = addCardModalAnswerLangSelect?.value || null;
 
 deck.cards.push({ id, question: q, answer: a, qLang, aLang });
 
@@ -5570,6 +5885,10 @@ document.addEventListener("keydown", (e) => {
     });
 
     silentSaveEditBtn.addEventListener("click", () => {
+      if (isDeckReadOnly(currentDeckId)) {
+  setStatus("You cannot edit cards in a shared deck.");
+  return;
+}
       if (!currentCard) return;
       const q = silentEditQuestion.value.trim();
       const a = silentEditAnswer.value.trim();
@@ -5650,6 +5969,10 @@ setCardContent(voiceAnswerText, currentCard.answer);
     });
 
     voiceSaveEditBtn.addEventListener("click", () => {
+      if (isDeckReadOnly(currentDeckId)) {
+  setStatus("You cannot edit cards in a shared deck.");
+  return;
+}
       if (!currentCard) return;
       const q = voiceEditQuestion.value.trim();
       const a = voiceEditAnswer.value.trim();
