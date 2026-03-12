@@ -899,10 +899,11 @@ input[type="number"]:focus-visible{
       />
     </div>
 
-    <div style="flex:0 0 auto;">
-      <button id="generateShareCodeBtn" class="secondary">Generate Code</button>
-      <button id="disableShareCodeBtn" class="secondary">Disable Code</button>
-    </div>
+<div style="flex:0 0 auto;">
+  <button id="generateShareCodeBtn" class="secondary">Generate Code</button>
+  <button id="disableShareCodeBtn" class="secondary">Disable Code</button>
+  <button id="refreshSharedDeckBtn" class="secondary">Refresh Shared Deck</button>
+</div>
   </div>
 
   <div class="row deckRow" style="margin-top:0.5rem;">
@@ -2565,9 +2566,10 @@ refreshDeckSelect = function() {
     const addDeckBtn = document.getElementById("addDeckBtn");
     const deleteDeckBtn = document.getElementById("deleteDeckBtn");
 
-    const shareDeckCodeInput = document.getElementById("shareDeckCodeInput");
+const shareDeckCodeInput = document.getElementById("shareDeckCodeInput");
 const generateShareCodeBtn = document.getElementById("generateShareCodeBtn");
 const disableShareCodeBtn = document.getElementById("disableShareCodeBtn");
+const refreshSharedDeckBtn = document.getElementById("refreshSharedDeckBtn");
 const joinDeckCodeInput = document.getElementById("joinDeckCodeInput");
 const joinDeckByCodeBtn = document.getElementById("joinDeckByCodeBtn");
 const deckSharingStatus = document.getElementById("deckSharingStatus");
@@ -2655,21 +2657,22 @@ function refreshMoveDeckSelect() {
 function refreshDeckSharingUI() {
   const deck = getDeckById(selectedDeckId);
 
-  if (!deck) {
-    if (shareDeckCodeInput) shareDeckCodeInput.value = "";
-    if (deckSharingStatus) deckSharingStatus.textContent = "";
+if (!deck) {
+  if (shareDeckCodeInput) shareDeckCodeInput.value = "";
+  if (deckSharingStatus) deckSharingStatus.textContent = "";
 
-    if (generateShareCodeBtn) generateShareCodeBtn.disabled = true;
-    if (disableShareCodeBtn) disableShareCodeBtn.disabled = true;
+  if (generateShareCodeBtn) generateShareCodeBtn.disabled = true;
+  if (disableShareCodeBtn) disableShareCodeBtn.disabled = true;
+  if (refreshSharedDeckBtn) refreshSharedDeckBtn.disabled = true;
 
-    if (editDeckNameBtn) editDeckNameBtn.disabled = true;
-    if (deleteDeckBtn) deleteDeckBtn.disabled = true;
-    if (addCardBtn) addCardBtn.disabled = true;
-    if (updateCardBtn) updateCardBtn.disabled = true;
-    if (moveCardBtn) moveCardBtn.disabled = true;
+  if (editDeckNameBtn) editDeckNameBtn.disabled = true;
+  if (deleteDeckBtn) deleteDeckBtn.disabled = true;
+  if (addCardBtn) addCardBtn.disabled = true;
+  if (updateCardBtn) updateCardBtn.disabled = true;
+  if (moveCardBtn) moveCardBtn.disabled = true;
 
-    return;
-  }
+  return;
+}
 
   const readOnly = !!deck.readOnly;
 
@@ -2684,6 +2687,10 @@ function refreshDeckSharingUI() {
   if (disableShareCodeBtn) {
     disableShareCodeBtn.disabled = readOnly || !deck.shareEnabled || !deck.shareCode;
   }
+
+  if (refreshSharedDeckBtn) {
+  refreshSharedDeckBtn.disabled = !deck.sharedWithMe || !deck.sourceDeckId;
+}
 
   if (editDeckNameBtn) {
     editDeckNameBtn.disabled = readOnly;
@@ -2705,15 +2712,15 @@ function refreshDeckSharingUI() {
     moveCardBtn.disabled = readOnly || !selectedCardId;
   }
 
-  if (deckSharingStatus) {
-    if (readOnly) {
-      deckSharingStatus.textContent = "This is a shared deck. It is view-only.";
-    } else if (deck.shareEnabled && deck.shareCode) {
-      deckSharingStatus.textContent = "Anyone with an active ZenCards account and access can join this deck using the code above.";
-    } else {
-      deckSharingStatus.textContent = "Deck sharing is currently off for this deck.";
-    }
+if (deckSharingStatus) {
+  if (readOnly) {
+    deckSharingStatus.textContent = "This is a shared deck. It is view-only. Tap Refresh Shared Deck to pull the latest version.";
+  } else if (deck.shareEnabled && deck.shareCode) {
+    deckSharingStatus.textContent = "Anyone with an active ZenCards account and access can join this deck using the code above.";
+  } else {
+    deckSharingStatus.textContent = "Deck sharing is currently off for this deck.";
   }
+}
 }
 
     // ================= IMAGE INSERT HELPERS =================
@@ -2858,6 +2865,25 @@ function findDeckByShareCode(code) {
     deck.shareCode &&
     String(deck.shareCode).toUpperCase() === normalized
   ) || null;
+}
+
+function refreshSharedDeckFromSource(sharedDeck) {
+  if (!sharedDeck || !sharedDeck.sharedWithMe || !sharedDeck.sourceDeckId) {
+    return false;
+  }
+
+  const sourceDeck = getDeckById(sharedDeck.sourceDeckId);
+  if (!sourceDeck) {
+    return false;
+  }
+
+  sharedDeck.name = sourceDeck.name + " (Shared)";
+  sharedDeck.qLang = sourceDeck.qLang || "en-US";
+  sharedDeck.aLang = sourceDeck.aLang || "en-US";
+  sharedDeck.ownerUserId = sourceDeck.ownerUserId || null;
+  sharedDeck.cards = (sourceDeck.cards || []).map(card => ({ ...card }));
+
+  return true;
 }
 
     function generateDeckShareCode() {
@@ -3347,6 +3373,32 @@ if (disableShareCodeBtn) {
   });
 }
 
+if (refreshSharedDeckBtn) {
+  refreshSharedDeckBtn.addEventListener("click", () => {
+    const deck = getDeckById(selectedDeckId);
+    if (!deck) return;
+
+    if (!deck.sharedWithMe || !deck.sourceDeckId) {
+      if (deckSharingStatus) deckSharingStatus.textContent = "This is not a shared deck.";
+      return;
+    }
+
+    const refreshed = refreshSharedDeckFromSource(deck);
+
+    if (!refreshed) {
+      if (deckSharingStatus) deckSharingStatus.textContent = "Could not refresh this shared deck.";
+      return;
+    }
+
+    saveDecks();
+    refreshDeckSelect();
+    refreshCardsList();
+    refreshDeckSharingUI();
+
+    if (deckSharingStatus) deckSharingStatus.textContent = "Shared deck refreshed.";
+  });
+}
+
 if (joinDeckByCodeBtn) {
   joinDeckByCodeBtn.addEventListener("click", () => {
     const code = (joinDeckCodeInput?.value || "").trim().toUpperCase();
@@ -3366,25 +3418,21 @@ if (joinDeckByCodeBtn) {
       deck.sourceDeckId === sourceDeck.id
     );
 
-    if (existingSharedDeck) {
-      existingSharedDeck.name = sourceDeck.name + " (Shared)";
-      existingSharedDeck.qLang = sourceDeck.qLang || "en-US";
-      existingSharedDeck.aLang = sourceDeck.aLang || "en-US";
-      existingSharedDeck.ownerUserId = sourceDeck.ownerUserId || null;
-      existingSharedDeck.cards = (sourceDeck.cards || []).map(card => ({ ...card }));
+  if (existingSharedDeck) {
+  refreshSharedDeckFromSource(existingSharedDeck);
 
-      saveDecks();
+  saveDecks();
 
-      selectedDeckId = existingSharedDeck.id;
-      if (joinDeckCodeInput) joinDeckCodeInput.value = "";
+  selectedDeckId = existingSharedDeck.id;
+  if (joinDeckCodeInput) joinDeckCodeInput.value = "";
 
-      refreshDeckSelect();
-      refreshCardsList();
-      refreshDeckSharingUI();
+  refreshDeckSelect();
+  refreshCardsList();
+  refreshDeckSharingUI();
 
-      if (deckSharingStatus) deckSharingStatus.textContent = "Shared deck refreshed.";
-      return;
-    }
+  if (deckSharingStatus) deckSharingStatus.textContent = "Shared deck refreshed.";
+  return;
+}
 
     const clonedDeck = {
       id: "shared_" + Date.now(),
