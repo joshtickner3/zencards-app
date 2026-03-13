@@ -3050,8 +3050,7 @@ function rebuildDeckUI() {
     opt.value = deck.id;
 
     const counts = getDeckPhaseCounts(deck);
-    const sharedLabel = deck.readOnly ? " [Shared]" : "";
-    opt.textContent = `${deck.name}${sharedLabel} (${counts.newCount}/${counts.learningCount}/${counts.dueTodayCount})`;
+opt.textContent = `${deck.name} (${counts.newCount}/${counts.learningCount}/${counts.dueTodayCount})`;
 
     deckSelect.appendChild(opt);
   });
