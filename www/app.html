@@ -1998,13 +1998,16 @@ async function queueSaveToSupabase() {
 }
 
 
-  function saveDecks() {
+function saveDecks() {
   console.log("💾 saveDecks() firing. decks.length =", decks.length);
 
   localStorage.setItem("srsDecks", JSON.stringify(decks));
 
-  // THIS is the critical wiring line:
- queueSaveToSupabase().catch(e => console.error("❌ queueSaveToSupabase rejected:", e));
+  queueSaveToSupabase().catch(e => console.error("❌ queueSaveToSupabase rejected:", e));
+
+  publishAllOwnedSharedDecks().catch(e =>
+    console.error("❌ publishAllOwnedSharedDecks rejected:", e)
+  );
 }
 
 
@@ -2935,6 +2938,25 @@ async function upsertSharedDeckToSupabase(deck) {
   }
 
   return { ok: true };
+}
+
+async function publishAllOwnedSharedDecks() {
+  if (!currentUser) return;
+
+  const ownedSharedDecks = decks.filter(deck =>
+    !deck.readOnly &&
+    !deck.sharedWithMe &&
+    deck.shareEnabled &&
+    deck.shareCode &&
+    deck.ownerUserId === currentUser.id
+  );
+
+  for (const deck of ownedSharedDecks) {
+    const result = await upsertSharedDeckToSupabase(deck);
+    if (!result.ok) {
+      console.error("[SHARE] auto-publish failed for deck:", deck.name, result.error);
+    }
+  }
 }
 
 async function disableSharedDeckInSupabase(deck) {
