@@ -2714,9 +2714,9 @@ if (!deck) {
 
 if (deckSharingStatus) {
   if (readOnly) {
-    deckSharingStatus.textContent = "This is a shared deck. It is view-only. Tap Refresh Shared Deck to pull the latest version.";
+    deckSharingStatus.textContent = "This is a shared deck. It is view-only. Tap Refresh Shared Deck to pull the latest online version.";
   } else if (deck.shareEnabled && deck.shareCode) {
-    deckSharingStatus.textContent = "Anyone with an active ZenCards account and access can join this deck using the code above.";
+    deckSharingStatus.textContent = "Anyone with this code can join this deck from another account.";
   } else {
     deckSharingStatus.textContent = "Deck sharing is currently off for this deck.";
   }
@@ -2856,32 +2856,86 @@ function getLastMode() {
   return !!deck?.readOnly;
 }
 
-function findDeckByShareCode(code) {
+async function upsertSharedDeckToSupabase(deck) {
+  if (!deck?.shareCode || !currentUser) {
+    return { ok: false, error: "Missing deck/shareCode/currentUser" };
+  }
+
+  const payload = {
+    share_code: String(deck.shareCode).trim().toUpperCase(),
+    owner_user_id: currentUser.id,
+    source_deck_id: deck.id,
+    deck_name: deck.name,
+    q_lang: deck.qLang || "en-US",
+    a_lang: deck.aLang || "en-US",
+    cards_json: deck.cards || [],
+    is_active: !!deck.shareEnabled
+  };
+
+  const { error } = await supabaseClient
+    .from("shared_decks")
+    .upsert(payload, { onConflict: "share_code" });
+
+  if (error) {
+    console.error("[SHARE] upsert failed:", error);
+    return { ok: false, error };
+  }
+
+  return { ok: true };
+}
+
+async function disableSharedDeckInSupabase(deck) {
+  if (!deck?.shareCode || !currentUser) {
+    return { ok: false, error: "Missing deck/shareCode/currentUser" };
+  }
+
+  const { error } = await supabaseClient
+    .from("shared_decks")
+    .update({ is_active: false })
+    .eq("share_code", String(deck.shareCode).trim().toUpperCase())
+    .eq("owner_user_id", currentUser.id);
+
+  if (error) {
+    console.error("[SHARE] disable failed:", error);
+    return { ok: false, error };
+  }
+
+  return { ok: true };
+}
+
+async function findSharedDeckByCodeRemote(code) {
   const normalized = String(code || "").trim().toUpperCase();
   if (!normalized) return null;
 
-  return decks.find(deck =>
-    deck.shareEnabled &&
-    deck.shareCode &&
-    String(deck.shareCode).toUpperCase() === normalized
-  ) || null;
+  const { data, error } = await supabaseClient
+    .from("shared_decks")
+    .select("*")
+    .eq("share_code", normalized)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[SHARE] find by code failed:", error);
+    return null;
+  }
+
+  return data || null;
 }
 
-function refreshSharedDeckFromSource(sharedDeck) {
-  if (!sharedDeck || !sharedDeck.sharedWithMe || !sharedDeck.sourceDeckId) {
-    return false;
-  }
+async function refreshSharedDeckFromSupabase(sharedDeck) {
+  if (!sharedDeck?.shareCode) return false;
 
-  const sourceDeck = getDeckById(sharedDeck.sourceDeckId);
-  if (!sourceDeck) {
-    return false;
-  }
+  const remote = await findSharedDeckByCodeRemote(sharedDeck.shareCode);
+  if (!remote) return false;
 
-  sharedDeck.name = sourceDeck.name + " (Shared)";
-  sharedDeck.qLang = sourceDeck.qLang || "en-US";
-  sharedDeck.aLang = sourceDeck.aLang || "en-US";
-  sharedDeck.ownerUserId = sourceDeck.ownerUserId || null;
-  sharedDeck.cards = (sourceDeck.cards || []).map(card => ({ ...card }));
+  sharedDeck.name = (remote.deck_name || "Shared Deck") + " (Shared)";
+  sharedDeck.qLang = remote.q_lang || "en-US";
+  sharedDeck.aLang = remote.a_lang || "en-US";
+  sharedDeck.ownerUserId = remote.owner_user_id || null;
+  sharedDeck.sourceDeckId = remote.source_deck_id || null;
+  sharedDeck.cards = Array.isArray(remote.cards_json)
+    ? remote.cards_json.map(card => ({ ...card }))
+    : [];
 
   return true;
 }
@@ -3337,8 +3391,8 @@ decks.push({
   refreshCardsList();
 });
 
-    if (generateShareCodeBtn) {
-  generateShareCodeBtn.addEventListener("click", () => {
+  if (generateShareCodeBtn) {
+  generateShareCodeBtn.addEventListener("click", async () => {
     const deck = getDeckById(selectedDeckId);
     if (!deck) return;
 
@@ -3351,12 +3405,20 @@ decks.push({
     deck.shareEnabled = true;
 
     saveDecks();
+
+    const result = await upsertSharedDeckToSupabase(deck);
+    if (!result.ok) {
+      if (deckSharingStatus) deckSharingStatus.textContent = "Code created locally, but failed to publish online.";
+      return;
+    }
+
     refreshDeckSharingUI();
+    if (deckSharingStatus) deckSharingStatus.textContent = "Deck sharing code generated and published.";
   });
 }
 
 if (disableShareCodeBtn) {
-  disableShareCodeBtn.addEventListener("click", () => {
+  disableShareCodeBtn.addEventListener("click", async () => {
     const deck = getDeckById(selectedDeckId);
     if (!deck) return;
 
@@ -3365,28 +3427,45 @@ if (disableShareCodeBtn) {
       return;
     }
 
-    deck.shareCode = null;
-    deck.shareEnabled = false;
+    const oldCode = deck.shareCode;
 
+    deck.shareEnabled = false;
+    saveDecks();
+
+    const result = await disableSharedDeckInSupabase({
+      ...deck,
+      shareCode: oldCode
+    });
+
+    if (!result.ok) {
+      if (deckSharingStatus) deckSharingStatus.textContent = "Failed to disable online share code.";
+      return;
+    }
+
+    deck.shareCode = null;
     saveDecks();
     refreshDeckSharingUI();
+
+    if (deckSharingStatus) deckSharingStatus.textContent = "Deck sharing disabled.";
   });
 }
 
 if (refreshSharedDeckBtn) {
-  refreshSharedDeckBtn.addEventListener("click", () => {
+  refreshSharedDeckBtn.addEventListener("click", async () => {
     const deck = getDeckById(selectedDeckId);
     if (!deck) return;
 
-    if (!deck.sharedWithMe || !deck.sourceDeckId) {
+    if (!deck.sharedWithMe || !deck.shareCode) {
       if (deckSharingStatus) deckSharingStatus.textContent = "This is not a shared deck.";
       return;
     }
 
-    const refreshed = refreshSharedDeckFromSource(deck);
+    const refreshed = await refreshSharedDeckFromSupabase(deck);
 
     if (!refreshed) {
-      if (deckSharingStatus) deckSharingStatus.textContent = "Could not refresh this shared deck.";
+      if (deckSharingStatus) {
+        deckSharingStatus.textContent = "Could not refresh this shared deck from Supabase.";
+      }
       return;
     }
 
@@ -3400,52 +3479,61 @@ if (refreshSharedDeckBtn) {
 }
 
 if (joinDeckByCodeBtn) {
-  joinDeckByCodeBtn.addEventListener("click", () => {
+  joinDeckByCodeBtn.addEventListener("click", async () => {
     const code = (joinDeckCodeInput?.value || "").trim().toUpperCase();
     if (!code) {
       if (deckSharingStatus) deckSharingStatus.textContent = "Enter a share code first.";
       return;
     }
 
-    const sourceDeck = findDeckByShareCode(code);
+    const sourceDeck = await findSharedDeckByCodeRemote(code);
     if (!sourceDeck) {
-      if (deckSharingStatus) deckSharingStatus.textContent = "Invalid share code.";
+      if (deckSharingStatus) {
+        deckSharingStatus.textContent = "Invalid share code.";
+      }
       return;
     }
 
     const existingSharedDeck = decks.find(deck =>
       deck.sharedWithMe &&
-      deck.sourceDeckId === sourceDeck.id
+      deck.shareCode === sourceDeck.share_code
     );
 
-  if (existingSharedDeck) {
-  refreshSharedDeckFromSource(existingSharedDeck);
+    if (existingSharedDeck) {
+      const refreshed = await refreshSharedDeckFromSupabase(existingSharedDeck);
 
-  saveDecks();
+      if (!refreshed) {
+        if (deckSharingStatus) deckSharingStatus.textContent = "Could not refresh shared deck.";
+        return;
+      }
 
-  selectedDeckId = existingSharedDeck.id;
-  if (joinDeckCodeInput) joinDeckCodeInput.value = "";
+      saveDecks();
 
-  refreshDeckSelect();
-  refreshCardsList();
-  refreshDeckSharingUI();
+      selectedDeckId = existingSharedDeck.id;
+      if (joinDeckCodeInput) joinDeckCodeInput.value = "";
 
-  if (deckSharingStatus) deckSharingStatus.textContent = "Shared deck refreshed.";
-  return;
-}
+      refreshDeckSelect();
+      refreshCardsList();
+      refreshDeckSharingUI();
+
+      if (deckSharingStatus) deckSharingStatus.textContent = "Shared deck refreshed.";
+      return;
+    }
 
     const clonedDeck = {
       id: "shared_" + Date.now(),
-      name: sourceDeck.name + " (Shared)",
-      qLang: sourceDeck.qLang || "en-US",
-      aLang: sourceDeck.aLang || "en-US",
-      ownerUserId: sourceDeck.ownerUserId || null,
-      shareCode: null,
+      name: (sourceDeck.deck_name || "Shared Deck") + " (Shared)",
+      qLang: sourceDeck.q_lang || "en-US",
+      aLang: sourceDeck.a_lang || "en-US",
+      ownerUserId: sourceDeck.owner_user_id || null,
+      shareCode: sourceDeck.share_code || null,
       shareEnabled: false,
       sharedWithMe: true,
-      sourceDeckId: sourceDeck.id,
+      sourceDeckId: sourceDeck.source_deck_id || null,
       readOnly: true,
-      cards: (sourceDeck.cards || []).map(card => ({ ...card }))
+      cards: Array.isArray(sourceDeck.cards_json)
+        ? sourceDeck.cards_json.map(card => ({ ...card }))
+        : []
     };
 
     decks.push(clonedDeck);
