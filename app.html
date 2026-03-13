@@ -2895,10 +2895,15 @@ async function publishAllOwnedSharedDecks() {
     !deck.sharedWithMe &&
     deck.shareEnabled &&
     deck.shareCode &&
-    deck.ownerUserId === currentUser.id
+    (!deck.ownerUserId || deck.ownerUserId === currentUser.id)
   );
 
   for (const deck of ownedSharedDecks) {
+    // heal old decks that never had ownerUserId set
+    if (!deck.ownerUserId) {
+      deck.ownerUserId = currentUser.id;
+    }
+
     const result = await upsertSharedDeckToSupabase(deck);
     if (!result.ok) {
       console.error("[SHARE] auto-publish failed for deck:", deck.name, result.error);
@@ -3381,15 +3386,38 @@ decks.push({
   refreshCardsList();
 });
 
-    deleteDeckBtn.addEventListener("click", () => {
-  if (isDeckReadOnly(selectedDeckId)) {
-    if (deckSharingStatus) deckSharingStatus.textContent = "Shared decks cannot be deleted.";
+  deleteDeckBtn.addEventListener("click", () => {
+  if (!selectedDeckId) return;
+
+  const deck = getDeckById(selectedDeckId);
+  if (!deck) return;
+
+  const isViewerSharedCopy = !!deck.readOnly && !!deck.sharedWithMe;
+
+  if (isViewerSharedCopy) {
+    if (!confirm(`Remove shared deck "${deck.name}" from this account?`)) return;
+
+    decks = decks.filter(d => d.id !== selectedDeckId);
+    saveDecks();
+
+    const prefix = selectedDeckId + "_";
+    Object.keys(schedule).forEach(key => {
+      if (key.startsWith(prefix)) delete schedule[key];
+    });
+    saveSchedule();
+
+    selectedDeckId = decks.length ? decks[0].id : null;
+    refreshDeckSelect();
+    refreshCardsList();
+    refreshDeckSharingUI();
     return;
   }
 
-  if (!selectedDeckId) return;
-  const deck = getDeckById(selectedDeckId);
-  if (!deck) return;
+  if (isDeckReadOnly(selectedDeckId)) {
+    if (deckSharingStatus) deckSharingStatus.textContent = "This deck cannot be deleted.";
+    return;
+  }
+
   if (!confirm(`Delete deck "${deck.name}" and all its cards?`)) return;
 
   decks = decks.filter(d => d.id !== selectedDeckId);
@@ -3397,19 +3425,14 @@ decks.push({
 
   const prefix = selectedDeckId + "_";
   Object.keys(schedule).forEach(key => {
-    if (key.startsWith(prefix)) {
-      delete schedule[key];
-    }
+    if (key.startsWith(prefix)) delete schedule[key];
   });
   saveSchedule();
 
-  if (decks.length > 0) {
-    selectedDeckId = decks[0].id;
-  } else {
-    selectedDeckId = null;
-  }
+  selectedDeckId = decks.length ? decks[0].id : null;
   refreshDeckSelect();
   refreshCardsList();
+  refreshDeckSharingUI();
 });
 
   if (generateShareCodeBtn) {
@@ -3424,6 +3447,7 @@ decks.push({
 
     deck.shareCode = generateDeckShareCode();
     deck.shareEnabled = true;
+    deck.ownerUserId = currentUser.id;
 
     saveDecks();
 
