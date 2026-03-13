@@ -2751,10 +2751,11 @@ if (!deck) {
   if (editDeckNameBtn) {
     editDeckNameBtn.disabled = readOnly;
   }
-
-  if (deleteDeckBtn) {
-    deleteDeckBtn.disabled = readOnly;
-  }
+  
+if (deleteDeckBtn) {
+  const isViewerSharedCopy = !!deck.readOnly && !!deck.sharedWithMe;
+  deleteDeckBtn.disabled = !deck || (deck.readOnly && !isViewerSharedCopy);
+}
 
   if (addCardBtn) {
     addCardBtn.disabled = readOnly;
